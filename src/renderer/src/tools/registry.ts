@@ -1,14 +1,21 @@
 /**
  * The tool host's registry. A tool is a module with an id, a title and a view
- * over the open world; later phases add the entity kinds it edits and its
- * commands (docs/PLAN.md §2). Tools never touch the file system: they read and
- * write the world through the shared model, via the preload API.
+ * over the open world. Tools never touch the file system: they read the world
+ * from the snapshot main pushes, and change it through window.malevo.world,
+ * where every edit is unsaved until the user saves.
  */
 import type { ComponentType } from 'react'
-import type { WorldInfo } from '../../../shared/types'
+import type { WorldInfo, WorldSnapshot } from '../../../shared/types'
 
 export interface ToolProps {
   world: WorldInfo
+  snapshot: WorldSnapshot
+  /** The global current date (universal seconds), shared by every tool. */
+  now: number
+  setNow(t: number): void
+  /** The calendar dates are shown in. */
+  displayCal: string | null
+  setDisplayCal(id: string): void
 }
 
 export interface ToolDefinition {

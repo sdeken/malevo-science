@@ -6,7 +6,7 @@ import { DAY, buildCalendars, formatInstant } from '@malevo/core'
 import {
   KINDS,
   arr,
-  calendarDefs,
+  worldCalendars,
   calendarKind,
   canonicalFixes,
   canonicalJson,
@@ -195,7 +195,7 @@ describe('checks', () => {
       })
     const good = readWorld(worldFiles([{ path: 'calendars/local.json', text: local(entered) }]))
     expect(runChecks(good).filter((i) => i.severity !== 'info')).toEqual([])
-    expect(Object.keys(calendarDefs(good)).sort()).toEqual(['gregorian', 'local'])
+    expect(worldCalendars(good).set.ids()).toEqual(['gregorian', 'local'])
 
     const drifted = readWorld(worldFiles([{ path: 'calendars/local.json', text: local('2002-09-28 12:00') }]))
     const issue = runChecks(drifted).find((i) => i.code === 'entered-text-drift')!

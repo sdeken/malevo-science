@@ -7,7 +7,7 @@
  * Every field name carries its unit (`_s`, `_au`, `_c`, ...). The converters
  * at the bottom turn file values into the SI values @malevo/core works in.
  */
-import { AU, C, DAY, G0, KM, LY, type CalendarDef, type FoamSettings } from '@malevo/core'
+import { AU, C, DAY, G0, KM, LY, type CalendarDef, type FoamSettings, type ScriptCalendarImpl } from '@malevo/core'
 import { arr, bool, dict, num, obj, oneOf, opt, ref, str, tagged, type Infer, type Schema } from './schema'
 
 export interface KindDef<T = unknown> {
@@ -19,6 +19,8 @@ export interface KindDef<T = unknown> {
   folder?: string
   /** A single entity at this path. */
   file?: string
+  /** Members may have a JavaScript file beside them, at `<folder>/<id>.js`. */
+  scripts?: boolean
 }
 
 /** Entity keys: "calendar/gregorian" for a collection member, "physics" for a single-file kind. */
@@ -170,6 +172,12 @@ export const calendarSchema = tagged('kind', {
     kind: oneOf(['offset']),
     base: ref('calendar'),
     offset_s: num({ sig: 15 })
+  }),
+  script: obj({
+    name: name(),
+    kind: oneOf(['script']),
+    /** The units the script's fields use, largest first. The code is in calendars/<id>.js. */
+    units: arr(obj({ name: unitName, first: opt(num({ integer: true })), time: opt(bool()) }), { min: 1 })
   })
 })
 export type CalendarFile = Infer<typeof calendarSchema>
@@ -178,11 +186,16 @@ export const calendarKind: KindDef<CalendarFile> = {
   kind: 'calendar',
   label: 'calendar',
   folder: 'calendars',
-  schema: calendarSchema
+  schema: calendarSchema,
+  scripts: true
 }
 
-/** A calendar file as the definition @malevo/core builds from. */
-export function calendarDef(c: CalendarFile): CalendarDef {
+/**
+ * A calendar file as the definition @malevo/core builds from. A script
+ * calendar needs its sandboxed implementation; without one it has no
+ * definition (null).
+ */
+export function calendarDef(c: CalendarFile, impl?: ScriptCalendarImpl): CalendarDef | null {
   switch (c.kind) {
     case 'gregorian':
       return { kind: 'gregorian' }
@@ -213,8 +226,48 @@ export function calendarDef(c: CalendarFile): CalendarDef {
       }
     case 'offset':
       return { kind: 'offset', base: c.base, offset_s: c.offset_s }
+    case 'script':
+      return impl ? { kind: 'script', units: c.units, impl } : null
   }
 }
 
+// ---- events ----
+
+/**
+ * When something happens (docs/PLAN.md §5.3): either an instant (`at`), or an
+ * anchor to another event's start or end plus an offset. Offsets are in the
+ * named calendar's own units (`{"year": 130}` adds 130 to the year field) plus
+ * an optional exact number of seconds, so moving the anchor moves this too.
+ */
+export const whenSchema = obj({
+  at: opt(instantSchema),
+  after: opt(ref('event')),
+  from: opt(oneOf(['start', 'end'])),
+  cal: opt(ref('calendar')),
+  offset: opt(dict(num({ integer: true }))),
+  offset_s: opt(num({ sig: 15 })),
+  /** The calendar unit the date is known to: "year", "day", ... Defaults to what the entered text shows, or the anchor's. */
+  precision: opt(unitName),
+  circa: opt(bool())
+})
+export type When = Infer<typeof whenSchema>
+
+export const eventSchema = obj({
+  name: name(),
+  /** A moment, a period, or a story (which also sets the span the app can show "as it was"). */
+  type: oneOf(['event', 'period', 'story']),
+  when: whenSchema,
+  until: opt(whenSchema),
+  tags: opt(arr(str({ min: 1, max: 40 })))
+})
+export type EventFile = Infer<typeof eventSchema>
+
+export const eventKind: KindDef<EventFile> = {
+  kind: 'event',
+  label: 'event',
+  folder: 'events',
+  schema: eventSchema
+}
+
 /** Every kind, in the order files are reported. */
-export const KINDS: readonly KindDef[] = [physicsKind as KindDef, calendarKind as KindDef]
+export const KINDS: readonly KindDef[] = [physicsKind as KindDef, calendarKind as KindDef, eventKind as KindDef]

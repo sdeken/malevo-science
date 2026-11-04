@@ -67,7 +67,7 @@ try {
   check(created.ok === true, 'creating a world in a missing folder succeeds')
   await page.waitForSelector('.workspace', { timeout: 10_000 })
   check((await page.locator('.sidebar-world').textContent()) === 'Smoke World', 'the workspace shows the world name, normalized')
-  check((await page.locator('.tool-link.is-current').textContent()) === 'World', 'the World tool is registered and selected')
+  check((await page.locator('.tool-link.is-current').textContent()) === 'Timeline', 'the Timeline tool is first and selected')
   check(
     (await app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0].getTitle())) === 'Smoke World — Malevo Science',
     'window title names the world'
@@ -94,6 +94,7 @@ try {
     text === `{\n  "format": 1,\n  "name": "Smoke World",\n  "seed": ${manifest.seed}\n}\n`,
     'world.json is canonical (key order, indent, LF, trailing newline)'
   )
+  await page.locator('.tool-link', { hasText: 'World' }).click()
   check((await page.locator('.world-seed').textContent()) === String(manifest.seed), 'the World tool shows the seed from the file')
   check(!JSON.stringify(await fs.readdir(userData)).includes('world.json'), 'nothing world-related is written to userData but settings')
   const stat = await fs.stat(path.join(worldDir, 'world.json'))
@@ -181,6 +182,152 @@ try {
   await page.waitForSelector('.workspace', { timeout: 10_000 })
   check(true, 'a recent world reopens from the welcome screen')
 
+  // 11. Phase 2: the timeline, calendars, saving, undo, scripts, fork and compare.
+  const tool = async (name) => {
+    await page.locator('.tool-link', { hasText: name }).first().click()
+    await page.waitForSelector(`[data-tool]`)
+  }
+  const statusText = async () => (await page.locator('.statusbar').textContent()) ?? ''
+  const exists = async (p) =>
+    fs
+      .access(path.join(worldDir, p))
+      .then(() => true)
+      .catch(() => false)
+  await tool('Timeline')
+  await page.waitForSelector('#currentDate')
+  check(
+    (await page.locator('#currentDate').inputValue()) === '2000-01-01 12:00',
+    'the current date starts at the epoch in the Gregorian calendar'
+  )
+
+  // A first event: unsaved until saved.
+  await page.locator('#newEvent').click()
+  await page.waitForSelector('[data-editing="new-event"]')
+  check((await statusText()).includes('1 unsaved change'), 'a new event is an unsaved change')
+  check(!(await exists('events/new-event.json')), 'nothing is written before saving')
+  await page.locator('#eventName').fill('Charter')
+  await page.locator('#eventName').press('Enter')
+  const dateField = page.locator('[data-editing="new-event"] fieldset.when .date-input input').first()
+  await dateField.fill('2700-06')
+  await dateField.press('Enter')
+  await page.waitForFunction(() => document.querySelector('[data-editing="new-event"] .resolved code')?.textContent === '2700-06')
+  check(true, 'the date is parsed, and shown to the precision it was entered at')
+  await page.locator('.status-save').click()
+  await page.waitForFunction(() => document.querySelector('.status-saved') !== null)
+  const charter = JSON.parse(await fs.readFile(path.join(worldDir, 'events/new-event.json'), 'utf8'))
+  check(
+    charter.name === 'Charter' && charter.when.at.text === '2700-06' && charter.when.at.cal === 'gregorian',
+    'saving writes the event file'
+  )
+
+  // A second event anchored to the first, 130 years later.
+  await page.locator('#newEvent').click()
+  await page.waitForSelector('[data-editing="new-event-2"]')
+  await page.locator('#eventName').fill('Founding')
+  await page.locator('#eventName').press('Enter')
+  await page.locator('[data-editing="new-event-2"] .seg button', { hasText: 'Relative to an event' }).click()
+  await page.waitForSelector('[data-editing="new-event-2"] .offset-grid')
+  const years = page.locator('[data-editing="new-event-2"] .offset-grid label', { hasText: 'years' }).locator('input')
+  await years.fill('130')
+  await years.press('Enter')
+  await page.waitForFunction(() => document.querySelector('[data-editing="new-event-2"] .resolved code')?.textContent === '2830-06')
+  check(true, 'an anchored event resolves 130 years after its anchor, at the anchor’s precision')
+  await page.locator('.toolbar button', { hasText: 'Fit' }).click()
+  await page.waitForFunction(() => document.querySelectorAll('[data-event]').length === 2)
+  check(true, 'after Fit, both events are drawn on the timeline')
+
+  // Undo and redo with the keyboard (outside a text field), then save from the File menu.
+  await page.locator('.timeline-canvas').click({ position: { x: 5, y: 120 } })
+  await page.keyboard.press('Control+z')
+  await page.waitForFunction(
+    () =>
+      document.querySelector('[data-editing="new-event-2"] .resolved code')?.textContent !== '2830-06' ||
+      !document.querySelector('[data-editing="new-event-2"]')
+  )
+  check(true, 'Ctrl+Z undoes the last change')
+  await page.keyboard.press('Control+y')
+  await page.locator('[data-event="new-event-2"]').click()
+  await page.waitForFunction(() => document.querySelector('[data-editing="new-event-2"] .resolved code')?.textContent === '2830-06')
+  check(true, 'Ctrl+Y redoes it')
+  await app.evaluate(({ Menu }) => {
+    const file = Menu.getApplicationMenu().items.find((i) => i.label === '&File')
+    file.submenu.items.find((i) => i.label === '&Save').click()
+  })
+  await page.waitForFunction(() => document.querySelector('.status-saved') !== null)
+  const founding = JSON.parse(await fs.readFile(path.join(worldDir, 'events/new-event-2.json'), 'utf8'))
+  check(founding.when.after === 'new-event' && founding.when.offset.year === 130, 'File › Save writes the anchored event')
+  await page.screenshot({ path: path.join(shots, '05-timeline.png') })
+
+  // Moving the anchor moves what is anchored to it.
+  await page.locator('[data-event="new-event"]').click()
+  const charterDate = page.locator('[data-editing="new-event"] fieldset.when .date-input input').first()
+  await charterDate.fill('2750-06')
+  await charterDate.press('Enter')
+  await page.locator('.toolbar button', { hasText: 'Fit' }).click()
+  await page.locator('[data-event="new-event-2"]').click()
+  await page.waitForFunction(() => document.querySelector('[data-editing="new-event-2"] .resolved code')?.textContent === '2880-06')
+  check(true, 'moving the anchor moves the anchored event')
+  await page.evaluate(() => window.malevo.world.discard())
+  await page.waitForFunction(() => document.querySelector('.status-saved') !== null)
+
+  // A script calendar, made from the template, run in the sandbox.
+  await tool('Calendars')
+  await page.locator('#newCalendar').click()
+  await page.locator('[data-add-kind="script"]').click()
+  await page.waitForFunction(() => document.querySelector('.preview-date')?.textContent?.startsWith('Y-99-01-01'))
+  check(true, 'a new script calendar runs its template script (year 2000 is Y-99)')
+  const code = page.locator('textarea.code')
+  await code.fill('module.exports = {}')
+  await page.locator('#calendarName').click()
+  await page.waitForFunction(() => document.querySelector('.calendar-editor .preview .error')?.textContent?.includes('toFields'))
+  check(true, 'a broken script is reported, not run')
+  await page.locator('.split-list h2').click()
+  await page.keyboard.press('Control+z')
+  await page.waitForFunction(() => document.querySelector('.preview-date')?.textContent?.startsWith('Y-99'))
+  check(true, 'undo restores the working script')
+  await page.screenshot({ path: path.join(shots, '06-calendars.png') })
+
+  // An era calendar, then show the current date in it.
+  await page.locator('#newCalendar').click()
+  await page.locator('[data-add-kind="era"]').click()
+  await page.waitForFunction(() => document.querySelector('.preview-date')?.textContent?.endsWith(' NE-01-01 12:00:00'))
+  check(
+    (await page.locator('.preview-date').textContent()) === '-99 NE-01-01 12:00:00',
+    'an era calendar counts years from its epoch (2000 is year −99 when 2100 is year 1)'
+  )
+  await page.locator('.status-save').click()
+  await page.waitForFunction(() => document.querySelector('.status-saved') !== null)
+  check(
+    (await exists('calendars/script-calendar.js')) && (await exists('calendars/era-count-calendar.json')),
+    'saving writes the calendars and the script'
+  )
+
+  // The checks agree that the saved world is sound.
+  await tool('Checks')
+  await page.locator('.checks-bar button').click()
+  await page.waitForFunction(() => document.querySelector('.checks-summary')?.textContent === 'No problems found.')
+  check(true, 'the saved world, script calendar included, passes every check')
+
+  // Fork, change the fork on disk, compare, and take the change back.
+  const forkDir = path.join(tmp, 'worlds', 'fork')
+  const forked = await page.evaluate((dir) => window.malevo.world.fork(dir), forkDir)
+  check(forked.ok && forked.world.name === 'Smoke World (fork)', 'forking copies the saved world under a new name')
+  const forkEvent = path.join(forkDir, 'events/new-event.json')
+  const ev = JSON.parse(await fs.readFile(forkEvent, 'utf8'))
+  ev.when.at.text = '2750-06'
+  ev.when.at.t_s += 50 * 365.2425 * 86400
+  await fs.writeFile(forkEvent, JSON.stringify(ev, null, 2) + '\n')
+  const report = await page.evaluate((dir) => window.malevo.world.compare(dir), forkDir)
+  check(report.changed.length === 1 && report.changed[0].key === 'event/new-event', 'the comparison finds the one changed event')
+  check(report.timeChanges.map((c) => c.id).join() === 'new-event,new-event-2', 'and shows that the anchored event moves with it')
+  await tool('Fork & compare')
+  await page.evaluate((keys) => window.malevo.world.take(keys[0], keys.slice(1)), [forkDir, 'event/new-event'])
+  await page.waitForFunction(() => document.querySelector('.status-dirty') !== null)
+  check(true, 'taking a change from the fork is an unsaved change here')
+  await page.evaluate(() => window.malevo.world.discard())
+  await page.waitForFunction(() => document.querySelector('.status-saved') !== null)
+  check(JSON.stringify(await listAll(forkDir)).includes('events/new-event.json'), 'the fork is a complete world folder')
+
   // 10. The update status reports a dev build.
   const status = await page.evaluate(() => window.malevo.updates.status())
   check(status.state === 'unavailable', 'an unpackaged build reports updates as unavailable')
@@ -188,6 +335,11 @@ try {
   failures.push(String(err?.stack ?? err))
   console.error(err)
 } finally {
+  // Unsaved changes would hold the window open behind a Save prompt.
+  await app
+    ?.windows()[0]
+    ?.evaluate(() => window.malevo.world.discard())
+    .catch(() => {})
   await app?.close().catch(() => {})
 }
 

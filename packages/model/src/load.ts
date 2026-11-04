@@ -51,12 +51,14 @@ export interface WorldData {
   issues: Issue[]
   /** Files outside the world format, left alone. */
   ignored: string[]
+  /** JavaScript files beside entities of kinds that allow them, by path ("calendars/x.js"). */
+  scripts: Map<string, string>
   kinds: readonly KindDef[]
 }
 
 /** Read every entity from a world's files. Never throws for bad content; problems become issues. */
 export function readWorld(files: readonly WorldFile[], kinds: readonly KindDef[] = KINDS): WorldData {
-  const data: WorldData = { manifest: null, entities: new Map(), issues: [], ignored: [], kinds }
+  const data: WorldData = { manifest: null, entities: new Map(), issues: [], ignored: [], scripts: new Map(), kinds }
   const add = (severity: Severity, code: string, message: string, path?: string, field?: string): void => {
     data.issues.push({ severity, check: 'files', code, message, path, field })
   }
@@ -106,8 +108,10 @@ export function readWorld(files: readonly WorldFile[], kinds: readonly KindDef[]
       if (ext === 'json') readEntity(data, kind, id, file)
       else if (ext === 'md' && !byPath.has(`${dir}/${id}.json`))
         add('info', 'orphan-note', `This note has no ${kind.label} "${id}" to belong to.`, file.path)
-      else if (ext === 'js')
-        add('info', 'script-not-yet', 'Script files are not used yet (script calendars arrive with the timeline).', file.path)
+      else if (ext === 'js') {
+        if (kind.scripts) data.scripts.set(file.path, file.text ?? '')
+        else add('warning', 'unexpected-file', `${kind.label} files do not take scripts; this one is ignored.`, file.path)
+      }
       continue
     }
     if (reservedDirs.has(dir) || [...reservedDirs].some((d) => dir.startsWith(`${d}/`))) {

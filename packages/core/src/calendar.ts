@@ -89,6 +89,25 @@ export type CalendarDef =
       suffix: string
     }
   | { kind: 'offset'; base: string; offset_s: number }
+  | {
+      kind: 'script'
+      /** Largest first; the units the script's fields use. */
+      units: { name: string; first?: number; time?: boolean }[]
+      /** The script's functions, already sandboxed by the caller (see @malevo/model/node). */
+      impl: ScriptCalendarImpl
+    }
+
+/**
+ * What a script calendar provides. Calls may throw (a bug in the script, or a
+ * time limit enforced by the sandbox); callers that format or parse treat a
+ * throw like any other unreadable date.
+ */
+export interface ScriptCalendarImpl {
+  toFields(t: Instant): Fields
+  fromFields(fields: Fields): Instant
+  yearLabel?(year: number): string
+  parseYearLabel?(text: string): number | null
+}
 
 export class CalendarError extends Error {}
 
@@ -318,6 +337,52 @@ class SolarCalendar implements Calendar {
   parseYearLabel = parsePlainYear
 }
 
+class ScriptCalendar implements Calendar {
+  readonly kind = 'script'
+  readonly units: CalendarUnit[]
+
+  constructor(
+    readonly id: string,
+    private readonly def: Extract<CalendarDef, { kind: 'script' }>
+  ) {
+    if (def.units.length === 0) throw new CalendarError('A script calendar must declare at least one unit.')
+    this.units = def.units.map((u, i) => ({ name: u.name, first: i === 0 ? 0 : (u.first ?? (u.time ? 0 : 1)), time: Boolean(u.time) }))
+    if (new Set(this.units.map((u) => u.name)).size !== this.units.length) throw new CalendarError('Unit names must be unique.')
+  }
+
+  toFields(t: Instant): Fields {
+    const raw = this.def.impl.toFields(t)
+    const out: Fields = {}
+    for (const u of this.units) {
+      const v = raw?.[u.name]
+      if (typeof v !== 'number' || !Number.isFinite(v)) throw new CalendarError(`The script's toFields() gave no number for "${u.name}".`)
+      out[u.name] = v
+    }
+    return out
+  }
+
+  fromFields(f: Partial<Fields>): Instant {
+    const full: Fields = {}
+    for (const u of this.units) full[u.name] = f[u.name] ?? u.first
+    const t = this.def.impl.fromFields(full)
+    if (typeof t !== 'number' || !Number.isFinite(t)) throw new CalendarError("The script's fromFields() did not return a number.")
+    return t
+  }
+
+  yearLabel(year: number): string {
+    if (!this.def.impl.yearLabel) return plainYearLabel(year)
+    const s = this.def.impl.yearLabel(year)
+    if (typeof s !== 'string') throw new CalendarError("The script's yearLabel() did not return text.")
+    return s
+  }
+
+  parseYearLabel(text: string): number | null {
+    if (!this.def.impl.parseYearLabel) return parsePlainYear(text)
+    const y = this.def.impl.parseYearLabel(text)
+    return typeof y === 'number' && Number.isInteger(y) ? y : null
+  }
+}
+
 class EraCalendar implements Calendar {
   readonly kind = 'era'
   constructor(
@@ -423,6 +488,9 @@ export function buildCalendars(defs: Record<string, CalendarDef>): CalendarSet {
         case 'solar':
           cal = new SolarCalendar(id, def)
           break
+        case 'script':
+          cal = new ScriptCalendar(id, def)
+          break
         case 'era':
         case 'offset': {
           if (!defs[def.base]) throw new CalendarError(`Its base calendar "${def.base}" does not exist.`)
@@ -497,7 +565,12 @@ export function parseInstant(cal: Calendar, text: string): Instant | null {
       const timePat = tp ? `\\s+(\\d+(?::\\d+){${tp - 1}}(?:\\.\\d+)?)` : '()'
       const m = new RegExp(`^(.+?)${datePat}${timePat}$`).exec(s)
       if (!m) continue
-      const year = cal.parseYearLabel(m[1])
+      let year: number | null
+      try {
+        year = cal.parseYearLabel(m[1])
+      } catch {
+        year = null
+      }
       if (year === null) continue
       fields = { [units[0].name]: year }
       if (dp)
@@ -509,9 +582,15 @@ export function parseInstant(cal: Calendar, text: string): Instant | null {
     }
   }
   if (!fields) return null
-  const t = cal.fromFields(fields)
+  let t: Instant
+  let back: Fields
+  try {
+    t = cal.fromFields(fields)
+    back = cal.toFields(t)
+  } catch {
+    return null
+  }
   // Range check: the fields must survive a round trip.
-  const back = cal.toFields(t)
   for (const [k, v] of Object.entries(fields)) {
     const isLast = k === units[units.length - 1].name
     if (isLast ? Math.abs(back[k] - v) > 1e-6 : back[k] !== v) return null

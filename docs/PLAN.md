@@ -637,7 +637,11 @@ foundation the tools stand on.
 **Exit:** `malevo check` validates a fixture world. Changing a frozen generator fails the app's
 CI build.
 
-### Phase 2: Timeline editor and calendars (first real tool)
+### Phase 2: Timeline editor and calendars (first real tool) — built
+
+Built; see [DEVELOPMENT.md](DEVELOPMENT.md). `solar` calendars take their day and year as numbers
+for now; Phase 3 links them to a body so they follow its orbit. Choosing calendars per culture
+waits for cultures (Phase 4).
 
 - The event schema, with anchors, precision and tags.
 - The timeline UI and the global "current date".

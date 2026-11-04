@@ -13,7 +13,9 @@ import { compareStrings } from '@malevo/core'
 import { promises as fs } from 'node:fs'
 import path from 'node:path'
 import { KINDS, entityPath, type KindDef } from './kinds'
+import type { WorldEnv } from './events'
 import { readWorld, serializeEntity, type WorldData, type WorldFile } from './load'
+import { sandboxedCalendar } from './sandbox'
 import { templateFiles } from './template'
 import { WORLD_FILE, WorldError, newWorldManifest, parseWorldManifest, serializeWorldManifest, type WorldManifest } from './world'
 
@@ -183,3 +185,11 @@ export async function addMissingTemplateFiles(root: string): Promise<string[]> {
   }
   return added
 }
+
+// ---- running world code ----
+
+export { WorldEditor, assertWorldPath, entityText, type FileChange } from './editor'
+export { ScriptError, sandboxedCalendar } from './sandbox'
+
+/** The environment for checks and calendars in Node: script calendars run in the vm sandbox. */
+export const nodeEnv: WorldEnv = { loadScript: (code, file) => sandboxedCalendar(code, file) }

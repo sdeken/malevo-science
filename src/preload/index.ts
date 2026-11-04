@@ -1,6 +1,19 @@
 import { contextBridge, ipcRenderer } from 'electron'
 import { IPC, type MenuCommand } from '../shared/ipc'
-import type { AppInfo, CheckReport, FolderInfo, Settings, UpdateStatus, WorldInfo, WorldResult } from '../shared/types'
+import type {
+  AppInfo,
+  CheckReport,
+  CompareReport,
+  EditableKind,
+  FolderInfo,
+  ParsedDate,
+  Settings,
+  TickInfo,
+  UpdateStatus,
+  WorldInfo,
+  WorldResult,
+  WorldSnapshot
+} from '../shared/types'
 
 type Unsubscribe = () => void
 
@@ -23,27 +36,48 @@ const api = {
   world: {
     current: (): Promise<WorldInfo | null> => ipcRenderer.invoke(IPC.worldCurrent),
     /** Shows a folder picker; resolves to the chosen path, or null if cancelled. */
-    chooseFolder: (purpose: 'open' | 'create'): Promise<string | null> => ipcRenderer.invoke(IPC.worldChooseFolder, purpose),
+    chooseFolder: (purpose: 'open' | 'create' | 'fork' | 'compare'): Promise<string | null> =>
+      ipcRenderer.invoke(IPC.worldChooseFolder, purpose),
     inspect: (dir: string): Promise<FolderInfo> => ipcRenderer.invoke(IPC.worldInspect, dir),
+    /** Asks to save first if there are unsaved changes; resolves with code "cancelled" if the user cancels. */
     open: (dir: string): Promise<WorldResult> => ipcRenderer.invoke(IPC.worldOpen, dir),
     create: (dir: string, name: string): Promise<WorldResult> => ipcRenderer.invoke(IPC.worldCreate, dir, name),
-    close: (): Promise<void> => ipcRenderer.invoke(IPC.worldClose),
+    /** Resolves false if the user cancelled because of unsaved changes. */
+    close: (): Promise<boolean> => ipcRenderer.invoke(IPC.worldClose),
     reveal: (): Promise<void> => ipcRenderer.invoke(IPC.worldReveal),
     forgetRecent: (dir: string): Promise<Settings> => ipcRenderer.invoke(IPC.worldForgetRecent, dir),
-    /** Run every check on the open world (reads only). */
+    /** Run every check on the saved world (reads only). */
     check: (): Promise<CheckReport | null> => ipcRenderer.invoke(IPC.worldCheck),
     /** Rewrite exactly these files into canonical form. Resolves to the paths that changed. */
     fix: (paths: string[]): Promise<string[]> => ipcRenderer.invoke(IPC.worldFix, paths),
     /** Add any new-world template files the world is missing. Resolves to the paths added. */
     addTemplate: (): Promise<string[]> => ipcRenderer.invoke(IPC.worldAddTemplate),
-    onChanged: (cb: (world: WorldInfo | null) => void): Unsubscribe => on(IPC.evWorldChanged, cb)
+    snapshot: (): Promise<WorldSnapshot | null> => ipcRenderer.invoke(IPC.worldSnapshot),
+    onSnapshot: (cb: (snapshot: WorldSnapshot | null) => void): Unsubscribe => on(IPC.evSnapshot, cb),
+    onChanged: (cb: (world: WorldInfo | null) => void): Unsubscribe => on(IPC.evWorldChanged, cb),
+    // Edits are unsaved until save(); each is one undo step.
+    setEntity: (kind: EditableKind, id: string, value: unknown): Promise<void> => ipcRenderer.invoke(IPC.worldSetEntity, kind, id, value),
+    deleteEntity: (kind: EditableKind, id: string): Promise<void> => ipcRenderer.invoke(IPC.worldDeleteEntity, kind, id),
+    setScript: (id: string, code: string | null): Promise<void> => ipcRenderer.invoke(IPC.worldSetScript, id, code),
+    undo: (): Promise<void> => ipcRenderer.invoke(IPC.worldUndo),
+    redo: (): Promise<void> => ipcRenderer.invoke(IPC.worldRedo),
+    save: (): Promise<string[]> => ipcRenderer.invoke(IPC.worldSave),
+    discard: (): Promise<void> => ipcRenderer.invoke(IPC.worldDiscard),
+    fork: (dest: string): Promise<WorldResult> => ipcRenderer.invoke(IPC.worldFork, dest),
+    compare: (other: string): Promise<CompareReport> => ipcRenderer.invoke(IPC.worldCompare, other),
+    take: (other: string, keys: string[]): Promise<void> => ipcRenderer.invoke(IPC.worldTake, other, keys)
+  },
+  calendar: {
+    ticks: (cal: string, t0: number, t1: number, target: number): Promise<TickInfo[]> =>
+      ipcRenderer.invoke(IPC.calTicks, cal, t0, t1, target),
+    format: (cal: string, items: { t: number; precision?: string | null }[]): Promise<(string | null)[]> =>
+      ipcRenderer.invoke(IPC.calFormat, cal, items),
+    parse: (cal: string, text: string): Promise<ParsedDate | null> => ipcRenderer.invoke(IPC.calParse, cal, text)
   },
   updates: {
     status: (): Promise<UpdateStatus> => ipcRenderer.invoke(IPC.updatesStatus),
     check: (): Promise<void> => ipcRenderer.invoke(IPC.updatesCheck),
     install: (): Promise<void> => ipcRenderer.invoke(IPC.updatesInstall),
-    /** Tools report unsaved changes so an update never restarts the app under them. */
-    setBusy: (busy: boolean): Promise<void> => ipcRenderer.invoke(IPC.updatesSetBusy, busy),
     onStatus: (cb: (status: UpdateStatus) => void): Unsubscribe => on(IPC.evUpdateStatus, cb)
   }
 }

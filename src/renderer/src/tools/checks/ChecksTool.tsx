@@ -41,8 +41,8 @@ function ChecksView({ world }: ToolProps): React.JSX.Element {
     <div className="tool-page">
       <h1>Checks</h1>
       <p className="muted">
-        Reads every file in the world and reports what does not add up. Nothing here is a blocker: a half-finished world is normal. The same
-        checks run from the command line as <code>malevo check</code>.
+        Reads every saved file in the world (unsaved changes are not included) and reports what does not add up. Nothing here is a blocker:
+        a half-finished world is normal. The same checks run from the command line as <code>malevo check</code>.
       </p>
       <div className="checks-bar">
         <button onClick={() => void runChecks()} disabled={running}>

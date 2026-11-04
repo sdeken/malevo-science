@@ -14,7 +14,7 @@
  */
 import path from 'node:path'
 import { canonicalFixes, runChecks, type Issue } from '@malevo/model'
-import { addMissingTemplateFiles, applyFixes, loadWorld } from '@malevo/model/node'
+import { addMissingTemplateFiles, applyFixes, loadWorld, nodeEnv } from '@malevo/model/node'
 
 export interface Io {
   out(line: string): void
@@ -70,7 +70,7 @@ async function check(root: string, flags: Set<string>, io: Io): Promise<number> 
     fixed = await applyFixes(root, canonicalFixes(world))
     if (fixed.length) world = await loadWorld(root)
   }
-  const issues = runChecks(world)
+  const issues = runChecks(world, nodeEnv)
   if (flags.has('--json')) {
     io.out(JSON.stringify({ world: root, fixed, issues }, null, 2))
   } else {

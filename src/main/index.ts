@@ -1,7 +1,7 @@
 import path from 'node:path'
 import { app, BrowserWindow, powerMonitor, shell } from 'electron'
 import { IPC } from '../shared/ipc'
-import { registerIpc } from './ipc'
+import { confirmLeave, registerIpc } from './ipc'
 import { buildMenu } from './menu'
 import { SettingsStore } from './settings'
 import { Updater } from './updates'
@@ -15,14 +15,15 @@ const settings = new SettingsStore(path.join(app.getPath('userData'), 'settings.
 const world = new WorldSession()
 let mainWindow: BrowserWindow | null = null
 let screenLocked = false
-let busy = false
+let closeConfirmed = false
+let lastReload = 0
 
 const updater = new Updater({
   enabled: () => settings.get().autoUpdate,
   windowVisible: () => Boolean(mainWindow && mainWindow.isVisible() && !mainWindow.isMinimized()),
   windowFocused: () => Boolean(mainWindow?.isFocused()),
   locked: () => screenLocked,
-  busy: () => busy,
+  busy: () => world.dirty,
   prepareQuit: async () => {
     /* Nothing to flush yet: no tool holds unsaved world data. */
   }
@@ -58,9 +59,21 @@ function createWindow(): BrowserWindow {
       if (/^https?:\/\//i.test(url)) void shell.openExternal(url)
     }
   })
-  // A reload discards any unsaved state the renderer held.
-  win.webContents.on('did-start-loading', () => {
-    busy = false
+  // Leaving with unsaved changes asks first.
+  win.on('close', (event) => {
+    if (closeConfirmed || !world.dirty) return
+    event.preventDefault()
+    void confirmLeave(world, win).then((ok) => {
+      if (!ok) return
+      closeConfirmed = true
+      win.close()
+    })
+  })
+  // Coming back to the window picks up edits made outside the app (unsaved changes stay on top).
+  win.on('focus', () => {
+    if (Date.now() - lastReload < 2000) return
+    lastReload = Date.now()
+    void world.reload()
   })
   if (isDev) void win.loadURL(process.env.ELECTRON_RENDERER_URL!)
   else void win.loadFile(path.join(__dirname, '../renderer/index.html'))
@@ -92,8 +105,17 @@ if (!gotLock) {
     app.setAppUserModelId('com.sdeken.malevo-science')
     await settings.load()
 
-    registerIpc({ settings, world, updater, setBusy: (b) => (busy = b) })
+    registerIpc({ settings, world, updater })
 
+    let lastDirty = false
+    world.on('snapshot', () => {
+      mainWindow?.webContents.send(IPC.evSnapshot, world.snapshot())
+      if (world.dirty !== lastDirty) {
+        lastDirty = world.dirty
+        const info = world.info()
+        mainWindow?.setTitle(info ? `${world.dirty ? '• ' : ''}${info.name} — Malevo Science` : 'Malevo Science')
+      }
+    })
     world.on('changed', (info) => {
       mainWindow?.webContents.send(IPC.evWorldChanged, info)
       mainWindow?.setTitle(info ? `${info.name} — Malevo Science` : 'Malevo Science')

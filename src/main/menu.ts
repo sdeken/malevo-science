@@ -15,9 +15,26 @@ export function buildMenu(deps: MenuDeps): void {
       submenu: [
         { label: '&New World…', accelerator: 'CmdOrCtrl+Shift+N', click: send('new-world') },
         { label: '&Open World…', accelerator: 'CmdOrCtrl+O', click: send('open-world') },
+        { type: 'separator' },
+        { label: '&Save', accelerator: 'CmdOrCtrl+S', enabled: deps.hasWorld(), click: send('save') },
+        { label: '&Fork World…', enabled: deps.hasWorld(), click: send('fork-world') },
+        { type: 'separator' },
         { label: '&Close World', enabled: deps.hasWorld(), click: send('close-world') },
         { type: 'separator' },
         { role: 'quit', label: 'E&xit' }
+      ]
+    },
+    {
+      label: '&Edit',
+      submenu: [
+        // Shown, not registered: in a text field Ctrl+Z undoes typing; elsewhere the page turns it into a world undo.
+        { label: '&Undo Change', accelerator: 'CmdOrCtrl+Z', registerAccelerator: false, enabled: deps.hasWorld(), click: send('undo') },
+        { label: '&Redo Change', accelerator: 'CmdOrCtrl+Y', registerAccelerator: false, enabled: deps.hasWorld(), click: send('redo') },
+        { type: 'separator' },
+        { role: 'cut' },
+        { role: 'copy' },
+        { role: 'paste' },
+        { role: 'selectAll' }
       ]
     },
     {

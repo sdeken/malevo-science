@@ -6,6 +6,8 @@ export * from './kinds'
 export * from './load'
 export * from './deps'
 export * from './checks'
+export * from './events'
+export * from './compare'
 export { templateFiles } from './template'
 export {
   WORLD_FILE,

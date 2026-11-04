@@ -28,8 +28,13 @@ npm run dev          # the app with hot reload
   updater.
 - **`src/preload`** is the typed bridge, exposed as `window.malevo`. The renderer never touches
   the file system.
-- **`src/renderer`** is the tool host: the welcome screen, sidebar and status bar. Tools live in
-  `src/renderer/src/tools/<id>/` and are listed in `src/renderer/src/tools/index.ts`.
+- **`src/renderer`** is the tool host: the welcome screen, sidebar, current-date bar and status
+  bar. Tools live in `src/renderer/src/tools/<id>/` and are listed in
+  `src/renderer/src/tools/index.ts`. The tools are Timeline, Calendars, Fork & compare, Checks
+  and World.
+- **The world session lives in main** (`src/main/world.ts`): the open world, its unsaved changes
+  (a `WorldEditor`), and every calendar operation. The renderer gets snapshots pushed to it, and
+  sends edits and calendar requests back.
 - **`src/shared`** holds the IPC channel names, the shared types, and pure policies such as when to
   install an update.
 - **`packages/core`** (`@malevo/core`) is the pure shared library: units, keyed random streams,
@@ -96,6 +101,86 @@ is never written into a world folder. The app has no git integration.
   the checks say so, and the instant does not move.
 - **Locked records** carry `"lock": { "gen": "name@1", "seed": …, "inputs": { "<entity key>":
   "<hash>" } }`. The checks flag a lock as stale when one of its inputs has changed.
+
+### Events and dates
+
+An event is a file `events/<id>.json`:
+
+```json
+{
+  "name": "Founding",
+  "type": "event",
+  "when": { "after": "charter", "cal": "gregorian", "offset": { "year": 130 } },
+  "until": { "after": "founding", "cal": "gregorian", "offset": { "year": 70 }, "circa": true },
+  "tags": ["politics"]
+}
+```
+
+- **`type`** is `event`, `period` or `story`.
+- **A `when` is either a date, `{ "at": { "t_s": …, "cal": …, "text": … } }`, or an anchor,
+  `{ "after": <event id>, … }`.**
+  - An anchor can measure from the other event's start (the default) or, with
+    `"from": "end"`, from its end.
+  - It adds `offset`, counted in the named calendar's own units, and `offset_s`, exact seconds.
+  - An end can be measured from the event's own start.
+  - Moving an event moves everything anchored to it.
+  - Cycles, missing events and unknown units are errors on the event, never crashes.
+- **`precision`** names the calendar unit the date is known to, such as `"year"`. It defaults to
+  what the entered text shows, or to the anchor's precision. The timeline draws that span as a
+  band.
+- **`circa: true`** marks a date as approximate, and the flag carries through anchors.
+
+### Calendars
+
+Calendars live in `calendars/<id>.json`, in the kinds `gregorian`, `fixed`, `solar`, `era`,
+`offset` and `script`. A new world has only Gregorian.
+
+Every calendar writes dates the same way, and parses that form back. The year comes first, then
+the other date units joined by `-`, then the time units joined by `:`. For example
+`2031-07-04 09:30`, or `XE 450-03-12` for an era.
+
+**Script calendars** are a `calendars/<id>.json` declaring the units, plus `calendars/<id>.js`:
+
+```js
+module.exports = {
+  toFields(t, h) { /* t: seconds since J2000.0 → { year, month, … } */ },
+  fromFields(f, h) { /* → t */ },
+  yearLabel(year, h) { /* optional: how the year is written */ },
+  parseYearLabel(text, h) { /* optional: the reverse, or null */ }
+}
+```
+
+- **What a script gets:** only JavaScript's built-ins and the helper `h`, which offers `DAY`,
+  `floorDiv`, `daysFromCivil`, `civilFromDays`, and `gregorian.toFields` / `fromFields`.
+- **What it doesn't get:** `Date`, `Math.random`, `require`, `process` or `eval`.
+- **Every call has a time limit,** so a script can't hang the app.
+- **The smallest unit must carry any fraction,** so that `fromFields(toFields(t))` gives `t` back.
+  The checks test this across ±10,000 years.
+- **Scripts run only in the main process and in `malevo`.** The renderer asks main for every
+  date it shows.
+
+### Editing, saving, undo
+
+- **Every edit in the app is unsaved until you save,** with Ctrl+S, File › Save or the status bar.
+  The status bar counts the files with unsaved changes; hover the count to list them.
+- **Saving writes exactly those files.** Undo and redo (Ctrl+Z, Ctrl+Y) work on world changes
+  whenever focus isn't in a text field.
+- **Leaving with unsaved changes asks Save / Don't save / Cancel.** That covers closing the window,
+  closing the world, and opening or creating another.
+- **Updates never install while there are unsaved changes.**
+- **When the window regains focus, the app re-reads the folder,** so edits made outside the app
+  show up. Unsaved changes stay on top of them.
+
+### Fork and compare
+
+- **Fork** copies the saved world, without dot-folders such as `.git`, into an empty folder, named
+  "<name> (fork)". Unsaved changes aren't copied.
+- **Compare** lists what differs from another world folder, field by field, including this
+  world's unsaved changes, and which events land at a different time because of it.
+- **Take** copies an entity from the other world. For an entity the other world lacks, it deletes
+  it here. A take is an unsaved change like any other.
+- To compare against an old version, check that commit out into a folder yourself; the app knows
+  nothing about git.
 
 ### The command-line checker
 

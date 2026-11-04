@@ -8,7 +8,9 @@ cities. Every tool works from one shared model, so details stay consistent from 
 The app contains no setting and knows nothing about git. It reads and writes plain world folders
 of JSON. The author decides what is canon and commits it by hand to a repository of their own.
 
-**Status:** Phases 0 and 1 are built:
+**Status:** Phases 0–2 are built. Phase 2 added the timeline editor, calendars of every kind
+(including JavaScript script calendars run in a sandbox), the current date, saving with undo, and
+fork and compare. Phases 0 and 1 provided:
 - the app shell, Windows packaging and auto-update;
 - world folders;
 - the shared physics and calendar library (`@malevo/core`);

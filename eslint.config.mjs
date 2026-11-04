@@ -23,7 +23,9 @@ export default tseslint.config(
   {
     files: ['scripts/**/*.mjs'],
     // page.evaluate() callbacks in the smoke test run in the renderer, where window exists.
-    languageOptions: { globals: { console: 'readonly', process: 'readonly', URL: 'readonly', Buffer: 'readonly', window: 'readonly' } }
+    languageOptions: {
+      globals: { console: 'readonly', process: 'readonly', URL: 'readonly', Buffer: 'readonly', window: 'readonly', document: 'readonly' }
+    }
   },
   {
     // The stability contract (docs/PLAN.md §3.2): the model and every
