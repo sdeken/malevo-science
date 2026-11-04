@@ -1,8 +1,8 @@
 # Malevo Science: Plan
 
-Malevo Science is a desktop app for planning, checking and visualizing the setting of the
-story-thing series. It models stars, planets, routes, traffic, calendars, cultures, history and
-cities, so the details stay the same from one story to the next.
+Malevo Science is a desktop app for building, checking and visualizing the physical and
+historical setting of a hard science fiction series. It models stars, planets, routes, traffic,
+calendars, cultures, history and cities, so the details stay consistent from story to story.
 
 This document covers:
 
@@ -16,39 +16,53 @@ blocked on them.
 
 ---
 
-## 1. The two guarantees
+## 1. Principles
 
-Everything else follows from these two.
+### P0. The app is a workbench; canon is whatever the author commits
 
-### G1. The world is text in git, and it does not shift under you
+- **The app contains no setting.** No star, planet, culture, date, name or story-specific number
+  is written into the app's code, defaults or tests. A gas giant called "Hollin" is just a body
+  someone created in some world folder. Nothing in the app knows it exists.
+- **Everything is movable.** Stars, systems, bodies, routes, cultures and events can be created,
+  dragged, re-rolled and deleted freely while the author explores. Nothing is canon until the
+  author decides it is.
+- **Canon is a set of files.** The app writes world folders. The author decides which world
+  folder, and which commit of it, is canon. That data lives in its own repository, separate from
+  this app repo and deliberately kept out of the app's development. The app works the same on a
+  scratch world, a variant, or the canon world.
+- **Prose and notes elsewhere are reference only.** Story documents and the existing prototype
+  tools informed this plan, but the app never imports them as truth. Algorithms from the prototype
+  tools are ported as code. Their data (star atlas, city file) can be loaded into a scratch world
+  as a starting sketch, nothing more.
+- **Tests use synthetic fixture worlds,** made up for the purpose. They test the physics and the
+  formats, not any particular setting.
+
+### P1. The world is text in git, and it does not shift under you
 
 All world data is plain text files, written for clean diffs and committed to git. Most of the world
 is procedural, so the main risk is a *cascade*: a change to one generator or one input ripples
-outward and quietly changes things that stories already depend on. Section 3, the stability
+outward and quietly changes things the author has already settled. Section 3, the stability
 contract, is the defense against this. It is the first thing built and the last thing compromised.
 
-### G2. One model, many views
+### P2. One model, many views
 
 Every tool reads one shared world model through one shared library of functions. No tool keeps
 its own copy of a constant, an orbit or a route. The test of this:
 
-> If the route network says three lanes touch Altaris, the night-sky view from Bluff shows exactly
-> those three lanes. The number of torches visible along each lane equals that lane's ship flow
-> multiplied by the time a ship spends on the in-system crawl. Port capacity is checked against
-> that same flow.
+> If the route network says three routes touch a planet, the night-sky view from any city on
+> that planet shows exactly those three routes. The number of torches visible along each route
+> equals the ship flow on that route multiplied by the time a ship spends crawling in-system.
+> The port's load is checked against the sum of those same flows.
 
-The existing tools break this today. The survey of `story-thing/tools/` found:
+The existing prototype tools break this today. A survey of them found:
 
-- **Two different random-number generators.** The star-map, settlement and city generators use
-  mulberry32; torchlight uses xorshift32.
-- **Constants in two unit systems.** AU and g are defined in metres in three tools and in
-  kilometres in torchlight.
+- **Two different random-number generators.**
+- **Constants in two unit systems.** AU and g are defined in metres in some tools and in
+  kilometres in another.
 - **The 1 g flip-and-brake crawl implemented separately four times.**
-- **Bluff transit speeds that disagree.** The terrace tram is 15 km/h in the maps and 43 km/h
-  in the city file. The field line is 60 km/h in one place and 90 km/h in another.
-- **Three different collapse thresholds:** 2.58, 2.70 and 2.85 AU.
-- **Two unrelated skies.** Torchlight's is a random starfield and star-map's is the real
-  catalogue. Neither is computed from where Altaris actually is.
+- **The same quantity with different values in different tools:** transit speeds, collapse
+  threshold, parking-orbit tilt.
+- **Two unrelated skies.** Neither is computed from where the planet actually is.
 
 The app replaces these copies with one library (section 4).
 
@@ -62,7 +76,7 @@ The app replaces these copies with one library (section 4).
 │  preload: typed, namespaced IPC bridge (devlog pattern)                         │
 │  renderer: tool host — one tab/pane per tool, shared selection & "current time" │
 │     ├─ Timeline  ├─ Cultures  ├─ History  ├─ Systems  ├─ Routes                 │
-│     └─ Terrain   ├─ Population ├─ Cities  ├─ Sky (torchlight)  ├─ Checks        │
+│     └─ Terrain   ├─ Population ├─ Cities  ├─ Sky       ├─ Checks                │
 └──────────────────────────────────┬──────────────────────────────────────────────┘
                                    │ all tools call the same packages
 ┌──────────────────────────────────▼──────────────────────────────────────────────┐
@@ -70,26 +84,26 @@ The app replaces these copies with one library (section 4).
 │ @malevo/gen    versioned, seeded generators (stars, systems, terrain, history…) │
 │ @malevo/model  schemas, world loader/saver, references, queries, validators     │
 │ @malevo/core   units, constants, RNG, vectors, time & calendars, orbits, foam,  │
-│                torch, frames, ephemeris, kinematics — pure TS, no I/O, no DOM   │
+│                torch, frames, ephemeris, kinematics, flows — pure TS, no I/O    │
 └──────────────────────────────────┬──────────────────────────────────────────────┘
                                    │ read / write canonical text
                          ┌─────────▼─────────┐        ┌──────────────────────────┐
                          │ world folder (git)│◄───────┤ malevo CLI: check / gen / │
-                         └───────────────────┘        │ query / report (CI, Claude)│
-                                                      └──────────────────────────┘
+                         │ any repo, any path│        │ query / report            │
+                         └───────────────────┘        └──────────────────────────┘
 ```
 
 **Design rules:**
 
 - **`@malevo/core` and `@malevo/model` do not depend on Electron or the DOM.** The command-line
-  tool, the tests and CI on the data repo all run them under plain Node. Claude sessions in the
-  story-thing repo can then run `malevo check` or `malevo query` without opening the app.
+  tool, the tests and CI on a world repo all run them under plain Node.
 - **Only `@malevo/model` writes world files.** The renderer never touches the file system; it
   goes through IPC, as in devlog.
-- **The world is a folder, opened the way devlog opens a repo.** The app is one repo and the world
-  data lives in another; see [D1](#d1-where-the-world-data-lives). The app shows git status and can
-  commit, but it does not commit or push automatically
-  ([D7](#d7-git-integration-level)). Canon changes should be deliberate commits.
+- **A world is a folder.** The app opens any world folder, usually a git working copy, the way
+  devlog opens a repo. It shows git status and can commit on request, but it does not commit or
+  push automatically ([D7](#d7-git-integration-level)).
+- **Experimenting is cheap** (section 3.6). A world can be forked into a scratch copy, played with,
+  compared against the original, and merged back piece by piece or thrown away.
 - **Heavy work runs in worker threads:** generation, history simulation, terrain rasters and route
   searches. Results are cached on disk under userData, keyed by the hash of their inputs, and never
   stored in the world folder.
@@ -100,33 +114,31 @@ The app replaces these copies with one library (section 4).
 
 ---
 
-## 3. The stability contract (guarantee G1 in detail)
+## 3. The stability contract (principle P1 in detail)
 
 ### 3.1 Three tiers of data
 
 | Tier | What it is | Stored? | Can a generator change it? |
 |---|---|---|---|
-| **Authored** | Typed in by the author, or imported from canon | Yes, as values | Never |
+| **Authored** | Values the author typed in or dragged into place | Yes, as values | Never |
 | **Locked** | Generated, then accepted ("roll, then lock") | Yes: values, plus the seed and generator version that made them | Never; only an explicit re-roll |
-| **Derived** | Computed on demand from the two tiers above (positions at a date, sky, traffic per edge, terrain rasters) | No; it lives only in the cache | Yes, freely |
+| **Derived** | Computed on demand from the two tiers above (positions at a date, sky, traffic totals, terrain rasters) | No; it lives only in the cache | Yes, freely |
 
-**The rule:** anything a story depends on must be Authored or Locked. A derived value can be
-promoted with a single "Lock" action. A Locked record keeps its values, so a later change to a
-generator cannot reach it.
+While exploring, the author can leave nearly everything Derived and re-roll at will. Locking is
+how the author says "I'm keeping this". Whatever is locked survives any later change to a
+generator, because its values are stored.
 
 ### 3.2 Keyed randomness
 
 - **Every random stream comes from a stable key, not from a position in a sequence:**
   `stream = rng(hash(worldSeed, generatorId, entityId, purpose))`. Adding, removing or reordering
-  one entity therefore cannot change the random numbers any other entity gets. This is the
-  approach `star-gen.js` already takes per 25 ly cube and `city-gen.js` takes per object; it
-  becomes the only allowed approach.
+  one entity therefore cannot change the random numbers any other entity gets.
 - **The algorithms are fixed:** mulberry32 for streams and an FNV-1a-style hash for keys. The
-  existing generators already use both, so imported atlas and city data keep reproducing exactly.
-  `Math.random` is banned in model and generator code by a lint rule.
+  prototype generators already use both, so an old atlas or city file loaded as a starting sketch
+  reproduces exactly. `Math.random` is banned in model and generator code by a lint rule.
 - **Iteration always follows a stable sort by id,** never insertion order or object-key order.
-- **Spatial generation is per cell,** as with the star-map cubes. Widening the radius adds cells
-  and does not reshuffle the existing ones.
+- **Spatial generation is per cell.** Widening the generated region adds cells and does not
+  reshuffle the existing ones.
 
 ### 3.3 Frozen generator versions
 
@@ -148,36 +160,48 @@ generator cannot reach it.
   you lock a city's climate, then change the planet's axial tilt. The checks panel lists every
   stale item with the old value and the value the current inputs would give. You choose to
   accept or re-roll each one.
-- This is how "change one thing" stays local. The app tells you what a change *would* affect
-  before anything is rewritten.
+- **Before a change is applied, the app can show what it would affect.** Moving a star shows
+  which routes would break the leg limit, which flows would change, and which locked values would
+  go stale. That is what makes it safe to play.
 
 ### 3.5 File format
 
 These rules carry over from devlog, adapted for structured data:
 
-- **One entity per file,** in a folder per kind (`systems/altaris/system.json`,
-  `events/charter.json`). Small files make for small diffs and few merge conflicts.
+- **One entity per file,** in a folder per kind (`systems/<id>/system.json`, `events/<id>.json`).
+  Small files make for small diffs and few merge conflicts.
 - **Canonical serialization:**
   - Keys appear in the schema's order, not alphabetically, so files read logically.
   - Two-space indent, LF line endings, trailing newline.
-  - Each numeric field has a declared precision, so values never churn at the 15th digit. This
-    avoids diffs like `0.30000000000000004`.
+  - Each numeric field has a declared precision, so values never churn at the 15th digit.
   - Short arrays of numbers stay on one line.
   - The app formats on every save, and `malevo check --fix` re-formats hand edits.
 - **The format is JSON, checked against schemas (zod).** Prose lives in a Markdown sidebar file
-  next to the entity (`altaris.md`) rather than in JSON strings
-  ([D2](#d2-file-format)).
+  next to the entity rather than in JSON strings ([D2](#d2-file-format)).
 - **Units are explicit in the key name** (`semiMajorAxis_au`, `period_d`, `mass_msun`,
   `speed_kmh`). The schema converts to SI on load. A unit mismatch cannot hide in a bare number.
-- **An id is separate from a name.** Ids are short slugs, immutable once created (`altaris`,
-  `hollin`, `persis`). Names are display data and can change freely. "Persis" and "Hollin" are
-  placeholder names, so this matters right away: a rename touches one file.
+- **An id is separate from a name.** Ids are short and immutable once created. Names are display
+  data and can change freely. Placeholder names are normal while exploring, so a rename touches one
+  file and breaks no references.
 - **Generated entities get deterministic ids** (`g.c12_-3_4.17` for generated star 17 in cell
   (12, −3, 4)). An entity gets a file only once it is authored, locked or referenced.
 - **`world.json` carries `format: N`.** The loader refuses formats it does not understand, as
   devlog does. Each format bump ships with a migration script.
-- **Large source catalogues are app assets, not world data.** The 5.4 MB HYG star catalogue is
-  one example. The world stores only overrides and references to it, by HYG/HIP id.
+- **Large source catalogues are app assets, not world data.** The real-star catalogue (HYG, about
+  5 MB) is one example. A world stores only its choices and overrides, referencing catalogue stars
+  by id.
+
+### 3.6 Experimenting: forks and comparisons
+
+- **Fork world:** copies a world folder, or makes a git branch or worktree when it is a repo, for
+  a what-if. Examples: move a system, change the threshold constant, try a different settlement
+  history.
+- **Compare worlds:** a semantic diff between two worlds or two commits. It lists entities added,
+  removed and changed, with field-level differences, plus the *derived* consequences (flows,
+  travel times, sky). The question it answers: "what does this change actually do?"
+- **Take pieces back:** copy selected entities from a fork into the main world.
+- **Optional status tags** on any entity (`idea`, `draft`, `settled`, or whatever the author
+  likes) can be used for filtering. The app attaches no meaning to them.
 
 ---
 
@@ -185,274 +209,285 @@ These rules carry over from devlog, adapted for structured data:
 
 Built first and tested hardest. Every number on screen should trace back to one of these.
 
-| Module | Contents | Replaces |
-|---|---|---|
-| `units` | SI internally; AU, ly, c, g, M☉, R⊕ and so on as named constants; formatting with units | Constants redefined in every tool, in both metres and km |
-| `rng` | mulberry32, FNV hash, keyed streams, distributions (normal, Poisson, weighted pick) | Three PRNG families |
-| `vec` | 3-vectors, matrices, quaternions; frame transforms (galactic ↔ equatorial ↔ ecliptic ↔ planet body-fixed) | The J2000→galactic matrix copied in three files |
-| `time` | Reference time scale, durations, proper time (section 5) | Ad-hoc `8766 h/yr` and `365.25 d` |
-| `calendar` | Calendar definitions and conversions (section 5) | — |
-| `orbit` | Kepler solver, orbital elements ↔ state, n-body positions at a date, synodic periods, habitable zone, insolation, tides, day length | The circular-orbit sun in torchlight |
-| `foam` | Collapse threshold (`r = 2.7 AU·∛M`), tidal load tensor and its norms (from lee-planner), drop-point search, leg limit, top speed with artificial-gravity tilt, gas drain | lee-planner, travel-times, star-gen parameters |
-| `torch` | Rocket equation, 1 g flip-and-brake crawl, relativistic proper time, torch power and brightness | Four separate crawl implementations |
-| `sky` | Apparent position and magnitude of stars, planets, moons and torches from any surface point; extinction and airmass; twilight | Torchlight's built-in model |
-| `kinematics` | Trapezoidal speed profiles, timetables, vehicles at time t (from `city-gen.js`) | Two copies of `moveDist` |
-| `flow` | Traffic circulations, edge flows, Little's-law counts (section 6) | — |
+| Module | Contents |
+|---|---|
+| `units` | SI internally; AU, ly, c, g, M☉, R⊕ and so on as named constants; formatting with units |
+| `rng` | mulberry32, FNV hash, keyed streams, distributions (normal, Poisson, weighted pick) |
+| `vec` | 3-vectors, matrices, quaternions; frame transforms (galactic ↔ equatorial ↔ ecliptic ↔ planet body-fixed) |
+| `time` | Reference time scale, durations, proper time (section 5) |
+| `calendar` | Calendar definitions and conversions (section 5) |
+| `orbit` | Kepler solver, orbital elements ↔ state, positions at a date, synodic periods and alignment windows, habitable zone, insolation, tides, day length |
+| `foam` | Collapse threshold as a function of mass, tidal load tensor and its norms, drop-point search, leg limit, top speed with artificial-gravity tilt, gas drain |
+| `torch` | Rocket equation, 1 g flip-and-brake crawl, relativistic proper time, torch power and brightness |
+| `sky` | Apparent position and magnitude of stars, planets, moons and torches from any surface point; extinction and airmass; twilight |
+| `kinematics` | Trapezoidal speed profiles, timetables, vehicles at time t |
+| `flow` | Directed flow network, node balance, balancing solver, Little's-law counts (section 6) |
 
-**Shared setting constants live in `world/settings/physics.json`,** not in code:
+**The setting's physical rules are world data, not code.** Each world's
+`settings/physics.json` holds them:
 
-- foam speed (6,500 c), threshold (2.7 AU), leg limit (15 ly), g_max (1.9 g)
+- foam top speed, collapse threshold constant, leg limit, artificial-gravity limit
 - torch exhaust speed, governor cutoff
 - default stopover time
 
-The library takes these as an argument, so every tool sees the same values and a canon change is
-a one-line diff.
+The library takes these as an argument. A new world starts from a template that the author can
+change at any time. The app has no idea which values are canon; it just shows what follows from
+the values in the open world.
 
 ---
 
 ## 5. Time and calendars
 
-The timeline has to handle Gregorian, a possible 360-day Galactic calendar, AE and S− year counts,
-planet-local calendars and ship clocks.
+The timeline must support several date systems side by side: Earth's Gregorian calendar, a
+possible 360-day Galactic calendar, era year-counts, planet-local calendars, a separate calendar
+for an insular culture, and ship clocks.
 
 ### 5.1 One reference time scale
 
-- **Internally, every instant is one number:** SI seconds since an epoch (J2000.0) on a single
-  reference clock. For a fixed rest frame of the foam, the setting's own rule already supplies one:
-  roughly the local gas, ultimately something like the cosmic background.
-- In practice, read it as Sol-barycentric time. Seconds since J2000 stay exact integers in a double
-  for ±285 million years.
+- **Internally, every instant is one number:** SI seconds since an epoch on a single reference
+  clock. In practice, read it as Sol-barycentric time. Seconds since J2000 stay exact integers in a
+  double for ±285 million years.
 - **Calendars are only ways of reading that number.** Converting between them is exact, so an
   event entered in one calendar shows correctly in every other.
 
 ### 5.2 Calendar kinds (data, not code)
 
-Calendars are defined in `calendars/*.json` using a few built-in kinds:
+Each world defines its calendars in `calendars/*.json` using a few built-in kinds:
 
 | Kind | Example | Notes |
 |---|---|---|
-| `gregorian` | Earth civil calendar | Proleptic Gregorian with leap years. No leap seconds: future ones can't be known, and nobody in-world would keep them. The slow drift of Earth's rotation is ignored unless a story needs it. |
-| `fixed` | **Galactic Standard** | Year/month/day/hour units of exact SI lengths, so 360 × 30 days × 24 h × 3,600 s. No intercalation. Its epoch is a parameter. |
-| `solar` | Altaris local | Derived from a body's real solar day and tropical year (from `orbit`), with a leap rule computed to track the seasons. "Local hours" are 1/24 of a local day, as the author proposed. Week length is configurable. |
-| `era` | AE, S−, "+ years from 2026" | A year count laid over another calendar, with an epoch event (the Accord Charter for AE). |
-| `clock` | Ship time, a station's clock | An offset and rate against reference time. Torch ships at 25% c run about 3% slow (γ ≈ 1.033), and the `torch` module accumulates that. |
+| `gregorian` | Earth civil calendar | Proleptic Gregorian with leap years. No leap seconds: future ones can't be known. The slow drift of Earth's rotation is ignored unless a story needs it. |
+| `fixed` | A 360 × 30 × 24 "Galactic" calendar | Year/month/day/hour units of exact SI lengths. No intercalation. Its epoch is a parameter. |
+| `solar` | A planet's local calendar | Derived from the body's real solar day and year (from `orbit`), with a leap rule computed to track the seasons. Local hours are a configurable fraction of the local day. Week length is configurable. It changes automatically if the body's orbit or rotation is edited. |
+| `era` | Year counts from some event | A year count laid over another calendar, with an epoch event. |
+| `clock` | Ship time, a station's clock | An offset and rate against reference time. Torch ships at relativistic speeds run slow, and the `torch` module accumulates that. |
 
-**A side effect of the Galactic calendar:** it is 5.24 days shorter than the tropical year, so its
-months slip through Earth's seasons in a full cycle about every **70 years**. On every other
-planet it is out of step with the local year by an amount the app can show per world. That
-is the "nobody's calendar matches their planet" effect, computed exactly.
+**A side effect a fixed 360-day calendar would have:** it is 5.24 days shorter than Earth's
+tropical year, so its months slip through Earth's seasons in a full cycle about every 70 years. On
+every other planet it drifts against the local year by an amount the app shows per world.
 
 **Cultures choose calendars.** Which calendar a culture uses, and when it switched, is a timeline
-event. The insular culture can keep its own `solar` or `fixed` calendar, and any date can be
-displayed "as they would write it".
+event. Any date can be displayed "as that culture would write it".
 
 ### 5.3 How events store dates
 
 ```json
-{ "id": "charter", "name": "Accord Charter ratified",
-  "when": { "cal": "gregorian", "date": "2776", "precision": "year", "circa": true },
-  "canon": "proposed", "tags": ["politics"], "refs": ["accord"] }
+{ "id": "e7k2", "name": "Charter ratified",
+  "when": { "after": "e3m9", "offset": "130 y", "cal": "gal" },
+  "tags": ["politics"], "refs": ["p4q1"] }
 ```
 
 - **Precision and uncertainty are first-class:** year / month / day / minute, `circa`, and
-  ranges (`"AE 130–200"`). Much of the timeline is still fuzzy, and the editor must not force
-  false precision.
-- **Dates can be anchored to other events:**
-  `{"after": "charter", "offset": "130 y", "cal": "galactic"}`. The timeline is still moving, so
-  shifting the Charter should shift everything anchored to it. That is exactly the
-  "rebuild-the-galaxy" problem avoided at the timeline level. Anchors resolve in dependency order,
-  and cycles are reported as errors.
-- **Canon status on every event:** `canon` / `proposed` / `generated` / `rejected`. This mirrors
-  the red/yellow/green provenance in `tools/origins`.
+  ranges. Early on most dates are fuzzy, and the editor must not force false precision.
+- **Dates can be anchored to other events,** as an offset in any calendar. Moving one event moves
+  everything anchored to it, which avoids the cascade problem at the timeline level. Anchors
+  resolve in dependency order, and cycles are reported as errors.
+- **Technology events gate the simulation.** "Foam drive available" is an event, and the history
+  generator and route tools ask the timeline what is possible at a given date.
 
 ---
 
-## 6. Routes and traffic: balance by construction
+## 6. Routes and traffic
 
 ### 6.1 Network
 
 - **Nodes** are systems and stations. Positions come from the star atlas.
 - **Legs** connect two nodes, are at most the leg limit long, and stay clear of nebulae.
-- **Lanes** are named chains of legs. The galactic route planner is the existing star-map A*,
-  moved into `@malevo/core`.
-- A lane's direction as seen from any node comes from the two star positions. This is how the sky
-  view knows which way to look for incoming torches.
+- **Routes** are named chains of legs, either drawn by hand or found by the galactic route
+  planner (A* under the leg limit).
+- **A route's direction as seen from any node** comes from the two star positions. The sky view
+  uses this to know where to draw incoming torches.
 
-### 6.2 Flows are made of circuits
+### 6.2 Flows are directed and need not be symmetric
 
-- **Traffic is not entered as per-edge numbers.** Those can be unbalanced, and nothing would
-  catch it. Instead, traffic is a set of **services**: closed circuits with a frequency, for
-  example `persis → altaris → persis, 12 ships / galactic day`, or a three-stop loop.
-- **Edge flows are the sum of the services that use each edge.** Any sum of closed circuits is
-  automatically balanced: at every node, average ships in equal average ships out. That is the
-  balance the author wants, guaranteed by the data structure rather than by checking afterwards.
-- Excluded on purpose, as the author specified: maiden voyages and trips to the scrapyard.
-  Optional one-off flows (a colonization wave, an evacuation) can still be entered as explicit
-  open flows. The checks panel reports every node's imbalance, so they never pass silently.
-- **Seasonality:** a service can carry a yearly profile, such as lee-season surges or
-  Approach's "expected load at that time of year". The yearly average must still balance; the
-  instantaneous flow can swing.
+- **Traffic is entered as directed flows: ships per unit time in one direction along a route.**
+  A → B and B → A are independent numbers. A route can carry 27 ships a day one way, 7 the other
+  way, or none.
+- **Flows can be entered at two levels; both resolve to the same per-edge numbers:**
+  - **Edge flows:** a number on one directed leg or route.
+  - **Itineraries:** a one-way path through several nodes with a frequency, for example
+    A → R → B at 17 a day. R is a rest stop: those ships arrive from A and leave for B.
+    Itineraries make through traffic explicit. They let the app say how many ships at a node are
+    passing through and how many are terminating, and they let it count fleet size.
+- **Balance is a rule the app checks, not something the data structure forces.** At every node,
+  average arrivals should equal average departures, summed over all routes and directions.
+  Maiden voyages and trips to the scrapyard are left out. In the rest-stop example R balances by
+  itself (17 in, 17 out). A then has 17 more departures than arrivals and B 17 more arrivals than
+  departures. The checks panel reports this until other flows bring those ships back, for example
+  B → C → A. The world's settings hold a balance tolerance.
+- **The balance report** shows, for each node:
+  - arrivals, departures and net imbalance
+  - through traffic vs terminating traffic
+  - each route's contribution in each direction
+
+  It also shows a network view of where an imbalance is created and where it would have to be
+  absorbed.
+- **The balancing helper** proposes the smallest set of flow changes that would balance the
+  network, either on routes the author picks or on the cheapest return routes. The author accepts
+  or ignores each one; it is never applied automatically.
+- **Seasonality:** a flow can carry a yearly profile, such as surges in alignment seasons. The
+  balance rule applies to the yearly average. The instantaneous flow can swing.
 
 ### 6.3 Derived numbers (Little's law)
 
-From one flow number λ (ships per day on an edge) and the shared physics:
+From the flow λ on each directed edge (ships per day) and the shared physics:
 
 - **Ships in transit on a leg:** λ × trip time.
-- **Torches visible in a system's sky:** λ × crawl time, split into inbound and outbound and
-  placed along each lane's direction. Torchlight will draw from this.
-- **Port load:** Σ inbound λ, checked against capacity. The stack model for Bluff gives about
-  77–80 freighters a day.
-- **Fleet size:** Σ over services of frequency × circuit time, including stopovers.
+- **Torches visible in a system's sky:** λ_in × inbound crawl time plus λ_out × outbound crawl
+  time, placed along each route's direction. Asymmetric flows show up in the sky as
+  asymmetric torches.
+- **Port load:** Σ arrivals that terminate there, checked against the capacity model.
+- **Fleet size:** Σ over itineraries of frequency × itinerary time, including stopovers.
 
-### 6.4 Where demand comes from
+### 6.4 Where flows come from
 
-- **Early on, services are authored by hand.** The Persis–Altaris lane and the others the
-  stories need come first.
-- **Later, a gravity-model generator proposes services.** Trade between two places scales with
-  their populations and economies, multiplied by the two cultures' affinity, divided by a cost
-  that grows with travel time. Each proposal is turned into circuits.
-- The insular culture's low affinity yields few services, a property of the inputs rather than
-  something hand-coded. Generated services are Derived until locked.
+- **At first, flows are entered by hand.**
+- **Later, a demand generator proposes flows.** Trade between two places scales with their
+  populations and economies, multiplied by the two cultures' affinity, divided by a cost that grows
+  with travel time. The trade can be lopsided (exports vs imports). The generator then adds the
+  return traffic the balance rule needs, along the cheapest routes, which may not be the same
+  route.
+- Low-affinity cultures get thin traffic because of their inputs, not because of a special case.
+- Generated flows are Derived until locked.
 
 ---
 
 ## 7. The tools
 
-Each tool is a set of editors and views over the shared model. "Supersedes" names the story-thing
-tool it replaces; those tools stay where they are until their replacement is good enough.
+Each tool is a set of editors and views over the shared model, and every one of them can create,
+move and delete freely. The prototype tool each one ports algorithms from is noted, as a source
+of code, not data.
 
 ### 7.1 Timeline editor
 
-- Events on a zoomable timeline across centuries, with calendar switching and filters (canon
-  status, tags, polity, culture, system).
+- Events on a zoomable timeline across centuries.
+- Calendar switching and filters (tags, polity, culture, system).
 - Anchored dates, ranges, uncertainty bands.
 - **A global "current date" that every other tool follows.** Picking a date shows the galaxy, a
   planet's sky or a city as they are then.
-- Story entities (title, date range, locations) live on the timeline too. The app can then answer
-  "what was true during *The Human Experience*?"
-- **Import:** `world/timeline.md` (events tagged `proposed`).
+- **Story entities** (title, date range, locations) live on the timeline too. The app can then
+  answer "what was true during this story?"
 
 ### 7.2 Culture editor
 
-- **Cultures and polities are separate kinds,** since canon says cultures span governments.
-  Polities include FSN, Stellarium, the Xenophobe State, the Port Authority and the Accord.
-  Cultures include the Collective, the Neo-Amish, the Proprietors and so on.
-- **Each culture has parameters:** openness/insularity, trade propensity, expansion drive,
-  tolerance of synthetic personhood, calendar used, naming palette (from `settle.js`), and tech
-  adoption lag.
+- **Cultures and polities are separate kinds.** A culture can span several polities.
+- **Each culture has parameters:** openness/insularity, trade propensity, expansion drive, the
+  calendar it uses, a naming palette, and tech adoption lag. Other parameters can be added per
+  world.
 - **Affinity between two cultures** is derived from how far apart their parameters are, plus
   explicit pairwise overrides, plus timeline events that change relations (wars, treaties). It is
   shown as a matrix and as a graph.
-- **Systems carry polity control and culture mix over time.** These are timeline-indexed, so
-  "who held this system in AE 250" has one answer.
+- **Systems carry polity control and culture mix over time.** These are timeline-indexed.
 
 ### 7.3 History generator
 
-- A port of `settle.js` (decade steps, slow-ship era, foam era, polity borders, culture blending)
-  onto the shared core, with three changes:
-  - **Gated by the timeline.** Capabilities come from tech events ("foam drive available",
-    "Slot Standard"), so nothing uses foam before the foam event.
-  - **Constrained by canon.** Authored facts are fixed points the simulation must honor: Altaris
-    founded AE 130, Persis about 4.5 ly away, the polity shares. If it cannot honor one, it reports
-    the conflict instead of quietly breaking it.
-  - **Proposes and does not overwrite.** A run produces a diff of proposed systems, lanes,
-    services and events. The author accepts pieces, and accepted pieces become Locked.
-- Information propagation: news moves at foam speed via couriers. The generator can answer "when
-  did system X learn of event Y", which matters for history with no real-time comms.
-- **Supersedes:** star-map's "Simulate settlement".
+Ported from the prototype `settle.js`: decade steps, a slow-ship era, a foam era, polity borders
+and culture blending, all running on the shared core. It adds four things:
+
+- **Gated by the timeline.** Capabilities come from technology events, so nothing uses foam before
+  the foam event, and so on.
+- **Respects what the author has fixed.** Authored and locked facts are fixed points: a system
+  settled at a given date, a given polity's share. If the simulation cannot honor them, it
+  reports the conflict instead of quietly breaking it.
+- **Proposes and does not overwrite.** A run produces a diff of proposed systems, routes, flows
+  and events. The author accepts pieces, and accepted pieces become Locked. Runs can also go into a
+  fork to compare.
+- **Information propagation.** News moves only as fast as ships. The generator can answer "when
+  did system X learn of event Y".
 
 ### 7.4 Solar system planner
 
-- **Star:** taken from the atlas (a real HYG star or a generated one), with overrides.
-- **Bodies:** planets, moons and belts, with Keplerian elements, mass, radius, rotation and
-  axial tilt.
-- **Derived values:** habitable zone, insolation, day length, seasons, tides, collapse radius
-  per body, synodic periods and alignment seasons.
+- **Star:** chosen from the atlas (a real catalogue star or a generated one), with overrides. A
+  system can be moved to a different star at any time; the derived consequences show before
+  committing.
+- **Bodies:** planets, moons and belts, with orbital elements, mass, radius, rotation and axial
+  tilt. Drag them to change orbits.
+- **Derived values:** habitable zone, insolation, day length, seasons, tides, the collapse radius
+  of each body, synodic periods and alignment seasons between any pair.
 - **Orbit view at the current date.**
-- Unauthored systems are generated lazily from their star's key and become files only once locked.
-- **Checks the model will run, for example:**
-  - Hollin at 2.6 AU around a 1 M☉ star has a 4.19-year period. Its synodic period with Altaris
-    is then 1.31 years, and Altaris gains 113° on it each lap. The ~4-year period in
-    `technology.md` and the 1.3-year lap in the navigation notes therefore agree.
-  - "10 hours of daylight in midwinter at 28°N" has no solution with a 23.4° tilt. The app
-    shows that directly.
-- **Supersedes:** the missing system editor noted in the star-map README.
+- Systems nobody has worked on are generated lazily from their star's key and become files only
+  once locked.
+- **Feasibility questions answered directly.** Example: "can a city at this latitude have only
+  10 hours of daylight at midwinter with this tilt?" The app gives the answer and the range of
+  tilts that would allow it.
+- Ports algorithms from the prototype `star-gen.js` and the planned system editor.
 
 ### 7.5 Route planner
 
 Route planning happens at two scales on the same network.
 
 - **Galactic scale**
-  - Lanes, legs, services and flows.
+  - Routes, legs, itineraries and directed flows.
   - Trip times with stopovers.
-  - The balance report from section 6.2.
-- **Approach scale (the lee-planner, generalized)**
+  - The balance report and balancing helper from section 6.2.
+- **Approach scale** (generalizing the prototype lee-planner)
   - For any arrival system at any date: the collapse surface from all its bodies, the drop
-    points, the crawl times, lee seasons and their timings, chart margins against a navigator's
-    margins, and what happens when an arrival misses.
-  - Altaris, Hollin and Persis are its first case, and it must reproduce the lee-planner's tables
-    in `ftl-navigation-notes.md`.
-- **Supersedes:** lee-planner, travel-times and the star-map routing panel.
+    points, the crawl times, and the windows when a giant planet shortens the approach.
+  - Chart margins against a navigator's margins, and what happens when an arrival misses.
+- **Regression tests** reproduce the prototype's numbers for the same inputs, set up in a
+  synthetic fixture. This confirms the port is faithful; it says nothing about canon.
+- Ports algorithms from the prototype lee-planner, travel-times and star-map routing.
 
 ### 7.6 Planet terrain generator
 
 - Seeded noise on the sphere, evaluated in 3D on the unit sphere so resolution never changes the
   result.
 - **Parameters:** plate count, sea level, roughness, ice and so on. Climate and biome colours are
-  derived from insolation and tilt (from `orbit`).
+  derived from insolation and tilt (from `orbit`), so moving the planet changes its look
+  automatically unless the look is locked.
 - **Roll, then lock:** re-roll seeds until a look is right, then lock the seed, parameters and
   generator version.
-- **Hand shaping is stored as text,** never as pixels: control points, continent outline polygons
-  and height or feature strokes, all in lat/lon. Example: "a Florida-like limestone peninsula with
-  a west-coast bluff at 28°N".
+- **Hand shaping is stored as text,** never as pixels: control points, coastline polygons and
+  height or feature strokes, all in latitude/longitude.
 - Rasters such as textures and height maps are derived and cached. They can be exported for
-  covers or reference without being committed.
+  reference without being committed.
 
 ### 7.7 Planet population planner
 
-- Cities placed at canonical lat/lon positions, each with founding date, population keyframes
-  over time, port role and polity/region.
+- Cities placed at lat/lon on a planet, each with founding date, population over time, port role
+  and polity/region.
 - **"Conditions at a time" for any place:**
   - local solar time and local calendar date
   - season, daylight hours and twilight
   - tide phase
-  - the sky: Sun, moon, planets, real star positions from *this* system, and lane torches from
-    section 6.3
+  - the sky: sun, moons, planets, real star positions as seen from *this* system, and route
+    torches from section 6.3
   - which ships are in port
-- **The sky view is torchlight, generalized to any planet, latitude and date.** It is a shared
-  `@malevo/viz` component, so a city view and the population planner show the same sky.
-- **Supersedes:** torchlight and classic torchlight.
+- **The sky view is a shared `@malevo/viz` component** for any planet, latitude and date. The city
+  planner and the population planner show the same sky.
+- Ports algorithms from the prototype torchlight.
 
 ### 7.8 City planner
 
-- The `bluff-city` format (FORMAT.md) moves over as format v2:
+- The prototype city format, moved over as format v2:
   - anchored to a planet and lat/lon, so sun direction, latitude and gravity come from the model
   - transit services use `@malevo/core` kinematics
-  - speeds come from one place, which settles the tram and field-line conflicts
-- **Travel-time estimation** across walking, transit (with headways and dwell) and lighters.
-  Routes are computed on the city's network at a given time of day.
-- The 3D preview, and the port and stack capacity model, reuse the shared flow numbers.
-- **Supersedes:** bluff-planner, bluff-map and stack.
+  - each speed and size has one source, inside the city file
+- **Travel-time estimation** across walking, transit (with headways and dwell) and surface-to-orbit
+  craft. Routes are computed on the city's network at a given time of day.
+- The 3D preview, and the port capacity model, reuse the shared flow numbers.
+- Ports algorithms from the prototype bluff-planner, bluff-map and stack.
 
 ### 7.9 Checks (cross-cutting)
 
-One panel, and also `malevo check` in CI on the data repo. It runs every validator:
+One panel, and also `malevo check` for CI on a world repo. It runs every validator:
 
 - schema errors and dangling references
 - legs longer than the leg limit, legs through nebulae
-- flow imbalance, port loads over capacity
-- events that happen before their enabling tech, anchor cycles
+- node flow imbalance beyond tolerance, port loads over capacity
+- events that happen before their enabling technology, anchor cycles
 - cities in the ocean
 - stale locked values
 
-Each finding links to the entity concerned.
+Each finding links to the entity concerned. Every finding is a warning the author can
+acknowledge; none blocks saving, because a half-finished world is the normal state.
 
-### 7.10 Reports back into story-thing
+### 7.10 Reports
 
-`malevo report` writes generated Markdown fact sheets, for example
-`world/generated/altaris.md` (day length, year, moon, lanes, traffic, sky facts). They carry a
-"generated, do not edit" header and are regenerated on demand. Prose work and Claude sessions in
-story-thing then read the same numbers as the app.
+`malevo report` writes generated Markdown fact sheets for any entity: a planet's day, year and
+moons; the routes and traffic at a system; sky facts for a city. They go to a folder the author
+chooses, usually inside the world repo. They carry a "generated, do not edit" header and are
+regenerated on demand, so notes and prose can quote the same numbers the app uses.
 
 ---
 
@@ -474,12 +509,11 @@ Copied from devlog, with three gaps fixed.
     macOS packaging. A release job publishes `latest*.yml` on a `v*` tag or a manual dispatch.
 - **Fixed relative to devlog**
   1. **npm workspaces.** devlog repeats its path aliases in four config files.
-  2. **A linter** (ESLint with a `no-restricted-properties` rule banning `Math.random` in
-     `core`, `model` and `gen`), plus Prettier.
+  2. **A linter** (ESLint, with a rule banning `Math.random` in `core`, `model` and `gen`), plus
+     Prettier.
   3. **macOS signing and notarization.** devlog ships unsigned, and Squirrel.Mac will not apply
      updates to an unsigned app, so macOS auto-update probably does not work there. Plan for a
-     Developer ID certificate and notarization secrets ([D6](#d6-code-signing)). Until then, macOS
-     users update by hand.
+     Developer ID certificate and notarization secrets ([D6](#d6-code-signing)).
 - **Golden-fixture job** (section 3.3) runs in the same CI.
 
 **Repo layout:**
@@ -492,7 +526,9 @@ packages/gen/          versioned generators + golden fixtures
 packages/viz/          shared React/three.js components
 packages/cli/          `malevo` command
 tools/<tool>/          each tool's UI module (registered with the host)
-assets/catalog/        HYG catalogue (moved from story-thing/tools/star-map/data)
+templates/new-world/   starting settings, calendars and physics for a new world (editable)
+fixtures/              synthetic test worlds
+assets/catalog/        real-star catalogue
 docs/                  this plan, design notes, format spec
 ```
 
@@ -501,85 +537,82 @@ docs/                  this plan, design notes, format spec
 ## 9. Phases: the order of the bites
 
 Each phase ends with something usable, and later phases only add to earlier ones. Phases 0–2 are
-the foundation, and doing them right is what makes guarantee G1 possible. Everything after that
-can be reordered to suit what the stories need next.
+the foundation, and doing them right is what makes principle P1 possible. Everything after that
+can be reordered to suit what the author wants to explore next.
 
 ### Phase 0: Skeleton (shell, release, empty world)
 
 - The repo layout above, workspaces, lint, typecheck, vitest, CI.
-- An Electron shell that opens a world folder, shows git status, and hosts an empty tool registry.
+- An Electron shell that creates or opens a world folder, shows git status, and hosts an empty
+  tool registry.
 - Auto-update end to end. Shipping `v0.1.0` and updating to `v0.1.1` is the exit test.
 - `world.json` with a format version and world seed; refuse unknown formats.
 
-**Exit:** an installable app that updates itself and opens an empty world.
+**Exit:** an installable app that updates itself and creates or opens an empty world.
 
 ### Phase 1: Core library and the stability contract
 
 - `units`, `rng`, `vec`, `time`, `calendar` (all five kinds), `orbit`, `foam`, `torch`,
-  `kinematics` and `flow`, with unit tests checked against known values. Lee-planner's tables and
-  Earth ephemeris spot checks are among them.
+  `kinematics` and `flow`, with unit tests checked against textbook values: real solar-system
+  ephemeris spot checks, rocket-equation cases, and port-fidelity cases from the prototypes.
 - `@malevo/model`: zod schemas, the canonical serializer (key order, precision, formatting),
   loader and saver, reference resolution, the dependency and staleness graph, and the validator
   framework.
 - The generator framework: `name@version` registry, keyed streams, golden-fixture tooling.
 - `malevo check` and `malevo check --fix`.
-- `world/settings/physics.json` holding the shared foam and torch constants.
+- The new-world template, including `settings/physics.json`.
 
 **Exit:** a world folder can be validated in CI. Changing a frozen generator fails the build.
 
 ### Phase 2: Timeline editor and calendars (first real tool)
 
-- The event schema, with anchors, precision and canon status.
+- The event schema, with anchors, precision and tags.
 - The timeline UI and the global "current date".
-- Calendar definitions for Gregorian, Galactic (draft), AE/S−/+ eras and Altaris local (once the
-  Altaris body exists, Phase 3).
-- Import `world/timeline.md`.
+- The calendar editor for all five kinds; `solar` calendars become usable once bodies exist
+  (Phase 3).
+- Fork and compare worlds (section 3.6), first exercised on timelines.
 
-**Why first:** the dependencies are simple, it settles the editing and saving UI patterns every
-other tool reuses, and every later tool needs "current date".
+**Why first:** the dependencies are simple, it settles the editing, saving and forking patterns
+every other tool reuses, and every later tool needs "current date".
 
 ### Phase 3: Star atlas and solar system planner
 
-- Port `star-gen.js` (generated faint stars, per-cell seeding) and the HYG catalogue as `gen` and
-  assets.
-- Import `atlas.json`. The imported generated stars must keep their ids and positions, and the
-  golden test proves it.
+- The real-star catalogue as an asset. Port the prototype star generator (generated faint stars,
+  per-cell seeding).
+- A galaxy view where systems can be placed on stars and moved between them.
 - The system and body editor, orbit view and derived physics.
-- **First authored systems:** Altaris (with its moon), Hollin, Persis and Sol. Each should be tied
-  to a real or generated atlas star, which also fixes the direction of Persis in Altaris's sky.
+- Optional loading of a prototype atlas file into a scratch world as a starting sketch.
 
 ### Phase 4: Cultures and polities
 
 - Culture and polity editors, the affinity model, and control and culture mix over time.
-- Import the cultures, governments and settlement shares from story-thing.
 
 ### Phase 5: Galactic routes and traffic
 
-- Legs, lanes, services, the flow balance report and Little's-law numbers.
-- Author the Persis–Altaris lane and the other lanes into Altaris. Bluff's port load must come out
-  against the stack's capacity.
+- Legs, routes, itineraries and directed flows.
+- The balance report and balancing helper, and the Little's-law numbers.
 
 ### Phase 6: Sky view and approach planner
 
-- The `sky` module, with the torchlight atmosphere and brightness physics moved into `@malevo/viz`.
-  It draws real stars from the atlas, bodies from the system and torches from the flows.
-- Approach-scale lee planning, reproducing the lee-planner's results through the shared `foam`
-  module.
+- The `sky` module, with the prototype torchlight's atmosphere and brightness physics moved into
+  `@malevo/viz`. It draws real stars from the atlas, bodies from the system and torches from the
+  flows.
+- Approach-scale planning through the shared `foam` module.
 
-**Exit:** the guarantee G2 test from section 1. The night sky over Bluff shows exactly the lanes
-and torch counts the route planner says.
+**Exit:** the principle P2 test from section 1, on a fixture world. The sky from a city shows
+exactly the routes the route planner has and the torch counts it implies. Editing a flow changes
+the sky.
 
 ### Phase 7: History generator
 
-- Port `settle.js` onto the shared core. Add tech gating, canon constraints, propose/accept diffs
-  and information propagation.
+- Port `settle.js` onto the shared core. Add tech gating, respecting fixed facts, propose/accept
+  diffs and information propagation.
 - This comes after phases 2–5 because it needs all of their entity types as inputs and outputs.
 
 ### Phase 8: Planet terrain
 
 - The spherical noise generator, roll and lock, vector hand shaping, climate colouring and
   cached rasters.
-- **First planet:** Altaris, including the limestone peninsula and the bluff.
 
 ### Phase 9: Population planner
 
@@ -588,34 +621,29 @@ and torch counts the route planner says.
 
 ### Phase 10: City planner
 
-- Port the `bluff-city` format to v2 and import `bluff.city.json`.
-- Timetables and travel-time routing on the shared kinematics, the 3D preview, and the stack
-  capacity model.
+- The city format v2, timetables and travel-time routing on the shared kinematics, the 3D preview
+  and the port capacity model.
+- Optional loading of a prototype city file as a starting sketch.
 
 ### Phase 11 onward
 
 - `malevo report` fact sheets (can come earlier if useful).
-- Gravity-model service generation, scene briefs ("conditions for this scene"), cover and
-  reference exports, and retiring the old story-thing tools.
+- The demand generator for flows, scene briefs ("conditions for this scene"), and reference
+  exports.
 
 ---
 
-## 10. What the existing data will need
+## 10. Lessons from the prototypes
 
-When it is imported, each inconsistency below goes to the author to decide, as a check finding
-with each source cited, rather than being settled silently:
+The prototype tools disagree with each other on the same quantity in several places: the collapse
+threshold, transit speeds, a parking-orbit tilt, a time offset, a funicular's length. The app
+does not pick winners. The lesson is structural, and the plan builds it in:
 
-| Item | Conflict |
-|---|---|
-| Collapse threshold | 2.58 AU (torchlight *Sandpiper* drop), 2.70 AU (lee-planner and others), 2.85 AU (`technology.md`, redesign prompt) |
-| Terrace tram speed | 15 km/h (maps) vs 12 m/s ≈ 43 km/h (city file) |
-| Field line speed | 60 km/h (measure tools) vs 25 m/s = 90 km/h (city file, torchlight) |
-| Parking-orbit tilt | 29° (torchlight README) vs 28° = latitude (stack) |
-| Ship time vs Bluff local | +10 h 35 m (timeline) vs +13 h 27 m (navigation notes) |
-| Settlement shares | "about a quarter" / "about a tenth" (README) vs 0.27 / 0.12 (`settle.js`) |
-| Altaris day length | 24 h (torchlight default) vs ~28.6 h (author-words); a "10 h daylight" figure that can't fit 28°N |
-| Story year | ~+900 (`overview.md`) vs +1,200 (`timeline.md`) |
-| Funicular | 175 m built into torchlight vs ~177 m in the city file |
+- **Every quantity has exactly one home in the world data,** and every tool reads it from there.
+- **Values a world is likely to change are settings, not constants in code.** Examples: the
+  threshold constant, the leg limit, transit speeds.
+- **Values that can be computed are never entered twice.** A planet's day length, the number of
+  torches in a sky and a port's load are derived from their inputs.
 
 ---
 
@@ -623,37 +651,34 @@ with each source cited, rather than being settled silently:
 
 Each has a recommendation, and the plan proceeds on it unless the author says otherwise.
 
-### D1. Where the world data lives
+### D1. Where world data lives (settled)
 
-- Options: a `data/` folder inside story-thing, a separate world-data repo, or inside this app repo.
-- **Recommendation:** `story-thing/data/`. Canon prose and canon numbers then change in the same
-  commit, and the `malevo report` fact sheets sit next to the prose that uses them. The app opens
-  any folder, so this can change later at no cost.
+World data lives in its own repository, separate from this app repo and the prose. This
+repository holds only the app, templates and synthetic fixtures.
 
 ### D2. File format
 
 - Options: JSON vs YAML/TOML.
 - **Recommendation:** JSON with a canonical formatter, plus Markdown sidebars for prose. JSON is
-  the format the existing tools already use, it is unambiguous, and the formatter keeps diffs small.
-  YAML's comments are its main advantage, and the sidebars cover most of that.
+  the format the prototype tools already use, it is unambiguous, and the formatter keeps diffs
+  small. YAML's comments are its main advantage, and the sidebars cover most of that.
 
-### D3. The Galactic calendar
+### D3. Calendars in the new-world template
 
-- Whether it is canon, its epoch, and its adoption date (which can differ per polity).
-- **Recommendation:** build it now as a `fixed` calendar marked `proposed`. Its epoch and adoption
-  are timeline events, so either can move without touching anything else.
+- **Recommendation:** a new world starts with Gregorian only. The 360-day calendar is offered as a
+  ready-made `fixed` preset to add. Its epoch and each culture's adoption are timeline events, so
+  any of them can move freely.
 
 ### D4. The reference clock and relativity
 
 - **Recommendation:** use one Sol-barycentric reference time, with proper time tracked for torch
-  legs (about 3% at 25% c).
-- Open question for the author: does a foam pocket's clock run at reference rate? The canon
-  "pocket of normal spacetime" suggests yes, and that is the default.
+  legs.
+- A world setting decides whether FTL travel has a clock-rate effect. The default is "none".
 
 ### D5. The unit for traffic flow
 
-- **Recommendation:** ships per Galactic day, which is exactly 86,400 s, so it equals ships per
-  Earth day. Display can also show ships per year.
+- **Recommendation:** ships per day, where a day is exactly 86,400 s, so it equals a Galactic day.
+  The display can also show ships per year, or per local day.
 
 ### D6. Code signing
 
@@ -665,9 +690,15 @@ Each has a recommendation, and the plan proceeds on it unless the author says ot
 ### D7. Git integration level
 
 - Options: show status and commit on request, or devlog-style automatic commit and push.
-- **Recommendation:** show status and commit on request. Canon edits should be deliberate. Auto-
-  sync can be an option later.
+- **Recommendation:** show status and commit on request, plus fork and compare. Settled data
+  should be a deliberate commit.
 
 ### D8. Platforms
 
 - **Recommendation:** macOS and Windows in CI, as devlog does. Linux AppImage if wanted.
+
+### D9. Balance tolerance
+
+- How large an imbalance at a node counts as "significant"?
+- **Recommendation:** a world setting, defaulting to a warning above 2% of a node's total traffic
+  or 1 ship per day, whichever is larger.
