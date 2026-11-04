@@ -572,18 +572,25 @@ Copied from devlog, with two gaps fixed. **Windows only** for now: this is a per
 **Repo layout:**
 
 ```
-apps/desktop/          src/main, src/preload, src/renderer (tool host), electron-builder.yml
+src/main, src/preload  Electron main process and preload bridge (the app is the root package)
+src/renderer/          tool host; each tool's UI module lives in src/renderer/src/tools/<tool>/
+src/shared/            IPC channel names, shared types, pure policies (update timing)
 packages/core/         pure library (section 4)
 packages/model/        schemas, canonical serializer, loader/saver, queries, validators
 packages/gen/          versioned generators + golden fixtures
 packages/viz/          shared React/three.js components
 packages/cli/          `malevo` command
-tools/<tool>/          each tool's UI module (registered with the host)
 templates/new-world/   starting settings, calendars and physics for a new world (editable)
 fixtures/              synthetic test worlds
 assets/catalog/        real-star catalogue
-docs/                  this plan, design notes, format spec
+scripts/               smoke test, icon generator
+docs/                  this plan, development guide, design notes, format spec
 ```
+
+The Electron app is the root package, as in devlog, and `packages/*` are npm workspaces. Keeping
+the app at the root avoids electron-builder's quirks with hoisted workspace dependencies. Workspace
+packages are dev dependencies whose `exports` point at TypeScript source, so Vite bundles them into
+the app and no package needs its own build step.
 
 ---
 
@@ -593,7 +600,10 @@ Each phase ends with something usable, and later phases only add to earlier ones
 the foundation, and doing them right is what makes principle P1 possible. Everything after that
 can be reordered to suit what the author wants to explore next.
 
-### Phase 0: Skeleton (shell, release, empty world)
+### Phase 0: Skeleton (shell, release, empty world) — built
+
+Built; see [DEVELOPMENT.md](DEVELOPMENT.md). The exit test (updating v0.1.0 to v0.1.1 on Windows)
+needs two published releases.
 
 - The repo layout above, workspaces, lint, typecheck, vitest, CI.
 - An Electron shell that creates or opens a world folder and hosts an empty tool registry.

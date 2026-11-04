@@ -1,0 +1,25 @@
+appId: com.sdeken.malevo-science
+productName: Malevo Science
+directories:
+  buildResources: build
+  output: release
+icon: build/icon.png
+publish:
+  provider: github
+  owner: sdeken
+  repo: malevo-science
+  releaseType: release
+files:
+  - out/**
+  - package.json
+# Windows only (plan decision D8). Unsigned (D6): electron-updater applies
+# updates to an unsigned app; the cost is a SmartScreen prompt on first install.
+win:
+  target: [nsis]
+  artifactName: Malevo-Science-Setup-${version}.${ext}
+nsis:
+  oneClick: true
+  perMachine: false
+  allowToChangeInstallationDirectory: false
+  deleteAppDataOnUninstall: false
+npmRebuild: false

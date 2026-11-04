@@ -1,0 +1,11 @@
+{
+  "name": "@malevo/model",
+  "version": "0.0.0",
+  "description": "World folder format: schemas, canonical serialization, loading and saving",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts",
+    "./node": "./src/node.ts"
+  }
+}

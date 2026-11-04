@@ -1,0 +1,91 @@
+name: Build
+
+on:
+  push:
+    branches: ['**']
+    tags: ['v*']
+  pull_request:
+  workflow_dispatch:
+    inputs:
+      release_version:
+        description: 'Publish a release for this version (must equal package.json version), e.g. 0.2.0. Leave empty to only build.'
+        required: false
+        default: ''
+
+jobs:
+  test:
+    name: Check (Linux)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - name: Check requested release version matches package.json
+        if: github.event_name == 'workflow_dispatch' && inputs.release_version != ''
+        run: |
+          v=$(node -p "require('./package.json').version")
+          if [ "$v" != "${{ inputs.release_version }}" ]; then
+            echo "package.json is $v but release_version is ${{ inputs.release_version }}"; exit 1
+          fi
+      - name: Check tag matches package.json
+        if: startsWith(github.ref, 'refs/tags/v')
+        run: |
+          v=$(node -p "require('./package.json').version")
+          if [ "v$v" != "${{ github.ref_name }}" ]; then
+            echo "package.json is $v but the tag is ${{ github.ref_name }}"; exit 1
+          fi
+      - run: npm run typecheck
+      - run: npm run lint
+      - run: npm run format:check
+      - run: npm test
+      - run: npm run build
+      - name: Smoke test the built app
+        run: xvfb-run -a --server-args="-screen 0 1280x800x24" npm run smoke:ci
+
+  windows:
+    name: Package (Windows)
+    runs-on: windows-latest
+    needs: test
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm run build
+      - name: Smoke test the built app on Windows
+        run: npm run smoke:ci
+      - run: npx electron-builder --win nsis --x64 --publish never
+      - uses: actions/upload-artifact@v4
+        with:
+          name: malevo-science-windows
+          path: |
+            release/*.exe
+            release/*.exe.blockmap
+            release/latest.yml
+          if-no-files-found: error
+
+  release:
+    name: GitHub release
+    runs-on: ubuntu-latest
+    needs: windows
+    if: startsWith(github.ref, 'refs/tags/v') || (github.event_name == 'workflow_dispatch' && inputs.release_version != '')
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: dist
+      - uses: softprops/action-gh-release@v2
+        with:
+          # On a manual run the tag is created here, on the built commit.
+          tag_name: ${{ startsWith(github.ref, 'refs/tags/') && github.ref_name || format('v{0}', inputs.release_version) }}
+          target_commitish: ${{ github.sha }}
+          # electron-updater reads latest.yml from the release assets.
+          files: dist/**/*
+          fail_on_unmatched_files: true
+          generate_release_notes: true

@@ -1,0 +1,14 @@
+// Pure entry point: safe to import from the renderer. File access lives in '@malevo/model/node'.
+export { canonicalJson } from './canonical'
+export {
+  WORLD_FILE,
+  WORLD_FORMAT,
+  WorldError,
+  isSeed,
+  newWorldManifest,
+  normalizeName,
+  parseWorldManifest,
+  serializeWorldManifest,
+  type WorldErrorCode,
+  type WorldManifest
+} from './world'
