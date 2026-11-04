@@ -559,8 +559,10 @@ Copied from devlog, with two gaps fixed. **Windows only** for now: this is a per
     hidden, never during an unsaved edit, with an "Update now" button in the status bar. The pure
     `shouldInstallNow` function and its tests port as-is.
   - CI: typecheck, test, build and a Playwright `_electron` smoke test on every push, then
-    Windows packaging. A release job publishes `latest*.yml` on a `v*` tag or a manual dispatch.
-    No macOS or Linux jobs.
+    Windows packaging. No macOS or Linux jobs.
+- **Releases are automatic.** Every push to `main` publishes a GitHub release, with the patch
+  version taken from the commit count on `main`. The repository must be public so installed copies
+  can fetch updates.
 - **Fixed relative to devlog**
   1. **npm workspaces.** devlog repeats its path aliases in four config files.
   2. **A linter** (ESLint, with a rule banning `Math.random` in `core`, `model` and `gen`), plus
@@ -602,12 +604,12 @@ can be reordered to suit what the author wants to explore next.
 
 ### Phase 0: Skeleton (shell, release, empty world) — built
 
-Built; see [DEVELOPMENT.md](DEVELOPMENT.md). The exit test (updating v0.1.0 to v0.1.1 on Windows)
-needs two published releases.
+Built; see [DEVELOPMENT.md](DEVELOPMENT.md). The exit test (one release updating itself to the next on
+Windows) needs two pushes to a public `main`.
 
 - The repo layout above, workspaces, lint, typecheck, vitest, CI.
 - An Electron shell that creates or opens a world folder and hosts an empty tool registry.
-- Auto-update end to end on Windows. Shipping `v0.1.0` and updating to `v0.1.1` is the exit test.
+- Auto-update end to end on Windows. One release updating itself to the next is the exit test.
 - `world.json` with a format version and world seed; refuse unknown formats.
 
 **Exit:** an installable app that updates itself and creates or opens an empty world.

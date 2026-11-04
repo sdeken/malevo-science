@@ -77,31 +77,40 @@ Updates come from GitHub Releases through electron-updater:
 - The status bar offers **Update now** once a download is ready.
 - Auto-install can be turned off under **Help → About**.
 
-### Publishing a release
+### How releases happen
 
-1. Bump `version` in `package.json` (for example `0.1.1`) and commit it to `main`.
-2. Do one of the following:
-   - push a tag `v0.1.1`, or
-   - run the **Build** workflow by hand with `release_version` set to `0.1.1`. CI creates the tag
-     on the built commit.
+Releases are automatic. Every push to `main` runs CI:
 
-CI then runs the checks and the Linux smoke test, builds and smoke-tests on Windows, packages the
-NSIS installer, and publishes a GitHub release with three assets:
+1. the checks and the Linux smoke test,
+2. the Windows smoke test and the NSIS installer,
+3. a GitHub release with three assets:
+   - `Malevo-Science-Setup-<version>.exe`
+   - its `.blockmap`
+   - `latest.yml`, which installed copies poll
 
-- `Malevo-Science-Setup-<version>.exe`
-- its `.blockmap`
-- `latest.yml`, which is what installed copies poll
+**Version numbers** are `<major>.<minor>.<patch>`:
 
-CI refuses to release if the tag or `release_version` doesn't match `package.json`.
+- Major and minor come from `version` in `package.json` (now `0.1`). Bump them by hand when you
+  want to mark a milestone.
+- The patch is the number of commits on `main`, so every release is numbered higher than the last.
+  This assumes `main` is never rewritten.
+- `package.json` keeps `.0` as its patch, and local builds report that.
 
-### Phase 0 exit test: updating v0.1.0 to v0.1.1
+**Pushes to other branches and pull requests** run the same checks and build the installer, but
+publish nothing. That run's installer can be downloaded from the run's **Artifacts** section on
+GitHub.
 
-1. Publish `v0.1.0` as above. Download and run `Malevo-Science-Setup-0.1.0.exe`, choosing
-   **More info → Run anyway** at the SmartScreen prompt.
+**The repository must be public for auto-update to work.** Installed copies fetch `latest.yml` and
+the installer from GitHub without signing in. A private repo's releases can still be downloaded by
+hand while signed in to GitHub, but no installed copy will ever see an update.
+
+### Phase 0 exit test: updating from one release to the next
+
+1. Push to `main`, or merge into it. Download the release's `Malevo-Science-Setup-<version>.exe`
+   and run it, choosing **More info → Run anyway** at the SmartScreen prompt.
 2. Create a world, then quit.
-3. Publish `v0.1.1`. Any visible change helps confirm the update, for example the version shown in
-   the status bar.
-4. Launch the installed v0.1.0. Within about a minute the status bar shows "Downloading 0.1.1…",
-   then **Update now to 0.1.1**.
-5. Click it. The app restarts as v0.1.1 and reopens the same world. The world folder still holds
-   only `world.json`, unchanged.
+3. Push any further commit to `main`. CI publishes the next patch version.
+4. Launch the installed copy. Within about a minute the status bar shows "Downloading <next
+   version>…", then **Update now to <next version>**.
+5. Click it. The app restarts as the new version and reopens the same world. The world folder
+   still holds only `world.json`, unchanged.
