@@ -18,7 +18,7 @@ blocked on them.
 
 ## 1. Principles
 
-### P0. The app is a workbench; canon is whatever the author commits
+### P0. The app is a workbench; canon is whatever the author keeps
 
 - **The app contains no setting.** No star, planet, culture, date, name or story-specific number
   is written into the app's code, defaults or tests. A gas giant called "Hollin" is just a body
@@ -27,9 +27,11 @@ blocked on them.
   dragged, re-rolled and deleted freely while the author explores. Nothing is canon until the
   author decides it is.
 - **Canon is a set of files.** The app writes world folders. The author decides which world
-  folder, and which commit of it, is canon. That data lives in its own repository, separate from
-  this app repo and deliberately kept out of the app's development. The app works the same on a
-  scratch world, a variant, or the canon world.
+  folder is canon, and commits it by hand to a repository of their own.
+  - The app knows nothing about that repository. It does not know about git at all: it has no git
+    integration, makes no commits and does not read history.
+  - Every commit in the canon repo is therefore a human act. A record of human effort is the point.
+  - The app works the same on a scratch world, a variant, or the canon world.
 - **Prose and notes elsewhere are reference only.** Story documents and the existing prototype
   tools informed this plan, but the app never imports them as truth. Algorithms from the prototype
   tools are ported as code. Their data (star atlas, city file) can be loaded into a scratch world
@@ -37,9 +39,10 @@ blocked on them.
 - **Tests use synthetic fixture worlds,** made up for the purpose. They test the physics and the
   formats, not any particular setting.
 
-### P1. The world is text in git, and it does not shift under you
+### P1. The world is diff-friendly text, and it does not shift under you
 
-All world data is plain text files, written for clean diffs and committed to git. Most of the world
+All world data is plain text files, written so the author can commit them to git (or anything
+else) and read clean diffs. Most of the world
 is procedural, so the main risk is a *cascade*: a change to one generator or one input ripples
 outward and quietly changes things the author has already settled. Section 3, the stability
 contract, is the defense against this. It is the first thing built and the last thing compromised.
@@ -72,7 +75,7 @@ The app replaces these copies with one library (section 4).
 
 ```
 ┌───────────────────────── Electron shell (apps/desktop) ─────────────────────────┐
-│  main: window, menus, file access, git status, auto-update, worker pool         │
+│  main: window, menus, file access, auto-update, worker pool                     │
 │  preload: typed, namespaced IPC bridge (devlog pattern)                         │
 │  renderer: tool host — one tab/pane per tool, shared selection & "current time" │
 │     ├─ Timeline  ├─ Cultures  ├─ History  ├─ Systems  ├─ Routes                 │
@@ -88,20 +91,20 @@ The app replaces these copies with one library (section 4).
 └──────────────────────────────────┬──────────────────────────────────────────────┘
                                    │ read / write canonical text
                          ┌─────────▼─────────┐        ┌──────────────────────────┐
-                         │ world folder (git)│◄───────┤ malevo CLI: check / gen / │
-                         │ any repo, any path│        │ query / report            │
+                         │   world folder    │◄───────┤ malevo CLI: check / gen / │
+                         │ (plain directory) │        │ query / report            │
                          └───────────────────┘        └──────────────────────────┘
 ```
 
 **Design rules:**
 
 - **`@malevo/core` and `@malevo/model` do not depend on Electron or the DOM.** The command-line
-  tool, the tests and CI on a world repo all run them under plain Node.
+  tool and the tests run them under plain Node.
 - **Only `@malevo/model` writes world files.** The renderer never touches the file system; it
   goes through IPC, as in devlog.
-- **A world is a folder.** The app opens any world folder, usually a git working copy, the way
-  devlog opens a repo. It shows git status and can commit on request, but it does not commit or
-  push automatically ([D7](#d7-git-integration-level)).
+- **A world is a plain folder.** The app opens any folder and does not care whether it is inside
+  a repository ([D7](#decisions)). Section 3.7 sets the rules for how it writes
+  there.
 - **Experimenting is cheap** (section 3.6). A world can be forked into a scratch copy, played with,
   compared against the original, and merged back piece by piece or thrown away.
 - **Heavy work runs in worker threads:** generation, history simulation, terrain rasters and route
@@ -177,7 +180,7 @@ These rules carry over from devlog, adapted for structured data:
   - Short arrays of numbers stay on one line.
   - The app formats on every save, and `malevo check --fix` re-formats hand edits.
 - **The format is JSON, checked against schemas (zod).** Prose lives in a Markdown sidebar file
-  next to the entity rather than in JSON strings ([D2](#d2-file-format)).
+  next to the entity rather than in JSON strings ([D2](#decisions)).
 - **Units are explicit in the key name** (`semiMajorAxis_au`, `period_d`, `mass_msun`,
   `speed_kmh`). The schema converts to SI on load. A unit mismatch cannot hide in a bare number.
 - **An id is separate from a name.** Ids are short and immutable once created. Names are display
@@ -193,15 +196,35 @@ These rules carry over from devlog, adapted for structured data:
 
 ### 3.6 Experimenting: forks and comparisons
 
-- **Fork world:** copies a world folder, or makes a git branch or worktree when it is a repo, for
-  a what-if. Examples: move a system, change the threshold constant, try a different settlement
+- **Fork world:** copies a world folder to a new folder, for a what-if. Examples: move a system, change the threshold constant, try a different settlement
   history.
-- **Compare worlds:** a semantic diff between two worlds or two commits. It lists entities added,
+- **Compare worlds:** a semantic diff between two world folders. The author can check out an
+  old commit into a folder by hand and compare against that. It lists entities added,
   removed and changed, with field-level differences, plus the *derived* consequences (flows,
   travel times, sky). The question it answers: "what does this change actually do?"
 - **Take pieces back:** copy selected entities from a fork into the main world.
 - **Optional status tags** on any entity (`idea`, `draft`, `settled`, or whatever the author
   likes) can be used for filtering. The app attaches no meaning to them.
+
+### 3.7 Writing discipline
+
+The author commits by hand, so what the app writes has to be easy to review and easy to commit
+in pieces:
+
+- **Only files the author changed are written.** Opening, viewing, generating and checking never
+  write. Nothing is reformatted on open; reformatting only happens with an explicit
+  `malevo check --fix`.
+- **Nothing derived lands in the world folder.** No caches, indexes, lock files, timestamps,
+  machine names or "last opened" state. All of that lives in the app's own userData.
+- **Generated content is written only when locked,** and only the locked entity's own file.
+  Re-rolling a whole region of the galaxy writes nothing until the author locks something.
+- **Edits that touch several files say so first.** Deleting an entity that others reference,
+  for example, lists every file it would change and asks.
+- **Saves are explicit by default** (Ctrl+S, with an unsaved-changes indicator). Autosave is an
+  option.
+- **Partial commits are the author's responsibility.** If only some of a change is committed, the
+  repo can hold a dangling reference or a stale locked value. `malevo check`, run by the author,
+  finds these. The app never tries to repair them on its own.
 
 ---
 
@@ -214,11 +237,11 @@ Built first and tested hardest. Every number on screen should trace back to one 
 | `units` | SI internally; AU, ly, c, g, M☉, R⊕ and so on as named constants; formatting with units |
 | `rng` | mulberry32, FNV hash, keyed streams, distributions (normal, Poisson, weighted pick) |
 | `vec` | 3-vectors, matrices, quaternions; frame transforms (galactic ↔ equatorial ↔ ecliptic ↔ planet body-fixed) |
-| `time` | Reference time scale, durations, proper time (section 5) |
+| `time` | The universal reference time scale, standard days, durations (section 5) |
 | `calendar` | Calendar definitions and conversions (section 5) |
 | `orbit` | Kepler solver, orbital elements ↔ state, positions at a date, synodic periods and alignment windows, habitable zone, insolation, tides, day length |
 | `foam` | Collapse threshold as a function of mass, tidal load tensor and its norms, drop-point search, leg limit, top speed with artificial-gravity tilt, gas drain |
-| `torch` | Rocket equation, 1 g flip-and-brake crawl, relativistic proper time, torch power and brightness |
+| `torch` | Rocket equation, 1 g flip-and-brake crawl, torch power and brightness |
 | `sky` | Apparent position and magnitude of stars, planets, moons and torches from any surface point; extinction and airmass; twilight |
 | `kinematics` | Trapezoidal speed profiles, timetables, vehicles at time t |
 | `flow` | Directed flow network, node balance, balancing solver, Little's-law counts (section 6) |
@@ -238,33 +261,50 @@ the values in the open world.
 
 ## 5. Time and calendars
 
-The timeline must support several date systems side by side: Earth's Gregorian calendar, a
-possible 360-day Galactic calendar, era year-counts, planet-local calendars, a separate calendar
-for an insular culture, and ship clocks.
+The timeline must support several date systems side by side: Earth's Gregorian calendar,
+era year-counts, planet-local calendars, culture calendars (including an insular culture's own),
+and ship time. No calendar beyond Gregorian is built in or assumed.
 
-### 5.1 One reference time scale
+### 5.1 One universal time
 
-- **Internally, every instant is one number:** SI seconds since an epoch on a single reference
-  clock. In practice, read it as Sol-barycentric time. Seconds since J2000 stay exact integers in a
-  double for ±285 million years.
-- **Calendars are only ways of reading that number.** Converting between them is exact, so an
-  event entered in one calendar shows correctly in every other.
+- **Time is the same everywhere.** There is one universal time and no relativistic clock
+  effects: a second on a torch ship, in the foam or on any planet is the same second. Hard
+  science fiction, not impossible-to-follow science fiction.
+- **Internally, every instant is one number:** seconds since a fixed internal epoch. Whole seconds
+  stay exact in a double for ±285 million years.
+- **The standard day is exactly 86,400 s.** It is the app's working unit for rates (ships per day)
+  and durations. It is a worldbuilding convenience, not an in-universe standard. A world's
+  cultures can measure time however they like.
+- **Calendars are only ways of reading that number.** An event entered in one calendar shows in
+  every other.
 
-### 5.2 Calendar kinds (data, not code)
+### 5.2 Calendars
 
-Each world defines its calendars in `calendars/*.json` using a few built-in kinds:
+Each world defines its calendars in `calendars/`. A calendar is either a built-in kind with
+parameters (JSON), or a script (JSON metadata plus a JavaScript file), for calendars whose rules
+or formatting don't fit a table.
 
-| Kind | Example | Notes |
+| Kind | Use | Notes |
 |---|---|---|
-| `gregorian` | Earth civil calendar | Proleptic Gregorian with leap years. No leap seconds: future ones can't be known. The slow drift of Earth's rotation is ignored unless a story needs it. |
-| `fixed` | A 360 × 30 × 24 "Galactic" calendar | Year/month/day/hour units of exact SI lengths. No intercalation. Its epoch is a parameter. |
-| `solar` | A planet's local calendar | Derived from the body's real solar day and year (from `orbit`), with a leap rule computed to track the seasons. Local hours are a configurable fraction of the local day. Week length is configurable. It changes automatically if the body's orbit or rotation is edited. |
+| `gregorian` | Earth civil calendar | Proleptic Gregorian with leap years. No leap seconds. The slow drift of Earth's rotation is ignored. |
+| `fixed` | Any regular calendar | Units nested to any depth (for example year/month/day/hour), each an exact number of seconds. No intercalation. An epoch parameter. |
+| `solar` | A planet's local calendar | Derived from the body's real solar day and year (from `orbit`), with a leap rule computed to track the seasons. Local hours are a configurable fraction of the local day. Week length is configurable. |
 | `era` | Year counts from some event | A year count laid over another calendar, with an epoch event. |
-| `clock` | Ship time, a station's clock | An offset and rate against reference time. Torch ships at relativistic speeds run slow, and the `torch` module accumulates that. |
+| `offset` | Ship time, a station's clock | A fixed offset from another calendar or clock, like a time zone. |
+| `script` | Anything else, including culture calendars | A JavaScript module in the world folder (below). |
 
-**A side effect a fixed 360-day calendar would have:** it is 5.24 days shorter than Earth's
-tropical year, so its months slip through Earth's seasons in a full cycle about every 70 years. On
-every other planet it drifts against the local year by an amount the app shows per world.
+**Script calendars** (`calendars/<id>.js`, alongside `<id>.json`):
+
+- **The module exports a small interface.** `toParts(t)` and `fromParts(parts)` convert between
+  universal time and calendar fields, and `format(parts, style)` and `parse(text)` handle the
+  written form. It can lean on the built-in kinds through a helper argument, for example
+  "Gregorian fields, but months named and counted this culture's way".
+- **Scripts run in a sandbox.** That means a worker with no file, network or Node access, a time
+  limit, and no clock or randomness. The result depends only on the inputs, so a script is as
+  deterministic as a generator.
+- **The app tests each script on load.** It checks that `fromParts(toParts(t)) = t` across a range
+  of dates, and the checks panel reports any mismatch.
+- A script is plain text in the world folder, so it is diffed and committed like everything else.
 
 **Cultures choose calendars.** Which calendar a culture uses, and when it switched, is a timeline
 event. Any date can be displayed "as that culture would write it".
@@ -273,9 +313,15 @@ event. Any date can be displayed "as that culture would write it".
 
 ```json
 { "id": "e7k2", "name": "Charter ratified",
-  "when": { "after": "e3m9", "offset": "130 y", "cal": "gal" },
+  "when": { "after": "e3m9", "offset": "130 y", "cal": "c-local" },
   "tags": ["politics"], "refs": ["p4q1"] }
 ```
+
+- **A date is stored as universal time, an anchor plus an offset, or a range.** The calendar it
+  was entered in is kept alongside (`"entered": {"cal": …, "text": …}`) for display only.
+  Changing a calendar's script, or a planet's orbit under a `solar` calendar, therefore never
+  moves an event. If an event's entered text no longer matches what its calendar now says, the
+  event is flagged stale (section 3.4).
 
 - **Precision and uncertainty are first-class:** year / month / day / minute, `circa`, and
   ranges. Early on most dates are fuzzy, and the editor must not force false precision.
@@ -311,10 +357,17 @@ event. Any date can be displayed "as that culture would write it".
     passing through and how many are terminating, and they let it count fleet size.
 - **Balance is a rule the app checks, not something the data structure forces.** At every node,
   average arrivals should equal average departures, summed over all routes and directions.
-  Maiden voyages and trips to the scrapyard are left out. In the rest-stop example R balances by
-  itself (17 in, 17 out). A then has 17 more departures than arrivals and B 17 more arrivals than
-  departures. The checks panel reports this until other flows bring those ships back, for example
-  B → C → A. The world's settings hold a balance tolerance.
+  - **Example:** in the rest-stop case, R balances by itself (17 in, 17 out). A then has 17 more
+    departures than arrivals, and B 17 more arrivals than departures. The checks panel reports
+    this until other flows bring those ships back, for example B → C → A.
+- **Nodes can have a declared imbalance.** A node can be a net *sink* or *source* by design, and
+  the check compares the actual imbalance with the declared one.
+  - A ship graveyard might absorb one extra ship every 5 days on average, a sink of 0.2 a day.
+  - A shipyard is a source.
+  - Across the whole network, sources minus sinks is the rate the fleet grows or shrinks, and the
+    report shows it.
+- **Tolerance.** An undeclared imbalance is a warning above 2% of the node's total traffic or 1
+  ship per day, whichever is larger. The tolerance is a world setting.
 - **The balance report** shows, for each node:
   - arrivals, departures and net imbalance
   - through traffic vs terminating traffic
@@ -398,8 +451,8 @@ and culture blending, all running on the shared core. It adds four things:
 ### 7.4 Solar system planner
 
 - **Star:** chosen from the atlas (a real catalogue star or a generated one), with overrides. A
-  system can be moved to a different star at any time; the derived consequences show before
-  committing.
+  system can be moved to a different star at any time; the app shows the derived consequences
+  before applying the move.
 - **Bodies:** planets, moons and belts, with orbital elements, mass, radius, rotation and axial
   tilt. Drag them to change orbits.
 - **Derived values:** habitable zone, insolation, day length, seasons, tides, the collapse radius
@@ -470,11 +523,11 @@ Route planning happens at two scales on the same network.
 
 ### 7.9 Checks (cross-cutting)
 
-One panel, and also `malevo check` for CI on a world repo. It runs every validator:
+One panel, and also the `malevo check` command, which the author can run whenever they like. It runs every validator:
 
 - schema errors and dangling references
 - legs longer than the leg limit, legs through nebulae
-- node flow imbalance beyond tolerance, port loads over capacity
+- node flow imbalance beyond the declared imbalance plus tolerance, port loads over capacity
 - events that happen before their enabling technology, anchor cycles
 - cities in the ocean
 - stale locked values
@@ -487,13 +540,13 @@ acknowledge; none blocks saving, because a half-finished world is the normal sta
 `malevo report` writes generated Markdown fact sheets for any entity: a planet's day, year and
 moons; the routes and traffic at a system; sky facts for a city. They go to a folder the author
 chooses, usually inside the world repo. They carry a "generated, do not edit" header and are
-regenerated on demand, so notes and prose can quote the same numbers the app uses.
+regenerated only on demand, so notes and prose can quote the same numbers the app uses.
 
 ---
 
 ## 8. Shell, build and release
 
-Copied from devlog, with three gaps fixed.
+Copied from devlog, with two gaps fixed. **Windows only** for now: this is a personal tool.
 
 - **Stack**
   - Electron, electron-vite, React, TypeScript strict, vitest
@@ -505,16 +558,16 @@ Copied from devlog, with three gaps fixed.
   - A silent update policy: download in the background, then install when idle, locked or
     hidden, never during an unsaved edit, with an "Update now" button in the status bar. The pure
     `shouldInstallNow` function and its tests port as-is.
-  - CI: typecheck, test, build and a Playwright `_electron` smoke test on every push. Windows and
-    macOS packaging. A release job publishes `latest*.yml` on a `v*` tag or a manual dispatch.
+  - CI: typecheck, test, build and a Playwright `_electron` smoke test on every push, then
+    Windows packaging. A release job publishes `latest*.yml` on a `v*` tag or a manual dispatch.
+    No macOS or Linux jobs.
 - **Fixed relative to devlog**
   1. **npm workspaces.** devlog repeats its path aliases in four config files.
   2. **A linter** (ESLint, with a rule banning `Math.random` in `core`, `model` and `gen`), plus
      Prettier.
-  3. **macOS signing and notarization.** devlog ships unsigned, and Squirrel.Mac will not apply
-     updates to an unsigned app, so macOS auto-update probably does not work there. Plan for a
-     Developer ID certificate and notarization secrets ([D6](#d6-code-signing)).
 - **Golden-fixture job** (section 3.3) runs in the same CI.
+- **Installer:** an unsigned NSIS installer, per user. electron-updater applies updates to an
+  unsigned Windows app; the only cost is a SmartScreen warning on first install.
 
 **Repo layout:**
 
@@ -543,9 +596,8 @@ can be reordered to suit what the author wants to explore next.
 ### Phase 0: Skeleton (shell, release, empty world)
 
 - The repo layout above, workspaces, lint, typecheck, vitest, CI.
-- An Electron shell that creates or opens a world folder, shows git status, and hosts an empty
-  tool registry.
-- Auto-update end to end. Shipping `v0.1.0` and updating to `v0.1.1` is the exit test.
+- An Electron shell that creates or opens a world folder and hosts an empty tool registry.
+- Auto-update end to end on Windows. Shipping `v0.1.0` and updating to `v0.1.1` is the exit test.
 - `world.json` with a format version and world seed; refuse unknown formats.
 
 **Exit:** an installable app that updates itself and creates or opens an empty world.
@@ -562,13 +614,14 @@ can be reordered to suit what the author wants to explore next.
 - `malevo check` and `malevo check --fix`.
 - The new-world template, including `settings/physics.json`.
 
-**Exit:** a world folder can be validated in CI. Changing a frozen generator fails the build.
+**Exit:** `malevo check` validates a fixture world. Changing a frozen generator fails the app's
+CI build.
 
 ### Phase 2: Timeline editor and calendars (first real tool)
 
 - The event schema, with anchors, precision and tags.
 - The timeline UI and the global "current date".
-- The calendar editor for all five kinds; `solar` calendars become usable once bodies exist
+- The calendar editor for every kind, including script calendars and their sandbox; `solar` calendars become usable once bodies exist
   (Phase 3).
 - Fork and compare worlds (section 3.6), first exercised on timelines.
 
@@ -647,58 +700,18 @@ does not pick winners. The lesson is structural, and the plan builds it in:
 
 ---
 
-## Open decisions
+## Decisions
 
-Each has a recommendation, and the plan proceeds on it unless the author says otherwise.
+All settled by the author.
 
-### D1. Where world data lives (settled)
-
-World data lives in its own repository, separate from this app repo and the prose. This
-repository holds only the app, templates and synthetic fixtures.
-
-### D2. File format
-
-- Options: JSON vs YAML/TOML.
-- **Recommendation:** JSON with a canonical formatter, plus Markdown sidebars for prose. JSON is
-  the format the prototype tools already use, it is unambiguous, and the formatter keeps diffs
-  small. YAML's comments are its main advantage, and the sidebars cover most of that.
-
-### D3. Calendars in the new-world template
-
-- **Recommendation:** a new world starts with Gregorian only. The 360-day calendar is offered as a
-  ready-made `fixed` preset to add. Its epoch and each culture's adoption are timeline events, so
-  any of them can move freely.
-
-### D4. The reference clock and relativity
-
-- **Recommendation:** use one Sol-barycentric reference time, with proper time tracked for torch
-  legs.
-- A world setting decides whether FTL travel has a clock-rate effect. The default is "none".
-
-### D5. The unit for traffic flow
-
-- **Recommendation:** ships per day, where a day is exactly 86,400 s, so it equals a Galactic day.
-  The display can also show ships per year, or per local day.
-
-### D6. Code signing
-
-- macOS: an Apple Developer ID, notarization, and secrets for CI. Windows: a certificate, or
-  accept SmartScreen warnings.
-- **Recommendation:** ship unsigned at first, as devlog does, but plan for macOS signing before
-  relying on macOS auto-update.
-
-### D7. Git integration level
-
-- Options: show status and commit on request, or devlog-style automatic commit and push.
-- **Recommendation:** show status and commit on request, plus fork and compare. Settled data
-  should be a deliberate commit.
-
-### D8. Platforms
-
-- **Recommendation:** macOS and Windows in CI, as devlog does. Linux AppImage if wanted.
-
-### D9. Balance tolerance
-
-- How large an imbalance at a node counts as "significant"?
-- **Recommendation:** a world setting, defaulting to a warning above 2% of a node's total traffic
-  or 1 ship per day, whichever is larger.
+| # | Topic | Decision |
+|---|---|---|
+| D1 | Where world data lives | In the author's own repository, separate from this app. This repo holds only the app, templates and synthetic fixtures. |
+| D2 | File format | JSON with a canonical formatter. Prose goes in Markdown sidebars. |
+| D3 | Calendars | A new world starts with Gregorian only, with no ready-made 360-day calendar. Culture calendars can be JavaScript scripts (section 5.2). |
+| D4 | Time | One universal time, the same everywhere. No relativistic clock effects. |
+| D5 | Rate unit | The standard day is exactly 86,400 s. It is a worldbuilding unit for ships per day and durations, not an in-universe standard. |
+| D6 | Code signing | None. Windows SmartScreen warnings are acceptable. |
+| D7 | Git | No git integration at all. The app doesn't know about repositories. The author commits by hand and owns the consequences of partial commits (section 3.7). |
+| D8 | Platforms | Windows only. |
+| D9 | Balance | Warn above 2% of a node's traffic or 1 ship per day. Nodes can declare an intended imbalance, such as a graveyard sink or a shipyard source (section 6.2). |
