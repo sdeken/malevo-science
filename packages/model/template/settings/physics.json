@@ -1,0 +1,22 @@
+{
+  "foam": {
+    "topSpeed_c": 6500,
+    "collapseRadius_au": 2.7,
+    "loadRule": "max-eigen",
+    "legLimit_ly": 15,
+    "gravityLimit_g": 1.9
+  },
+  "torch": {
+    "exhaustSpeed_c": 0.05,
+    "propellantFraction": 0.5,
+    "cruiseAccel_g": 1,
+    "governorCutoff_km": 20000
+  },
+  "travel": {
+    "stopover_d": 1
+  },
+  "traffic": {
+    "balanceTolerance": 0.02,
+    "balanceFloor_perDay": 1
+  }
+}

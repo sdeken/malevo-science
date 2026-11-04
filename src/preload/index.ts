@@ -1,6 +1,6 @@
 import { contextBridge, ipcRenderer } from 'electron'
 import { IPC, type MenuCommand } from '../shared/ipc'
-import type { AppInfo, FolderInfo, Settings, UpdateStatus, WorldInfo, WorldResult } from '../shared/types'
+import type { AppInfo, CheckReport, FolderInfo, Settings, UpdateStatus, WorldInfo, WorldResult } from '../shared/types'
 
 type Unsubscribe = () => void
 
@@ -30,6 +30,12 @@ const api = {
     close: (): Promise<void> => ipcRenderer.invoke(IPC.worldClose),
     reveal: (): Promise<void> => ipcRenderer.invoke(IPC.worldReveal),
     forgetRecent: (dir: string): Promise<Settings> => ipcRenderer.invoke(IPC.worldForgetRecent, dir),
+    /** Run every check on the open world (reads only). */
+    check: (): Promise<CheckReport | null> => ipcRenderer.invoke(IPC.worldCheck),
+    /** Rewrite exactly these files into canonical form. Resolves to the paths that changed. */
+    fix: (paths: string[]): Promise<string[]> => ipcRenderer.invoke(IPC.worldFix, paths),
+    /** Add any new-world template files the world is missing. Resolves to the paths added. */
+    addTemplate: (): Promise<string[]> => ipcRenderer.invoke(IPC.worldAddTemplate),
     onChanged: (cb: (world: WorldInfo | null) => void): Unsubscribe => on(IPC.evWorldChanged, cb)
   },
   updates: {

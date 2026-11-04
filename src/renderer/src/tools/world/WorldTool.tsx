@@ -23,7 +23,8 @@ function WorldView({ world }: ToolProps): React.JSX.Element {
         </dd>
       </dl>
       <p className="muted">
-        The seed is the root of every procedural choice in this world and never changes. Tools for timelines, star systems, routes and the
+        The seed is the root of every procedural choice in this world and never changes. The world's physics lives in{' '}
+        <code>settings/physics.json</code> and its calendars in <code>calendars/</code>. Tools for timelines, star systems, routes and the
         rest arrive in later phases.
       </p>
     </div>

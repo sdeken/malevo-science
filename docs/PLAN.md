@@ -179,7 +179,10 @@ These rules carry over from devlog, adapted for structured data:
   - Each numeric field has a declared precision, so values never churn at the 15th digit.
   - Short arrays of numbers stay on one line.
   - The app formats on every save, and `malevo check --fix` re-formats hand edits.
-- **The format is JSON, checked against schemas (zod).** Prose lives in a Markdown sidebar file
+- **The format is JSON, checked against schemas.** The schemas use a small purpose-built library in
+  `@malevo/model`, not zod. Each schema validates, writes canonical output (key order, per-field
+  rounding) and lists which fields reference other entities, all from one definition. Getting the
+  last two from zod would mean depending on its internals. Prose lives in a Markdown sidebar file
   next to the entity rather than in JSON strings ([D2](#decisions)).
 - **Units are explicit in the key name** (`semiMajorAxis_au`, `period_d`, `mass_msun`,
   `speed_kmh`). The schema converts to SI on load. A unit mismatch cannot hide in a bare number.
@@ -364,8 +367,10 @@ event. Any date can be displayed "as that culture would write it".
   the check compares the actual imbalance with the declared one.
   - A ship graveyard might absorb one extra ship every 5 days on average, a sink of 0.2 a day.
   - A shipyard is a source.
-  - Across the whole network, sources minus sinks is the rate the fleet grows or shrinks, and the
-    report shows it.
+  - Every trip leaves one node and arrives at another, so across the whole network arrivals
+    always equal departures. Declared sinks must therefore be matched by declared sources (ships
+    scrapped at the graveyard come from somewhere). The report shows the total of the declarations,
+    which should be zero.
 - **Tolerance.** An undeclared imbalance is a warning above 2% of the node's total traffic or 1
   ship per day, whichever is larger. The tolerance is a world setting.
 - **The balance report** shows, for each node:
@@ -582,7 +587,7 @@ packages/model/        schemas, canonical serializer, loader/saver, queries, val
 packages/gen/          versioned generators + golden fixtures
 packages/viz/          shared React/three.js components
 packages/cli/          `malevo` command
-templates/new-world/   starting settings, calendars and physics for a new world (editable)
+packages/model/template/  the files every new world starts with (data, not code; editable)
 fixtures/              synthetic test worlds
 assets/catalog/        real-star catalogue
 scripts/               smoke test, icon generator
@@ -614,12 +619,15 @@ Windows) needs two pushes to a public `main`.
 
 **Exit:** an installable app that updates itself and creates or opens an empty world.
 
-### Phase 1: Core library and the stability contract
+### Phase 1: Core library and the stability contract — built
+
+Built; see [DEVELOPMENT.md](DEVELOPMENT.md). The app shows only a Checks tool; the rest is the
+foundation the tools stand on.
 
 - `units`, `rng`, `vec`, `time`, `calendar` (all five kinds), `orbit`, `foam`, `torch`,
   `kinematics` and `flow`, with unit tests checked against textbook values: real solar-system
   ephemeris spot checks, rocket-equation cases, and port-fidelity cases from the prototypes.
-- `@malevo/model`: zod schemas, the canonical serializer (key order, precision, formatting),
+- `@malevo/model`: schemas, the canonical serializer (key order, precision, formatting),
   loader and saver, reference resolution, the dependency and staleness graph, and the validator
   framework.
 - The generator framework: `name@version` registry, keyed streams, golden-fixture tooling.

@@ -1,0 +1,262 @@
+{
+  "generator": "placeholder-names@1",
+  "note": "Pinned output hashes of a frozen generator. Never edit; see packages/gen/tests/golden.test.ts.",
+  "cases": [
+    {
+      "seed": 1,
+      "input": {
+        "ids": ["a", "b", "c", "sys-001", "sys-002", "x.y_z"],
+        "palette": 0
+      },
+      "hash": "158b36f2eb6aa8"
+    },
+    {
+      "seed": 1,
+      "input": {
+        "ids": ["a", "b", "c", "sys-001", "sys-002", "x.y_z"],
+        "palette": 1
+      },
+      "hash": "02321a0d7339aa"
+    },
+    {
+      "seed": 1,
+      "input": {
+        "ids": ["a", "b", "c", "sys-001", "sys-002", "x.y_z"],
+        "palette": 2
+      },
+      "hash": "072e8f7bebd9a1"
+    },
+    {
+      "seed": 1,
+      "input": {
+        "ids": ["a", "b", "c", "sys-001", "sys-002", "x.y_z"],
+        "palette": 3
+      },
+      "hash": "13c6a850622b63"
+    },
+    {
+      "seed": 1,
+      "input": {
+        "ids": ["a", "b", "c", "sys-001", "sys-002", "x.y_z"],
+        "palette": 4
+      },
+      "hash": "1fc9cfb27dd38d"
+    },
+    {
+      "seed": 1,
+      "input": {
+        "ids": ["a", "b", "c", "sys-001", "sys-002", "x.y_z"],
+        "palette": 5
+      },
+      "hash": "0faa4283ed9fa6"
+    },
+    {
+      "seed": 1,
+      "input": {
+        "ids": ["a", "b", "c", "sys-001", "sys-002", "x.y_z"],
+        "palette": 6
+      },
+      "hash": "014769ab180931"
+    },
+    {
+      "seed": 1,
+      "input": {
+        "ids": ["a", "b", "c", "sys-001", "sys-002", "x.y_z"],
+        "palette": 7
+      },
+      "hash": "0931c6c87b5950"
+    },
+    {
+      "seed": 42,
+      "input": {
+        "ids": ["a", "b", "c", "sys-001", "sys-002", "x.y_z"],
+        "palette": 0
+      },
+      "hash": "0e76f13962c8f3"
+    },
+    {
+      "seed": 42,
+      "input": {
+        "ids": ["a", "b", "c", "sys-001", "sys-002", "x.y_z"],
+        "palette": 1
+      },
+      "hash": "045b50b46d6521"
+    },
+    {
+      "seed": 42,
+      "input": {
+        "ids": ["a", "b", "c", "sys-001", "sys-002", "x.y_z"],
+        "palette": 2
+      },
+      "hash": "198af797f737fb"
+    },
+    {
+      "seed": 42,
+      "input": {
+        "ids": ["a", "b", "c", "sys-001", "sys-002", "x.y_z"],
+        "palette": 3
+      },
+      "hash": "18f538ff16a787"
+    },
+    {
+      "seed": 42,
+      "input": {
+        "ids": ["a", "b", "c", "sys-001", "sys-002", "x.y_z"],
+        "palette": 4
+      },
+      "hash": "13296b04b4dfbf"
+    },
+    {
+      "seed": 42,
+      "input": {
+        "ids": ["a", "b", "c", "sys-001", "sys-002", "x.y_z"],
+        "palette": 5
+      },
+      "hash": "0c8f937f918dc0"
+    },
+    {
+      "seed": 42,
+      "input": {
+        "ids": ["a", "b", "c", "sys-001", "sys-002", "x.y_z"],
+        "palette": 6
+      },
+      "hash": "0122151eb04fc2"
+    },
+    {
+      "seed": 42,
+      "input": {
+        "ids": ["a", "b", "c", "sys-001", "sys-002", "x.y_z"],
+        "palette": 7
+      },
+      "hash": "1180a62ed92e28"
+    },
+    {
+      "seed": 4242,
+      "input": {
+        "ids": ["a", "b", "c", "sys-001", "sys-002", "x.y_z"],
+        "palette": 0
+      },
+      "hash": "051572e5bfa0f3"
+    },
+    {
+      "seed": 4242,
+      "input": {
+        "ids": ["a", "b", "c", "sys-001", "sys-002", "x.y_z"],
+        "palette": 1
+      },
+      "hash": "14d88e38875808"
+    },
+    {
+      "seed": 4242,
+      "input": {
+        "ids": ["a", "b", "c", "sys-001", "sys-002", "x.y_z"],
+        "palette": 2
+      },
+      "hash": "0594a822c8a467"
+    },
+    {
+      "seed": 4242,
+      "input": {
+        "ids": ["a", "b", "c", "sys-001", "sys-002", "x.y_z"],
+        "palette": 3
+      },
+      "hash": "07c84f65a7a0f9"
+    },
+    {
+      "seed": 4242,
+      "input": {
+        "ids": ["a", "b", "c", "sys-001", "sys-002", "x.y_z"],
+        "palette": 4
+      },
+      "hash": "184f0bc027b83a"
+    },
+    {
+      "seed": 4242,
+      "input": {
+        "ids": ["a", "b", "c", "sys-001", "sys-002", "x.y_z"],
+        "palette": 5
+      },
+      "hash": "1d0ace767ea645"
+    },
+    {
+      "seed": 4242,
+      "input": {
+        "ids": ["a", "b", "c", "sys-001", "sys-002", "x.y_z"],
+        "palette": 6
+      },
+      "hash": "1ab4108fb88276"
+    },
+    {
+      "seed": 4242,
+      "input": {
+        "ids": ["a", "b", "c", "sys-001", "sys-002", "x.y_z"],
+        "palette": 7
+      },
+      "hash": "05e0f807739160"
+    },
+    {
+      "seed": 4294967295,
+      "input": {
+        "ids": ["a", "b", "c", "sys-001", "sys-002", "x.y_z"],
+        "palette": 0
+      },
+      "hash": "00d6b3e98cc46c"
+    },
+    {
+      "seed": 4294967295,
+      "input": {
+        "ids": ["a", "b", "c", "sys-001", "sys-002", "x.y_z"],
+        "palette": 1
+      },
+      "hash": "1df9106426d73c"
+    },
+    {
+      "seed": 4294967295,
+      "input": {
+        "ids": ["a", "b", "c", "sys-001", "sys-002", "x.y_z"],
+        "palette": 2
+      },
+      "hash": "194468df5c4253"
+    },
+    {
+      "seed": 4294967295,
+      "input": {
+        "ids": ["a", "b", "c", "sys-001", "sys-002", "x.y_z"],
+        "palette": 3
+      },
+      "hash": "08cf10d598d03d"
+    },
+    {
+      "seed": 4294967295,
+      "input": {
+        "ids": ["a", "b", "c", "sys-001", "sys-002", "x.y_z"],
+        "palette": 4
+      },
+      "hash": "047368ec44cb46"
+    },
+    {
+      "seed": 4294967295,
+      "input": {
+        "ids": ["a", "b", "c", "sys-001", "sys-002", "x.y_z"],
+        "palette": 5
+      },
+      "hash": "0b36cea189a76d"
+    },
+    {
+      "seed": 4294967295,
+      "input": {
+        "ids": ["a", "b", "c", "sys-001", "sys-002", "x.y_z"],
+        "palette": 6
+      },
+      "hash": "03643b6d8b61ec"
+    },
+    {
+      "seed": 4294967295,
+      "input": {
+        "ids": ["a", "b", "c", "sys-001", "sys-002", "x.y_z"],
+        "palette": 7
+      },
+      "hash": "10a20a50fb4ae1"
+    }
+  ]
+}

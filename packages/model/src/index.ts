@@ -1,5 +1,12 @@
 // Pure entry point: safe to import from the renderer. File access lives in '@malevo/model/node'.
 export { canonicalJson } from './canonical'
+export { contentHash } from './hash'
+export * from './schema'
+export * from './kinds'
+export * from './load'
+export * from './deps'
+export * from './checks'
+export { templateFiles } from './template'
 export {
   WORLD_FILE,
   WORLD_FORMAT,

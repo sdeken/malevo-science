@@ -56,3 +56,19 @@ export interface UpdateStatus {
   /** "Update now" was pressed while still downloading. */
   installRequested?: boolean
 }
+
+/** One finding from the world checks (mirrors @malevo/model's Issue). */
+export interface CheckIssue {
+  severity: 'error' | 'warning' | 'info'
+  check: string
+  code: string
+  message: string
+  path?: string
+  field?: string
+}
+
+export interface CheckReport {
+  issues: CheckIssue[]
+  /** Files that `fix` would rewrite into canonical form (values unchanged). */
+  fixable: string[]
+}

@@ -5,9 +5,9 @@
  */
 import { EventEmitter } from 'node:events'
 import { randomInt } from 'node:crypto'
-import { WorldError } from '@malevo/model'
-import { createWorld, inspectFolder, openWorld, type OpenWorld } from '@malevo/model/node'
-import type { FolderInfo, WorldInfo, WorldResult } from '../shared/types'
+import { WorldError, canonicalFixes, runChecks } from '@malevo/model'
+import { addMissingTemplateFiles, applyFixes, createWorld, inspectFolder, loadWorld, openWorld, type OpenWorld } from '@malevo/model/node'
+import type { CheckReport, FolderInfo, WorldInfo, WorldResult } from '../shared/types'
 
 export class WorldSession extends EventEmitter {
   private current: OpenWorld | null = null
@@ -37,6 +37,30 @@ export class WorldSession extends EventEmitter {
     // once, here, and never changes (docs/PLAN.md §3.2).
     const seed = randomInt(0, 2 ** 32)
     return this.attempt(() => createWorld(dir, name, seed))
+  }
+
+  /** Run every check on the open world. Reads only. */
+  async check(): Promise<CheckReport | null> {
+    if (!this.current) return null
+    const world = await loadWorld(this.current.root)
+    return { issues: runChecks(world), fixable: canonicalFixes(world).map((f) => f.path) }
+  }
+
+  /**
+   * Rewrite the named files into canonical form, and only those: the renderer
+   * has shown the list and the user has agreed. Files whose content changed
+   * since the list was made are re-derived from what is on disk now.
+   */
+  async fix(paths: readonly string[]): Promise<string[]> {
+    if (!this.current) return []
+    const wanted = new Set(paths)
+    const fixes = canonicalFixes(await loadWorld(this.current.root)).filter((f) => wanted.has(f.path))
+    return applyFixes(this.current.root, fixes)
+  }
+
+  /** Copy any new-world template files the open world lacks; never touches existing files. */
+  async addTemplate(): Promise<string[]> {
+    return this.current ? addMissingTemplateFiles(this.current.root) : []
   }
 
   close(): void {

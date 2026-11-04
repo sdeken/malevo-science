@@ -32,7 +32,8 @@ export default tseslint.config(
     rules: {
       'no-restricted-properties': [
         'error',
-        { object: 'Math', property: 'random', message: 'Use a keyed stream from @malevo/core rng; world data must be reproducible.' }
+        { object: 'Math', property: 'random', message: 'Use a keyed stream from @malevo/core rng; world data must be reproducible.' },
+        { property: 'localeCompare', message: 'Locale-dependent order. Use compareStrings from @malevo/core.' }
       ],
       'no-restricted-syntax': [
         'error',

@@ -9,6 +9,7 @@
 import { _electron as electron } from 'playwright-core'
 import { promises as fs } from 'node:fs'
 import os from 'node:os'
+import { execFileSync } from 'node:child_process'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 
@@ -72,9 +73,19 @@ try {
     'window title names the world'
   )
 
-  // 4. What landed on disk: world.json and nothing else, canonical text.
-  const files = await fs.readdir(worldDir)
-  check(JSON.stringify(files) === '["world.json"]', `the world folder holds only world.json (${files.join(', ')})`)
+  // 4. What landed on disk: world.json and the new-world template, nothing else, all canonical.
+  const listAll = async (dir, rel = '') => {
+    const out = []
+    for (const e of (await fs.readdir(dir, { withFileTypes: true })).sort((a, b) => (a.name < b.name ? -1 : 1))) {
+      const r = rel ? `${rel}/${e.name}` : e.name
+      if (e.isDirectory()) out.push(...(await listAll(path.join(dir, e.name), r)))
+      else out.push(r)
+    }
+    return out
+  }
+  const EXPECTED_FILES = '["calendars/gregorian.json","settings/physics.json","world.json"]'
+  const files = await listAll(worldDir)
+  check(JSON.stringify(files) === EXPECTED_FILES, `the world folder holds world.json and the template, nothing else (${files.join(', ')})`)
   const text = await fs.readFile(path.join(worldDir, 'world.json'), 'utf8')
   const manifest = JSON.parse(text)
   check(manifest.format === 1 && manifest.name === 'Smoke World', 'world.json has format 1 and the name')
@@ -86,6 +97,29 @@ try {
   check((await page.locator('.world-seed').textContent()) === String(manifest.seed), 'the World tool shows the seed from the file')
   check(!JSON.stringify(await fs.readdir(userData)).includes('world.json'), 'nothing world-related is written to userData but settings')
   const stat = await fs.stat(path.join(worldDir, 'world.json'))
+  const physicsStat = await fs.stat(path.join(worldDir, 'settings', 'physics.json'))
+
+  // 4b. The Checks tool finds nothing wrong with a new world, and writes nothing.
+  await page.locator('.tool-link', { hasText: 'Checks' }).click()
+  await page.waitForSelector('.checks-summary', { timeout: 10_000 })
+  check((await page.locator('.checks-summary').textContent()) === 'No problems found.', 'the Checks tool finds no problems in a new world')
+  check((await page.locator('.checks-fix').count()) === 0, 'a new world needs no formatting fixes')
+  await page.screenshot({ path: path.join(shots, '04-checks.png') })
+  await page.locator('.tool-link', { hasText: 'World' }).click()
+
+  // 4c. The command-line checker agrees, and reads only.
+  let cliOut = ''
+  let cliStatus = 0
+  try {
+    cliOut = execFileSync(process.execPath, [path.join(appRoot, 'out/cli/malevo.mjs'), 'check', worldDir], { encoding: 'utf8' })
+  } catch (err) {
+    cliStatus = err.status
+    cliOut = String(err.stdout)
+  }
+  check(
+    cliStatus === 0 && cliOut.trim().endsWith('No problems found.'),
+    `malevo check passes the new world (${cliOut.trim().split('\n').at(-1)})`
+  )
   await page.screenshot({ path: path.join(shots, '03-world.png') })
 
   // 5. A non-empty folder is refused.
@@ -104,7 +138,11 @@ try {
   check((await page.locator('.sidebar-world').textContent()) === 'Smoke World', 'relaunch reopens the last world')
   const after = await fs.stat(path.join(worldDir, 'world.json'))
   check(after.mtimeMs === stat.mtimeMs, 'reopening a world does not write to it')
-  check(JSON.stringify(await fs.readdir(worldDir)) === '["world.json"]', 'the world folder still holds only world.json')
+  check(
+    (await fs.stat(path.join(worldDir, 'settings', 'physics.json'))).mtimeMs === physicsStat.mtimeMs,
+    'checking and reopening never rewrite world files'
+  )
+  check(JSON.stringify(await listAll(worldDir)) === EXPECTED_FILES, 'the world folder still holds only its own files')
 
   // 7. Close the world: back to welcome, with it in the recent list.
   await page.evaluate(() => window.malevo.world.close())
@@ -119,8 +157,27 @@ try {
   check(future.ok === false && future.code === 'format-too-new', 'a newer world format is refused')
   check((await fs.readFile(path.join(futureDir, 'world.json'), 'utf8')).includes('"format": 99'), 'the refused world is left untouched')
 
+  // 8b. A world from before physics settings existed gets them from the Checks tool.
+  const oldDir = path.join(tmp, 'old-world')
+  await fs.mkdir(oldDir)
+  await fs.writeFile(path.join(oldDir, 'world.json'), '{\n  "format": 1,\n  "name": "Old",\n  "seed": 5\n}\n')
+  const opened = await page.evaluate((dir) => window.malevo.world.open(dir), oldDir)
+  check(opened.ok === true, 'a Phase 0 world (world.json only) still opens')
+  await page.locator('.tool-link', { hasText: 'Checks' }).click()
+  await page.waitForSelector('.checks-fix button.primary', { timeout: 10_000 })
+  await page.locator('.checks-fix button.primary').click()
+  await page.waitForSelector('.ok', { timeout: 10_000 })
+  check(
+    (await page.locator('.ok').textContent()) === 'Added settings/physics.json, calendars/gregorian.json.',
+    'the Checks tool adds the missing template files'
+  )
+  check((await page.locator('.checks-summary').textContent()) === 'No problems found.', 'after which the old world checks clean')
+  await page.locator('.tool-link', { hasText: 'World' }).click()
+  await page.evaluate(() => window.malevo.world.close())
+  await page.waitForSelector('.welcome .recent', { timeout: 10_000 })
+
   // 9. Reopen from the recent list.
-  await page.locator('.recent-open').first().click()
+  await page.locator('.recent-open', { hasText: 'Smoke World' }).click()
   await page.waitForSelector('.workspace', { timeout: 10_000 })
   check(true, 'a recent world reopens from the welcome screen')
 

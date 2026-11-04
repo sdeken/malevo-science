@@ -24,7 +24,7 @@ const updater = new Updater({
   locked: () => screenLocked,
   busy: () => busy,
   prepareQuit: async () => {
-    /* Nothing to flush yet: Phase 0 never holds unsaved world data. */
+    /* Nothing to flush yet: no tool holds unsaved world data. */
   }
 })
 

@@ -51,11 +51,13 @@ describe('world folders', () => {
     await fs.rm(tmp, { recursive: true, force: true })
   })
 
-  it('creates a world that holds world.json and nothing else', async () => {
+  it('creates a world holding world.json and the new-world template, nothing else', async () => {
     const dir = path.join(tmp, 'new', 'world')
     const world = await createWorld(dir, 'Scratch', 42)
     expect(world.manifest.seed).toBe(42)
-    expect(await fs.readdir(dir)).toEqual(['world.json'])
+    expect((await fs.readdir(dir)).sort()).toEqual(['calendars', 'settings', 'world.json'])
+    expect(await fs.readdir(path.join(dir, 'settings'))).toEqual(['physics.json'])
+    expect(await fs.readdir(path.join(dir, 'calendars'))).toEqual(['gregorian.json'])
     expect((await openWorld(dir)).manifest.name).toBe('Scratch')
   })
 
@@ -78,7 +80,7 @@ describe('world folders', () => {
     const after = await fs.stat(file)
     expect(after.mtimeMs).toBe(before.mtimeMs)
     expect(await fs.readFile(file, 'utf8')).toBe(text)
-    expect(await fs.readdir(tmp)).toEqual(['world.json'])
+    expect((await fs.readdir(tmp)).sort()).toEqual(['calendars', 'settings', 'world.json'])
   })
 
   it('reports what a folder is', async () => {

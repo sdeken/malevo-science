@@ -8,8 +8,15 @@ cities. Every tool works from one shared model, so details stay consistent from 
 The app contains no setting and knows nothing about git. It reads and writes plain world folders
 of JSON. The author decides what is canon and commits it by hand to a repository of their own.
 
-**Status:** Phase 0 is built: the app shell, Windows packaging, auto-update and world folders. To
-build and release it, see **[docs/DEVELOPMENT.md](docs/DEVELOPMENT.md)**.
+**Status:** Phases 0 and 1 are built:
+- the app shell, Windows packaging and auto-update;
+- world folders;
+- the shared physics and calendar library (`@malevo/core`);
+- the world file format and its checks (`@malevo/model`);
+- versioned generators with golden fixtures;
+- the `malevo check` command.
+
+To build, check and release it, see **[docs/DEVELOPMENT.md](docs/DEVELOPMENT.md)**.
 
 To understand where it's going, read the plan: **[docs/PLAN.md](docs/PLAN.md)**.
 

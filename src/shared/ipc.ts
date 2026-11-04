@@ -16,6 +16,9 @@ export const IPC = {
   worldClose: 'world:close',
   worldReveal: 'world:reveal',
   worldForgetRecent: 'world:forgetRecent',
+  worldCheck: 'world:check',
+  worldFix: 'world:fix',
+  worldAddTemplate: 'world:addTemplate',
 
   updatesStatus: 'updates:status',
   updatesCheck: 'updates:check',

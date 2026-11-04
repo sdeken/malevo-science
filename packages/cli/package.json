@@ -1,0 +1,10 @@
+{
+  "name": "@malevo/cli",
+  "version": "0.0.0",
+  "description": "The malevo command: check, fix and template world folders",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  }
+}
