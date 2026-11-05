@@ -1,5 +1,5 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
-import { AU, M_SUN, collapseOutlines, stateAt, type MassPoint, type OrbitalElements, type Vec3 } from '@malevo/core'
+import { AU, M_SUN, contourGrid, stateAt, topDownLoad, type MassPoint, type OrbitalElements, type Vec3 } from '@malevo/core'
 import type { ElementsInfo, PhysicsSummary, SystemInfoDto } from '../../../../shared/types'
 import { sig, starColour } from '../../components/fields'
 
@@ -31,6 +31,8 @@ interface Props {
   onMeasure?: (p: { body: string } | { pos: Vec3 }) => void
   /** A measured leg to draw, star-relative positions. */
   measureLine?: [Vec3, Vec3] | null
+  /** Draw the load's isolines (1/8 to 8 times the collapse load) as well as the collapse edge. */
+  isolines?: boolean
 }
 
 const SIZE = 440
@@ -54,7 +56,8 @@ export function OrbitView({
   bodies,
   scale,
   onMeasure,
-  measureLine
+  measureLine,
+  isolines = false
 }: Props): React.JSX.Element {
   const box = useRef<HTMLDivElement>(null)
   const svgRef = useRef<SVGSVGElement>(null)
@@ -96,8 +99,6 @@ export function OrbitView({
     return () => el.removeEventListener('wheel', onWheel)
   }, [])
   const drag = useRef<{ x: number; y: number; vx: number; vy: number; moved: boolean } | null>(null)
-  // Zoomed in, smaller collapse regions are worth tracing (in steps, so a wheel turn does not retrace every time).
-  const zoomBucket = Math.pow(4, Math.floor(Math.log(zoom) / Math.log(4)))
 
   const shown = bodies.filter((b) => (center === null ? !isMoonOf(b, bodies) : parentOf(b) === center))
   const extra: number[] = center === null ? [system.habitableZone?.[1] ?? 0, system.collapse ?? 0] : []
@@ -122,21 +123,6 @@ export function OrbitView({
     return r === 0 ? [0, 0] : [(x / r) * m, -(y / r) * m]
   }
 
-  // The collapse surface at the current date, sliced in the system plane (positions relative to the star).
-  const collapse = useMemo(() => {
-    if (!foam || !system.star || system.star.mass === null) return []
-    const { masses } = systemMasses(system, now)!
-    const settings = { collapseRadius: foam.collapseRadius_au * AU, rule: foam.loadRule }
-    return collapseOutlines(masses, settings, [0, 0, 0], [1, 0, 0], [0, 1, 0], { minRadius: outer / (1000 * zoomBucket), grid: 160 }).map(
-      (o) => ({
-        star: o.body === 0,
-        center: o.center,
-        // The outer boundary, then any holes.
-        loops: o.loops,
-        points: o.loops[0]
-      })
-    )
-  }, [foam, system, now, outer, zoomBucket])
   const hostPos = useMemo((): Vec3 => {
     if (center === null) return [0, 0, 0]
     const byId = new Map(system.bodies.map((b) => [b.id, b]))
@@ -148,20 +134,88 @@ export function OrbitView({
     return p
   }, [center, system, now])
 
-  // Zoomed in on a body, the whole view can lie inside a collapse region far bigger than it: say so.
-  const enclosing = useMemo(() => {
-    if (center === null) return null
-    for (const c of collapse) {
-      if (c.points.length < 3) continue
-      const d = c.points.map((p) => Math.hypot(p[0] - hostPos[0], p[1] - hostPos[1]))
-      const inside = pointInPolygon([hostPos[0], hostPos[1]], c.points)
-      if (inside && Math.min(...d) > outer) {
-        const r = Math.min(...d)
-        return r > 0.01 * AU ? `${sig(r / AU, 3)} AU out at its nearest` : `${sig(r / 1000, 3)} km out at its nearest`
-      }
+  // The collapse region, seen from above: one load field for the whole system, sampled on a grid laid out in this
+  // view's own drawing units (log or linear, panned and zoomed), and contoured there. Every line is the field's,
+  // mapped point by point; nothing is drawn per body. Isolines at 1/8 to 8 times the collapse load show its shape.
+  const field = useMemo(() => {
+    if (!foam || !system.star || system.star.mass === null) return null
+    const { masses } = systemMasses(system, now)!
+    return topDownLoad(masses, { collapseRadius: foam.collapseRadius_au * AU, rule: foam.loadRule }, [0, 0, 0], [1, 0, 0], [0, 1, 0])
+  }, [foam, system, now])
+  /** Drawing units to the star-relative position they show. */
+  const toWorld = (ux: number, uy: number): [number, number] => {
+    const m = Math.hypot(ux, uy)
+    if (m === 0) return [hostPos[0], hostPos[1]]
+    const r = unmap(m)
+    return [hostPos[0] + (ux / m) * r, hostPos[1] - (uy / m) * r]
+  }
+  const [contours, setContours] = useState<{ level: number; d: string }[]>([])
+  const [enclosing, setEnclosing] = useState<string | null>(null)
+  const geometry = `${view.x}|${view.y}|${zoom}|${scale}|${outer}|${inner}|${hostPos.join()}`
+  useEffect(() => {
+    if (!field) {
+      setContours([])
+      setEnclosing(null)
+      return
     }
-    return null
-  }, [collapse, center, hostPos, outer])
+    // Wait for panning and zooming to settle; until then the old lines, in drawing units, stay where they belong.
+    const timer = setTimeout(() => {
+      const N = 180
+      const span = (SIZE / zoom) * 1.1
+      const x0 = view.x - span / 2
+      const y0 = view.y - span / 2
+      const h = span / N
+      const f = new Float64Array((N + 1) * (N + 1))
+      let allInside = true
+      for (let a = 0; a <= N; a++)
+        for (let b = 0; b <= N; b++) {
+          const [wx, wy] = toWorld(x0 + b * h, y0 + a * h)
+          const v = field(wx, wy)
+          f[a * (N + 1) + b] = v
+          if (v < 0) allInside = false
+        }
+      const levels = isolines ? [-3, -2, -1, 0, 1, 2, 3].map((k) => k * Math.LN2) : [0]
+      const out: { level: number; d: string }[] = []
+      for (const L of levels) {
+        // log₂ steps of 1, 2 and 3 are loads of 2, 4 and 8 times (or under) the collapse load.
+        const lines = contourGrid(f, N, N, x0, y0, h, h, L)
+        const d = lines
+          .map((l) => {
+            const closed = Math.hypot(l[0][0] - l[l.length - 1][0], l[0][1] - l[l.length - 1][1]) < 2 * h
+            return 'M ' + l.map((p) => `${p[0].toFixed(2)},${p[1].toFixed(2)}`).join(' L ') + (closed ? ' Z' : '')
+          })
+          .join(' ')
+        if (d) out.push({ level: L, d })
+      }
+      setContours(out)
+      // Zoomed in on a body, the whole view can lie inside a collapse region far bigger than it: say how far out it ends.
+      if (center !== null && allInside) {
+        let nearest = Infinity
+        for (let k = 0; k < 24; k++) {
+          const a = (2 * Math.PI * k) / 24
+          const dir = [Math.cos(a), Math.sin(a)]
+          const inside = (r: number): boolean => field(hostPos[0] + dir[0] * r, hostPos[1] + dir[1] * r) >= 0
+          let lo2 = outer
+          let hi2 = outer * 2
+          while (inside(hi2) && hi2 < 1e6 * outer) {
+            lo2 = hi2
+            hi2 *= 2
+          }
+          for (let i = 0; i < 30; i++) {
+            const m = (lo2 + hi2) / 2
+            if (inside(m)) lo2 = m
+            else hi2 = m
+          }
+          nearest = Math.min(nearest, hi2)
+        }
+        setEnclosing(
+          nearest > 0.01 * AU ? `${sig(nearest / AU, 3)} AU out at its nearest` : `${sig(nearest / 1000, 3)} km out at its nearest`
+        )
+      } else setEnclosing(null)
+    }, 120)
+    return () => clearTimeout(timer)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [field, geometry, isolines])
 
   const orbits = useMemo(
     () =>
@@ -306,54 +360,16 @@ export function OrbitView({
               </text>
             </g>
           ))}
-        {collapse.map((c, k) => {
-          // On the log scale, a region away from the view's centre would be squashed toward its orbit (distances
-          // out from the centre shrink, distances along the orbit do not). A small one is drawn in its true shape
-          // instead, at the scale along the orbit where its centre sits. A big one (a third of its distance or more)
-          // is mapped like everything else, so a gap or a join with the star's region reads as it is; between, a blend.
-          const cx = c.center[0] - hostPos[0]
-          const cy = c.center[1] - hostPos[1]
-          const rc = Math.hypot(cx, cy)
-          const size = Math.max(...c.points.map((p) => Math.hypot(p[0] - c.center[0], p[1] - c.center[1])))
-          const w = scale === 'log' && rc > 1e-9 * outer ? Math.max(0, Math.min(1, (0.35 - size / rc) / 0.25)) : 0
-          const [mx, my] = at(cx, cy)
-          const kl = rc > 0 ? map(rc) / rc : 0
-          const place = (p: Vec3): [number, number] => {
-            const g = at(p[0] - hostPos[0], p[1] - hostPos[1])
-            if (w === 0) return g
-            const t: [number, number] = [mx + (p[0] - c.center[0]) * kl, my - (p[1] - c.center[1]) * kl]
-            return [t[0] * w + g[0] * (1 - w), t[1] * w + g[1] * (1 - w)]
-          }
-          const pts = c.points.map(place)
-          if (pts.length < 3) return null
-          const d = c.loops
-            .map(
-              (l) =>
-                'M ' +
-                l
-                  .map((p) =>
-                    place(p)
-                      .map((x) => x.toFixed(1))
-                      .join(',')
-                  )
-                  .join(' L ') +
-                ' Z'
-            )
-            .join(' ')
-          const top = pts.reduce((a, b) => (b[1] < a[1] ? b : a))
-          return (
-            <g key={`c-${k}`} className="ov-collapse" pointerEvents="none">
-              <path d={d} fillRule="evenodd">
-                <title>The foam collapses inside this line (every body's tide, at the current date)</title>
-              </path>
-              {c.star && center === null && system.collapse && (
-                <text x={top[0]} y={top[1] - 4 / zoom}>
-                  collapse {sig(system.collapse / AU, 3)} AU
-                </text>
-              )}
-            </g>
-          )
-        })}
+        {contours.map((c) => (
+          <path key={`c${c.level}`} className={c.level === 0 ? 'ov-collapse-edge' : 'ov-isoline'} d={c.d} pointerEvents="none">
+            {c.level === 0 && <title>The foam collapses inside this line (every body's tide, at the current date)</title>}
+          </path>
+        ))}
+        {center === null && system.collapse && contours.some((c) => c.level === 0) && (
+          <text className="ov-collapse-label" x={0} y={-map(system.collapse) - 4 / zoom} textAnchor="middle" pointerEvents="none">
+            collapse {sig(system.collapse / AU, 3)} AU
+          </text>
+        )}
         {measureLine && (
           <g className="ov-measure" pointerEvents="none">
             {(() => {
@@ -390,16 +406,6 @@ function parentOf(b: Drawn): string | null {
 function isMoonOf(b: Drawn, all: Drawn[]): boolean {
   const p = parentOf(b)
   return p !== null && all.some((x) => x.id === p)
-}
-
-function pointInPolygon(p: [number, number], poly: readonly (readonly number[])[]): boolean {
-  let inside = false
-  for (let i = 0, j = poly.length - 1; i < poly.length; j = i++) {
-    const [xi, yi] = poly[i]
-    const [xj, yj] = poly[j]
-    if (yi > p[1] !== yj > p[1] && p[0] < ((xj - xi) * (p[1] - yi)) / (yj - yi) + xi) inside = !inside
-  }
-  return inside
 }
 
 /**

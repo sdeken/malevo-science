@@ -360,7 +360,7 @@ export function collapseOutlines(
         // On a body itself the load is unbounded (NaN from 0/0): inside.
         f[a * (n + 1) + b] = Number.isNaN(L) || L === Infinity ? 700 : L > 0 ? Math.log(L) : -700
       }
-    const loops = marchingSquares(f, n, cx - reach, cy - reach, h)
+    const loops = contourGrid(f, n, n, cx - reach, cy - reach, h, h)
     const outer = loops.filter((l) => pointInLoop([cx, cy], l)).sort((p, q) => Math.abs(loopArea(p)) - Math.abs(loopArea(q)))[0]
     if (!outer) continue
     const holes = loops.filter((l) => l !== outer && !pointInLoop([cx, cy], l) && pointInLoop(l[0], outer))
@@ -386,13 +386,23 @@ function loopArea(loop: readonly (readonly number[])[]): number {
 }
 
 /**
- * The closed contours where `f` (on an (n+1)² grid, row a at y0 + a·h, column
- * b at x0 + b·h) crosses 0, with crossings placed by linear interpolation.
- * Lines that run off the grid are returned open (read as closed by a straight edge).
+ * The contours where `f` crosses `level`: f holds (nx+1) columns × (ny+1)
+ * rows, row a at y0 + a·hy and column b at x0 + b·hx. Crossings are placed by
+ * linear interpolation and chained into lines; closed loops repeat no point,
+ * and lines that run off the grid are returned open.
  */
-function marchingSquares(f: Float64Array, n: number, x0: number, y0: number, h: number): [number, number][][] {
-  const W = n + 1
-  const val = (a: number, b: number): number => f[a * W + b]
+export function contourGrid(
+  f: ArrayLike<number>,
+  nx: number,
+  ny: number,
+  x0: number,
+  y0: number,
+  hx: number,
+  hy: number,
+  level = 0
+): [number, number][][] {
+  const W = nx + 1
+  const val = (a: number, b: number): number => f[a * W + b] - level
   // A crossing point on an edge, keyed so neighbouring cells share it: horizontal edges "h:a:b", vertical "v:a:b".
   const pts = new Map<string, [number, number]>()
   const point = (key: string, a0: number, b0: number, a1: number, b1: number): string => {
@@ -400,7 +410,7 @@ function marchingSquares(f: Float64Array, n: number, x0: number, y0: number, h: 
       const p = val(a0, b0)
       const q = val(a1, b1)
       const t = p === q ? 0.5 : Math.max(0, Math.min(1, p / (p - q)))
-      pts.set(key, [x0 + (b0 + (b1 - b0) * t) * h, y0 + (a0 + (a1 - a0) * t) * h])
+      pts.set(key, [x0 + (b0 + (b1 - b0) * t) * hx, y0 + (a0 + (a1 - a0) * t) * hy])
     }
     return key
   }
@@ -409,8 +419,8 @@ function marchingSquares(f: Float64Array, n: number, x0: number, y0: number, h: 
     next.set(p, [...(next.get(p) ?? []), q])
     next.set(q, [...(next.get(q) ?? []), p])
   }
-  for (let a = 0; a < n; a++)
-    for (let b = 0; b < n; b++) {
+  for (let a = 0; a < ny; a++)
+    for (let b = 0; b < nx; b++) {
       // Corners: 0 (a,b), 1 (a,b+1), 2 (a+1,b+1), 3 (a+1,b); inside where f ≥ 0.
       const c = [val(a, b) >= 0, val(a, b + 1) >= 0, val(a + 1, b + 1) >= 0, val(a + 1, b) >= 0]
       const idx = (c[0] ? 1 : 0) | (c[1] ? 2 : 0) | (c[2] ? 4 : 0) | (c[3] ? 8 : 0)
@@ -481,4 +491,50 @@ const CASES: Record<number, [number, number]> = {
   12: [1, 3],
   13: [0, 1],
   14: [3, 0]
+}
+
+/**
+ * The collapse region seen from above a plane: at a point (x, y) of the plane
+ * through `origin` spanned by `u` and `v`, the log of the highest foam load
+ * along the line through it at right angles (the region's outline as seen
+ * looking down, so a bubble round a body above or below the plane still
+ * shows). The load is taken in the plane and at the heights of the bodies
+ * whose collapse could reach that point, and halfway to them; between those
+ * heights it varies smoothly, so the maximum is close.
+ */
+export function topDownLoad(
+  bodies: readonly MassPoint[],
+  s: Pick<FoamSettings, 'collapseRadius' | 'rule'>,
+  origin: Vec3,
+  u: Vec3,
+  v: Vec3
+): (x: number, y: number) => number {
+  const nrm: Vec3 = [u[1] * v[2] - u[2] * v[1], u[2] * v[0] - u[0] * v[2], u[0] * v[1] - u[1] * v[0]]
+  const flat = bodies.map((b) => {
+    const d = [b.pos[0] - origin[0], b.pos[1] - origin[1], b.pos[2] - origin[2]]
+    return {
+      x: d[0] * u[0] + d[1] * u[1] + d[2] * u[2],
+      y: d[0] * v[0] + d[1] * v[1] + d[2] * v[2],
+      z: d[0] * nrm[0] + d[1] * nrm[1] + d[2] * nrm[2],
+      // Far enough out that its own load is under 1/64 (isolines included): 4× its collapse radius.
+      reach: 4 * collapseRadius(b.mass, s)
+    }
+  })
+  const at = (x: number, y: number, z: number): Vec3 => [
+    origin[0] + x * u[0] + y * v[0] + z * nrm[0],
+    origin[1] + x * u[1] + y * v[1] + z * nrm[1],
+    origin[2] + x * u[2] + y * v[2] + z * nrm[2]
+  ]
+  const logLoad = (p: Vec3): number => {
+    const L = foamLoad(p, bodies, s)
+    return Number.isNaN(L) || L === Infinity ? 700 : L > 0 ? Math.log(L) : -700
+  }
+  return (x, y) => {
+    let best = logLoad(at(x, y, 0))
+    for (const b of flat) {
+      if (b.z === 0 || Math.abs(x - b.x) > b.reach || Math.abs(y - b.y) > b.reach) continue
+      best = Math.max(best, logLoad(at(x, y, b.z)), logLoad(at(x, y, b.z / 2)))
+    }
+    return best
+  }
 }

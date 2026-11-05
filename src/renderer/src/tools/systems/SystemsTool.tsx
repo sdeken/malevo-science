@@ -107,6 +107,7 @@ function SystemDetail({
   const [selectedBody, setSelectedBody] = useState<string | null>(null)
   const [center, setCenter] = useState<string | null>(null)
   const [measuring, setMeasuring] = useState(false)
+  const [isolines, setIsolines] = useState(false)
   const [measurePts, setMeasurePts] = useState<MeasurePoint[]>([])
   const [scale, setScale] = useState<'log' | 'linear'>('log')
   const [proposal, setProposal] = useState<PlanetProposal | null>(null)
@@ -306,6 +307,10 @@ function SystemDetail({
               <input type="checkbox" checked={scale === 'log'} onChange={(e) => setScale(e.target.checked ? 'log' : 'linear')} />
               Log scale
             </label>
+            <label className="check small">
+              <input type="checkbox" checked={isolines} onChange={(e) => setIsolines(e.target.checked)} id="isolines" />
+              Isolines
+            </label>
           </div>
           <OrbitView
             system={system}
@@ -316,6 +321,7 @@ function SystemDetail({
             center={center}
             bodies={drawn}
             scale={scale}
+            isolines={isolines}
             onMeasure={measuring && center === null ? (p) => setMeasurePts((pts) => (pts.length >= 2 ? [p] : [...pts, p])) : undefined}
             measureLine={
               center === null && measurePts.length === 2

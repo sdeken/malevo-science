@@ -3,6 +3,7 @@ import { nodeWaypoint, waypointNode, type RouteFile, type Waypoint } from '@male
 import type { BalanceSuggestionDto, EntityDto, RouteInfoDto, StarField, StarSearchHit, WorldSnapshot } from '../../../../shared/types'
 import { NumberField, TextField, duration, sig } from '../../components/fields'
 import { slugId, useWorldPref } from '../../state'
+import { LegView } from './LegView'
 import type { ToolDefinition, ToolProps } from '../registry'
 import { StarMap, type MapSystem } from '../stars/StarMap'
 import { NEBULA_COLOR, ROUTE_COLOR, mapNebulae, mapRoutes, mapStations } from './mapData'
@@ -13,7 +14,7 @@ type Service = NonNullable<RouteFile['services']>[number]
 const nodeName = (snapshot: WorldSnapshot, id: string | null): string => (id ? (snapshot.nodes[id]?.name ?? id) : '(nothing)')
 const KIND_LABEL = { system: 'system', station: 'station', star: 'star' } as const
 
-function RoutesView({ world, snapshot, focus, navigate }: ToolProps): React.JSX.Element {
+function RoutesView({ world, snapshot, focus, navigate, now }: ToolProps): React.JSX.Element {
   const [tab, setTab] = useWorldPref<Tab>(world.root, 'routesTab', 'routes')
   const [selected, setSelected] = useState<Record<string, string | null>>({})
   const [creating, setCreating] = useState(false)
@@ -135,7 +136,11 @@ function RoutesView({ world, snapshot, focus, navigate }: ToolProps): React.JSX.
           !creating &&
           (() => {
             const r = snapshot.routes.find((x) => x.id === currentId)
-            return r ? <RouteEditor key={r.id} route={r} snapshot={snapshot} /> : <p className="tool-page muted">Make a route to start.</p>
+            return r ? (
+              <RouteEditor key={r.id} route={r} snapshot={snapshot} now={now} />
+            ) : (
+              <p className="tool-page muted">Make a route to start.</p>
+            )
           })()}
         {tab === 'stations' &&
           (() => {
@@ -308,7 +313,7 @@ function servicesSwapped(services: Service[], i: number, j: number): Service[] {
   return services.map((s) => ({ ...s, from: m(s.from), to: m(s.to) })).filter((s) => s.from !== s.to)
 }
 
-function RouteEditor({ route, snapshot }: { route: RouteInfoDto; snapshot: WorldSnapshot }): React.JSX.Element {
+function RouteEditor({ route, snapshot, now }: { route: RouteInfoDto; snapshot: WorldSnapshot; now: number }): React.JSX.Element {
   const v = route.value as unknown as RouteFile
   const services = v.services ?? []
   const [note, setNote] = useState<string | null>(null)
@@ -461,6 +466,8 @@ function RouteEditor({ route, snapshot }: { route: RouteInfoDto; snapshot: World
         </div>
       </div>
       {note && <p className="warning">{note}</p>}
+
+      <LegView route={route} snapshot={snapshot} now={now} />
 
       <h3>Services</h3>
       <p className="muted small">

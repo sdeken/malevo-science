@@ -206,18 +206,28 @@ module.exports = {
 
 - **Where the foam collapses** is the surface where the load from every body's tide reaches 1
   (`collapseRegions`, `collapseMesh` and `collapseSlice` in `packages/core/src/foam.ts`).
-- **The orbit view** draws the slice in the system plane at the current date with
-  `collapseOutlines`. It samples the load on a grid around each body big enough to matter and
-  traces the contour where it is 1 (marching squares on the log of the load). This is the exact
-  slice of the 3D surface, whatever its shape:
-  - two bubbles stay apart until the load between them reaches 1, and join through a smooth neck;
-  - a lee shows as a dent, or a hole;
-  - a body inside an area already traced has none of its own.
-- **On the log scale** distances out from the star are squashed and distances along an orbit are
-  not. A small region away from the view's centre is drawn in its true shape, at the scale along
-  the orbit where it sits, so it does not become a sliver. A big one (a third of its distance or
-  more) is mapped like everything else, so its gap to the star's region, or its join with it,
-  reads as it is. The linear scale shows every shape as it is.
+- **The orbit view** draws the region as seen from above the system plane, at the current date.
+  It is one load field for the whole system (`topDownLoad`): at each point, the highest load
+  along the line through it at right angles, so a bubble round a planet on an inclined orbit
+  still shows. The field is sampled on a grid laid out in the view's own drawing units (log or
+  linear, panned and zoomed) and contoured there (`contourGrid`). Every line is the field's,
+  mapped point by point, with nothing drawn per body:
+  - two bubbles stay apart until the load between them reaches 1, then join through a smooth
+    neck;
+  - a lee shows as a dent;
+  - on the log scale the shapes are bent the way the scale bends everything else.
+- **Isolines** (a toggle by **Log scale**) draw the same field at 1/8, 1/4, 1/2, 2, 4 and 8
+  times the collapse load, to give a sense of the region's shape.
+- **The Routes tool** draws a leg between two systems end to end (`LegView.tsx`):
+  - both ends, seen side-on to the leg, to the same scale;
+  - each system's plane tilted as it really is against the other's, with its pole marked and
+    the angle between the leg and the plane;
+  - the collapse region cut through the plane that holds the leg, with isolines;
+  - where the approach model drops ships out of the foam, and their crawl to the port.
+
+  A slider turns the view about the leg.
+- **`collapseOutlines`** traces each body's area, cut at that body's own height. The torch
+  times use it for the star's edge.
 - **`collapseRegions` and `collapseMesh`** give a 3D mesh found along rays from each centre. They
   assume a region looks like a single blob from its centre, so they cannot show a neck or two
   bubbles side by side. The app does not draw them.

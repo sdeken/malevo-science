@@ -1770,3 +1770,65 @@ fieldset.plain {
   background: var(--accent);
   color: var(--accent-text);
 }
+
+.ov-collapse-edge {
+  fill: none;
+  stroke: var(--now);
+  stroke-dasharray: 5 4;
+  opacity: 0.85;
+}
+
+.ov-isoline {
+  fill: none;
+  stroke: var(--now);
+  stroke-width: 0.6;
+  opacity: 0.35;
+}
+
+.ov-collapse-label {
+  fill: var(--muted);
+  font-size: calc(9px * var(--ovs, 1));
+}
+
+.leg-view {
+  margin: 12px 0;
+}
+
+.leg-panels {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.leg-end svg {
+  display: block;
+  background: var(--bg-sunken);
+  border-radius: var(--radius);
+}
+
+.leg-gap {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.leg-pole {
+  stroke: var(--muted);
+  stroke-width: 1.5;
+}
+
+.leg-foam {
+  stroke: var(--accent);
+  stroke-width: 1.5;
+  stroke-dasharray: 4 3;
+}
+
+.leg-crawl {
+  stroke: var(--accent);
+  stroke-width: 2;
+}
+
+.leg-drop {
+  fill: var(--accent);
+}

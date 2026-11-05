@@ -542,6 +542,21 @@ try {
   await page.waitForFunction(() => /No problems found|notes/.test(document.querySelector('.checks-summary')?.textContent ?? ''))
   const s5 = (await page.locator('.checks-summary').textContent()) ?? ''
   check(s5 === 'No problems found.' || /0 errors, 0 warnings/.test(s5), `routes and traffic check clean (${s5})`)
+  // A leg between two systems, end to end (left unsaved).
+  await page.evaluate(() =>
+    window.malevo.world.setEntity('route', 'sol-proxima', {
+      name: 'Sol–Proxima',
+      waypoints: [{ system: 'sol' }, { system: 'proxima-centauri' }]
+    })
+  )
+  await tool('Routes')
+  await page.locator('[data-tab="routes"]').click()
+  await page.locator('[data-entity="sol-proxima"]').click()
+  await page.waitForFunction(() => /Drops out .* AU out/.test(document.querySelector('#legView')?.textContent ?? ''), null, {
+    timeout: 30_000
+  })
+  check(true, 'a leg between two systems shows both ends, tilted, with where ships drop out')
+  await page.evaluate(() => window.malevo.world.undo())
 
   // 15. Phase 6: the sky from a kept planet, with the route's torches; an approach into the system.
   await tool('Sky')
