@@ -6,13 +6,29 @@ import { buildMenu } from './menu'
 import { SettingsStore } from './settings'
 import { Updater } from './updates'
 import { WorldSession } from './world'
+import { existsSync } from 'node:fs'
+import type { WorldEnv } from '@malevo/model'
+import { loadCatalog, nodeEnv } from '@malevo/model/node'
 
 // Tests point userData at a throwaway folder.
 if (process.env.MALEVO_USER_DATA) app.setPath('userData', process.env.MALEVO_USER_DATA)
 
 const isDev = !app.isPackaged && Boolean(process.env.ELECTRON_RENDERER_URL)
 const settings = new SettingsStore(path.join(app.getPath('userData'), 'settings.json'))
-const world = new WorldSession()
+// The catalogue is loaded once at start, before any world opens (caches key on this object).
+const env: WorldEnv = { loadScript: nodeEnv.loadScript }
+const world = new WorldSession(env)
+
+/** The star catalogue: beside the app when installed, in assets/ when run from the repository. */
+function catalogPath(): string | null {
+  for (const p of [
+    path.join(process.resourcesPath ?? '', 'catalog', 'hyg-stars.json'),
+    path.join(app.getAppPath(), 'assets', 'catalog', 'hyg-stars.json')
+  ]) {
+    if (existsSync(p)) return p
+  }
+  return null
+}
 let mainWindow: BrowserWindow | null = null
 let screenLocked = false
 let closeConfirmed = false
@@ -104,6 +120,14 @@ if (!gotLock) {
   app.whenReady().then(async () => {
     app.setAppUserModelId('com.sdeken.malevo-science')
     await settings.load()
+    const catalog = catalogPath()
+    if (catalog) {
+      try {
+        env.catalog = await loadCatalog(catalog)
+      } catch (err) {
+        console.error('[stars] could not load the catalogue', err)
+      }
+    } else console.error('[stars] the star catalogue is missing')
 
     registerIpc({ settings, world, updater })
 

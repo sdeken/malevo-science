@@ -7,7 +7,11 @@ import type {
   EditableKind,
   FolderInfo,
   ParsedDate,
+  PlanetProposal,
   Settings,
+  StarField,
+  StarInfoDto,
+  StarSearchHit,
   TickInfo,
   UpdateStatus,
   WorldInfo,
@@ -58,6 +62,7 @@ const api = {
     // Edits are unsaved until save(); each is one undo step.
     setEntity: (kind: EditableKind, id: string, value: unknown): Promise<void> => ipcRenderer.invoke(IPC.worldSetEntity, kind, id, value),
     deleteEntity: (kind: EditableKind, id: string): Promise<void> => ipcRenderer.invoke(IPC.worldDeleteEntity, kind, id),
+    deleteEntities: (items: { kind: EditableKind; id: string }[]): Promise<void> => ipcRenderer.invoke(IPC.worldDeleteEntities, items),
     setScript: (id: string, code: string | null): Promise<void> => ipcRenderer.invoke(IPC.worldSetScript, id, code),
     undo: (): Promise<void> => ipcRenderer.invoke(IPC.worldUndo),
     redo: (): Promise<void> => ipcRenderer.invoke(IPC.worldRedo),
@@ -66,6 +71,19 @@ const api = {
     fork: (dest: string): Promise<WorldResult> => ipcRenderer.invoke(IPC.worldFork, dest),
     compare: (other: string): Promise<CompareReport> => ipcRenderer.invoke(IPC.worldCompare, other),
     take: (other: string, keys: string[]): Promise<void> => ipcRenderer.invoke(IPC.worldTake, other, keys)
+  },
+  stars: {
+    /** Stars within `radius` light-years of `center` (galactic ly), packed for drawing. */
+    near: (center: [number, number, number], radius: number, generated: boolean): Promise<StarField> =>
+      ipcRenderer.invoke(IPC.starsNear, center, radius, generated),
+    get: (id: string): Promise<StarInfoDto | null> => ipcRenderer.invoke(IPC.starsGet, id),
+    search: (text: string): Promise<StarSearchHit[]> => ipcRenderer.invoke(IPC.starsSearch, text)
+  },
+  systems: {
+    /** A planets@1 proposal for a system (nothing is written). */
+    roll: (id: string, roll: number): Promise<PlanetProposal> => ipcRenderer.invoke(IPC.systemsRoll, id, roll),
+    /** Keep a roll as locked bodies, replacing an earlier kept roll. Unsaved, undoable. */
+    keep: (id: string, roll: number): Promise<string[]> => ipcRenderer.invoke(IPC.systemsKeep, id, roll)
   },
   calendar: {
     ticks: (cal: string, t0: number, t1: number, target: number): Promise<TickInfo[]> =>

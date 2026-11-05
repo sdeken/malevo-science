@@ -144,6 +144,8 @@ export interface WorldSnapshot {
   canRedo: boolean
   calendars: CalendarInfo[]
   events: EventInfo[]
+  systems: SystemInfoDto[]
+  physics: PhysicsSummary | null
   issueCounts: { error: number; warning: number; info: number }
 }
 
@@ -193,4 +195,109 @@ export interface CompareReport {
   }[]
 }
 
-export type EditableKind = 'event' | 'calendar' | 'physics'
+export type EditableKind = 'event' | 'calendar' | 'physics' | 'system' | 'body'
+
+// ---- Phase 3: stars, systems, bodies ----
+
+export interface ElementsInfo {
+  a: number
+  e: number
+  i: number
+  node: number
+  peri: number
+  meanAnomaly: number
+  epoch: number
+  mu: number
+}
+
+export interface BodyInfoDto {
+  id: string
+  path: string
+  name: string
+  cls: string
+  parent: string | null
+  depth: number
+  /** The body file's value. */
+  value: Record<string, unknown>
+  error: string | null
+  elements: ElementsInfo | null
+  mass: number
+  radius: number
+  tilt: number
+  rotation: number | null
+  period: number | null
+  year: number | null
+  solarDay: number | null
+  hill: number | null
+  collapse: number | null
+  surfaceGravity: number
+  escapeVelocity: number
+  density: number
+  insolation: number | null
+  equilibriumTemp: number | null
+  /** Generated and kept (planets@1 and so on). */
+  generatedBy: string | null
+}
+
+export interface StarInfoDto {
+  id: string
+  name: string | null
+  spect: string
+  absmag: number
+  mag: number
+  ci: number
+  pos: [number, number, number]
+  generated: boolean
+  teff: number
+  luminosity: number
+  radius: number
+  mass: number | null
+  massSource: string
+  overridden: string[]
+}
+
+export interface SystemInfoDto {
+  id: string
+  path: string
+  name: string
+  starId: string
+  value: Record<string, unknown>
+  star: StarInfoDto | null
+  starError: string | null
+  /** Habitable zone, m. */
+  habitableZone: [number, number] | null
+  /** Collapse radius around the star, m. */
+  collapse: number | null
+  bodies: BodyInfoDto[]
+}
+
+export interface PhysicsSummary {
+  legLimit_ly: number
+  topSpeed_c: number
+  collapseRadius_au: number
+}
+
+/** Stars near a point, packed for drawing. */
+export interface StarField {
+  ids: string[]
+  /** x, y, z per star, light-years. */
+  pos: Float32Array
+  absmag: Float32Array
+  ci: Float32Array
+  /** Index → name, for named stars only. */
+  names: Record<number, string>
+  generated: Uint8Array
+}
+
+export interface StarSearchHit {
+  id: string
+  name: string
+  /** Which system sits on it, if one does. */
+  system: string | null
+  distance: number
+}
+
+export interface PlanetProposal {
+  roll: number
+  bodies: { id: string; value: Record<string, unknown> }[]
+}

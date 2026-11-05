@@ -12,6 +12,10 @@ publish:
 files:
   - out/**
   - package.json
+# The star catalogue (CC BY-SA 4.0, see assets/catalog/README.md) ships beside the app, not inside it.
+extraResources:
+  - from: assets/catalog
+    to: catalog
 # Windows only (plan decision D8). Unsigned (D6): electron-updater applies
 # updates to an unsigned app; the cost is a SmartScreen prompt on first install.
 win:

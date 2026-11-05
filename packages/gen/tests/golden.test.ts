@@ -30,7 +30,26 @@ interface GoldenFile {
 }
 
 /** The inputs each frozen generator is pinned with. Extend when adding a generator; never change existing ones. */
+const STARFIELD_PARAMS = { density: 0.004, scaleHeight: 1000, cell: 25, catalogMag: 8, catalogNear: 25 }
+const STARS = [
+  { mass_msun: 1, luminosity_lsun: 1, cls: 'G' },
+  { mass_msun: 0.12, luminosity_lsun: 0.0016, cls: 'M' },
+  { mass_msun: 2.1, luminosity_lsun: 25, cls: 'A' },
+  { mass_msun: 0.75, luminosity_lsun: 0.3, cls: 'K' }
+]
+
 const CASES: Record<string, { seed: number; input: unknown }[]> = {
+  'starfield@1': [1, 42, 4242].flatMap((seed) =>
+    [
+      [0, 0, 0],
+      [3, -2, 1],
+      [-7, 5, 0],
+      [9, 9, -1]
+    ].map((cell) => ({ seed, input: { params: STARFIELD_PARAMS, cell } }))
+  ),
+  'planets@1': [1, 42, 4242].flatMap((seed) =>
+    STARS.flatMap((star, k) => [0, 1, 2].map((roll) => ({ seed, input: { system: `sys-${k}`, systemName: `System ${k}`, star, roll } })))
+  ),
   'placeholder-names@1': [1, 42, 4242, 0xffffffff].flatMap((seed) =>
     [0, 1, 2, 3, 4, 5, 6, 7].map((palette) => ({ seed, input: { ids: ['a', 'b', 'c', 'sys-001', 'sys-002', 'x.y_z'], palette } }))
   )

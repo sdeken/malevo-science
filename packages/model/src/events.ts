@@ -15,19 +15,14 @@ import {
   type CalendarDef,
   type CalendarSet,
   type Fields,
-  type Instant,
-  type ScriptCalendarImpl
+  type Instant
 } from '@malevo/core'
+import type { WorldEnv } from './env'
 import { calendarDef, calendarKind, eventKind, type EventFile, type When } from './kinds'
 import { entitiesOf, type WorldData } from './load'
+import { bodyCalendarLengths } from './systems'
 
-/** Compiles a script calendar's code into a sandboxed implementation; throws with a readable message on failure. */
-export type ScriptLoader = (code: string, path: string) => ScriptCalendarImpl
-
-export interface WorldEnv {
-  /** Without one (in the renderer, say), script calendars are reported as unavailable. */
-  loadScript?: ScriptLoader
-}
+export type { ScriptLoader, WorldEnv } from './env'
 
 export interface WorldCalendars {
   set: CalendarSet
@@ -46,6 +41,16 @@ export function worldCalendars(world: WorldData, env: WorldEnv = {}): WorldCalen
   const defs: Record<string, CalendarDef> = {}
   const errors = new Map<string, string>()
   for (const e of entitiesOf(world, calendarKind)) {
+    if (e.value.kind === 'solar' && e.value.body) {
+      const lengths = bodyCalendarLengths(world, env, e.value.body)
+      if ('error' in lengths) errors.set(e.id, lengths.error)
+      else defs[e.id] = calendarDef(e.value, undefined, lengths)!
+      continue
+    }
+    if (e.value.kind === 'solar' && (e.value.dayLength_s === undefined || e.value.yearLength_s === undefined)) {
+      errors.set(e.id, 'A planet-local calendar needs either a body to follow or both a day length and a year length.')
+      continue
+    }
     if (e.value.kind !== 'script') {
       defs[e.id] = calendarDef(e.value)!
       continue

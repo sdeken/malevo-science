@@ -652,7 +652,10 @@ waits for cultures (Phase 4).
 **Why first:** the dependencies are simple, it settles the editing, saving and forking patterns
 every other tool reuses, and every later tool needs "current date".
 
-### Phase 3: Star atlas and solar system planner
+### Phase 3: Star atlas and solar system planner — built
+
+Built; see [DEVELOPMENT.md](DEVELOPMENT.md). The prototype atlas file was not imported. It holds
+only Sol and twelve nebulae, and nebulae belong with routes (Phase 5).
 
 - The real-star catalogue as an asset. Port the prototype star generator (generated faint stars,
   per-cell seeding).

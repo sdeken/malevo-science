@@ -1,0 +1,510 @@
+{
+  "generator": "planets@1",
+  "note": "Pinned output hashes of a frozen generator. Never edit; see packages/gen/tests/golden.test.ts.",
+  "cases": [
+    {
+      "seed": 1,
+      "input": {
+        "system": "sys-0",
+        "systemName": "System 0",
+        "star": {
+          "mass_msun": 1,
+          "luminosity_lsun": 1,
+          "cls": "G"
+        },
+        "roll": 0
+      },
+      "hash": "110953109953ae"
+    },
+    {
+      "seed": 1,
+      "input": {
+        "system": "sys-0",
+        "systemName": "System 0",
+        "star": {
+          "mass_msun": 1,
+          "luminosity_lsun": 1,
+          "cls": "G"
+        },
+        "roll": 1
+      },
+      "hash": "16be81d9388a57"
+    },
+    {
+      "seed": 1,
+      "input": {
+        "system": "sys-0",
+        "systemName": "System 0",
+        "star": {
+          "mass_msun": 1,
+          "luminosity_lsun": 1,
+          "cls": "G"
+        },
+        "roll": 2
+      },
+      "hash": "08982e586a6a73"
+    },
+    {
+      "seed": 1,
+      "input": {
+        "system": "sys-1",
+        "systemName": "System 1",
+        "star": {
+          "mass_msun": 0.12,
+          "luminosity_lsun": 0.0016,
+          "cls": "M"
+        },
+        "roll": 0
+      },
+      "hash": "1aa0cbc793c249"
+    },
+    {
+      "seed": 1,
+      "input": {
+        "system": "sys-1",
+        "systemName": "System 1",
+        "star": {
+          "mass_msun": 0.12,
+          "luminosity_lsun": 0.0016,
+          "cls": "M"
+        },
+        "roll": 1
+      },
+      "hash": "175b67ef158f0f"
+    },
+    {
+      "seed": 1,
+      "input": {
+        "system": "sys-1",
+        "systemName": "System 1",
+        "star": {
+          "mass_msun": 0.12,
+          "luminosity_lsun": 0.0016,
+          "cls": "M"
+        },
+        "roll": 2
+      },
+      "hash": "0fe8c3147c0dd5"
+    },
+    {
+      "seed": 1,
+      "input": {
+        "system": "sys-2",
+        "systemName": "System 2",
+        "star": {
+          "mass_msun": 2.1,
+          "luminosity_lsun": 25,
+          "cls": "A"
+        },
+        "roll": 0
+      },
+      "hash": "0fd12631e0cd73"
+    },
+    {
+      "seed": 1,
+      "input": {
+        "system": "sys-2",
+        "systemName": "System 2",
+        "star": {
+          "mass_msun": 2.1,
+          "luminosity_lsun": 25,
+          "cls": "A"
+        },
+        "roll": 1
+      },
+      "hash": "18a0ff5f4b48ff"
+    },
+    {
+      "seed": 1,
+      "input": {
+        "system": "sys-2",
+        "systemName": "System 2",
+        "star": {
+          "mass_msun": 2.1,
+          "luminosity_lsun": 25,
+          "cls": "A"
+        },
+        "roll": 2
+      },
+      "hash": "15fb82ae7cb88b"
+    },
+    {
+      "seed": 1,
+      "input": {
+        "system": "sys-3",
+        "systemName": "System 3",
+        "star": {
+          "mass_msun": 0.75,
+          "luminosity_lsun": 0.3,
+          "cls": "K"
+        },
+        "roll": 0
+      },
+      "hash": "05e225d6467998"
+    },
+    {
+      "seed": 1,
+      "input": {
+        "system": "sys-3",
+        "systemName": "System 3",
+        "star": {
+          "mass_msun": 0.75,
+          "luminosity_lsun": 0.3,
+          "cls": "K"
+        },
+        "roll": 1
+      },
+      "hash": "0c8c6bb447d2e8"
+    },
+    {
+      "seed": 1,
+      "input": {
+        "system": "sys-3",
+        "systemName": "System 3",
+        "star": {
+          "mass_msun": 0.75,
+          "luminosity_lsun": 0.3,
+          "cls": "K"
+        },
+        "roll": 2
+      },
+      "hash": "16b0fb090c3bdd"
+    },
+    {
+      "seed": 42,
+      "input": {
+        "system": "sys-0",
+        "systemName": "System 0",
+        "star": {
+          "mass_msun": 1,
+          "luminosity_lsun": 1,
+          "cls": "G"
+        },
+        "roll": 0
+      },
+      "hash": "1a18de95e8bf12"
+    },
+    {
+      "seed": 42,
+      "input": {
+        "system": "sys-0",
+        "systemName": "System 0",
+        "star": {
+          "mass_msun": 1,
+          "luminosity_lsun": 1,
+          "cls": "G"
+        },
+        "roll": 1
+      },
+      "hash": "0b0f65a254f6d4"
+    },
+    {
+      "seed": 42,
+      "input": {
+        "system": "sys-0",
+        "systemName": "System 0",
+        "star": {
+          "mass_msun": 1,
+          "luminosity_lsun": 1,
+          "cls": "G"
+        },
+        "roll": 2
+      },
+      "hash": "030f37d2824022"
+    },
+    {
+      "seed": 42,
+      "input": {
+        "system": "sys-1",
+        "systemName": "System 1",
+        "star": {
+          "mass_msun": 0.12,
+          "luminosity_lsun": 0.0016,
+          "cls": "M"
+        },
+        "roll": 0
+      },
+      "hash": "1356b913fe294d"
+    },
+    {
+      "seed": 42,
+      "input": {
+        "system": "sys-1",
+        "systemName": "System 1",
+        "star": {
+          "mass_msun": 0.12,
+          "luminosity_lsun": 0.0016,
+          "cls": "M"
+        },
+        "roll": 1
+      },
+      "hash": "0675b4bce92d9f"
+    },
+    {
+      "seed": 42,
+      "input": {
+        "system": "sys-1",
+        "systemName": "System 1",
+        "star": {
+          "mass_msun": 0.12,
+          "luminosity_lsun": 0.0016,
+          "cls": "M"
+        },
+        "roll": 2
+      },
+      "hash": "017734f9540437"
+    },
+    {
+      "seed": 42,
+      "input": {
+        "system": "sys-2",
+        "systemName": "System 2",
+        "star": {
+          "mass_msun": 2.1,
+          "luminosity_lsun": 25,
+          "cls": "A"
+        },
+        "roll": 0
+      },
+      "hash": "0675b4bce92d9f"
+    },
+    {
+      "seed": 42,
+      "input": {
+        "system": "sys-2",
+        "systemName": "System 2",
+        "star": {
+          "mass_msun": 2.1,
+          "luminosity_lsun": 25,
+          "cls": "A"
+        },
+        "roll": 1
+      },
+      "hash": "1e5b927ae4570d"
+    },
+    {
+      "seed": 42,
+      "input": {
+        "system": "sys-2",
+        "systemName": "System 2",
+        "star": {
+          "mass_msun": 2.1,
+          "luminosity_lsun": 25,
+          "cls": "A"
+        },
+        "roll": 2
+      },
+      "hash": "16578fcd34a2cb"
+    },
+    {
+      "seed": 42,
+      "input": {
+        "system": "sys-3",
+        "systemName": "System 3",
+        "star": {
+          "mass_msun": 0.75,
+          "luminosity_lsun": 0.3,
+          "cls": "K"
+        },
+        "roll": 0
+      },
+      "hash": "08202eb934ae2c"
+    },
+    {
+      "seed": 42,
+      "input": {
+        "system": "sys-3",
+        "systemName": "System 3",
+        "star": {
+          "mass_msun": 0.75,
+          "luminosity_lsun": 0.3,
+          "cls": "K"
+        },
+        "roll": 1
+      },
+      "hash": "0610e20c0e00fc"
+    },
+    {
+      "seed": 42,
+      "input": {
+        "system": "sys-3",
+        "systemName": "System 3",
+        "star": {
+          "mass_msun": 0.75,
+          "luminosity_lsun": 0.3,
+          "cls": "K"
+        },
+        "roll": 2
+      },
+      "hash": "18d31714e10bb4"
+    },
+    {
+      "seed": 4242,
+      "input": {
+        "system": "sys-0",
+        "systemName": "System 0",
+        "star": {
+          "mass_msun": 1,
+          "luminosity_lsun": 1,
+          "cls": "G"
+        },
+        "roll": 0
+      },
+      "hash": "105a7904d758de"
+    },
+    {
+      "seed": 4242,
+      "input": {
+        "system": "sys-0",
+        "systemName": "System 0",
+        "star": {
+          "mass_msun": 1,
+          "luminosity_lsun": 1,
+          "cls": "G"
+        },
+        "roll": 1
+      },
+      "hash": "0bf1d382bf9f10"
+    },
+    {
+      "seed": 4242,
+      "input": {
+        "system": "sys-0",
+        "systemName": "System 0",
+        "star": {
+          "mass_msun": 1,
+          "luminosity_lsun": 1,
+          "cls": "G"
+        },
+        "roll": 2
+      },
+      "hash": "1408e95a23d729"
+    },
+    {
+      "seed": 4242,
+      "input": {
+        "system": "sys-1",
+        "systemName": "System 1",
+        "star": {
+          "mass_msun": 0.12,
+          "luminosity_lsun": 0.0016,
+          "cls": "M"
+        },
+        "roll": 0
+      },
+      "hash": "13ba7122d4f58f"
+    },
+    {
+      "seed": 4242,
+      "input": {
+        "system": "sys-1",
+        "systemName": "System 1",
+        "star": {
+          "mass_msun": 0.12,
+          "luminosity_lsun": 0.0016,
+          "cls": "M"
+        },
+        "roll": 1
+      },
+      "hash": "11e59e78965f77"
+    },
+    {
+      "seed": 4242,
+      "input": {
+        "system": "sys-1",
+        "systemName": "System 1",
+        "star": {
+          "mass_msun": 0.12,
+          "luminosity_lsun": 0.0016,
+          "cls": "M"
+        },
+        "roll": 2
+      },
+      "hash": "0e093eab9794fe"
+    },
+    {
+      "seed": 4242,
+      "input": {
+        "system": "sys-2",
+        "systemName": "System 2",
+        "star": {
+          "mass_msun": 2.1,
+          "luminosity_lsun": 25,
+          "cls": "A"
+        },
+        "roll": 0
+      },
+      "hash": "1f9ce9a6ee03d1"
+    },
+    {
+      "seed": 4242,
+      "input": {
+        "system": "sys-2",
+        "systemName": "System 2",
+        "star": {
+          "mass_msun": 2.1,
+          "luminosity_lsun": 25,
+          "cls": "A"
+        },
+        "roll": 1
+      },
+      "hash": "155dd1c0cc8b74"
+    },
+    {
+      "seed": 4242,
+      "input": {
+        "system": "sys-2",
+        "systemName": "System 2",
+        "star": {
+          "mass_msun": 2.1,
+          "luminosity_lsun": 25,
+          "cls": "A"
+        },
+        "roll": 2
+      },
+      "hash": "079a89085e7a23"
+    },
+    {
+      "seed": 4242,
+      "input": {
+        "system": "sys-3",
+        "systemName": "System 3",
+        "star": {
+          "mass_msun": 0.75,
+          "luminosity_lsun": 0.3,
+          "cls": "K"
+        },
+        "roll": 0
+      },
+      "hash": "059be4ddf5a4e2"
+    },
+    {
+      "seed": 4242,
+      "input": {
+        "system": "sys-3",
+        "systemName": "System 3",
+        "star": {
+          "mass_msun": 0.75,
+          "luminosity_lsun": 0.3,
+          "cls": "K"
+        },
+        "roll": 1
+      },
+      "hash": "0c57014545be5d"
+    },
+    {
+      "seed": 4242,
+      "input": {
+        "system": "sys-3",
+        "systemName": "System 3",
+        "star": {
+          "mass_msun": 0.75,
+          "luminosity_lsun": 0.3,
+          "cls": "K"
+        },
+        "roll": 2
+      },
+      "hash": "01827623ced744"
+    }
+  ]
+}

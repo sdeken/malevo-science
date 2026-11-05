@@ -16,6 +16,10 @@ export interface ToolProps {
   /** The calendar dates are shown in. */
   displayCal: string | null
   setDisplayCal(id: string): void
+  /** Switch to another tool, optionally pointing it at something (a system id, a star id). */
+  navigate(toolId: string, focus?: string): void
+  /** What another tool pointed this one at, if anything. */
+  focus: string | null
 }
 
 export interface ToolDefinition {

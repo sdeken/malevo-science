@@ -14,7 +14,9 @@
  */
 import path from 'node:path'
 import { canonicalFixes, runChecks, type Issue } from '@malevo/model'
-import { addMissingTemplateFiles, applyFixes, loadWorld, nodeEnv } from '@malevo/model/node'
+import { existsSync } from 'node:fs'
+import { fileURLToPath } from 'node:url'
+import { addMissingTemplateFiles, applyFixes, loadCatalog, loadWorld, nodeEnvWith } from '@malevo/model/node'
 
 export interface Io {
   out(line: string): void
@@ -70,7 +72,7 @@ async function check(root: string, flags: Set<string>, io: Io): Promise<number> 
     fixed = await applyFixes(root, canonicalFixes(world))
     if (fixed.length) world = await loadWorld(root)
   }
-  const issues = runChecks(world, nodeEnv)
+  const issues = runChecks(world, await cliEnv())
   if (flags.has('--json')) {
     io.out(JSON.stringify({ world: root, fixed, issues }, null, 2))
   } else {
@@ -99,4 +101,16 @@ export function summary(issues: readonly Issue[]): string {
   if (issues.length === 0) return 'No problems found.'
   const part = (count: number, word: string): string => `${count} ${word}${count === 1 ? '' : 's'}`
   return `${part(n('error'), 'error')}, ${part(n('warning'), 'warning')}, ${part(n('info'), 'note')}.`
+}
+
+/** The script sandbox, plus the star catalogue when it can be found (assets/catalog in the repository). */
+async function cliEnv(): Promise<ReturnType<typeof nodeEnvWith>> {
+  const here = path.dirname(fileURLToPath(import.meta.url))
+  for (const p of [
+    path.resolve(here, '../../assets/catalog/hyg-stars.json'),
+    path.resolve(here, '../../../assets/catalog/hyg-stars.json')
+  ]) {
+    if (existsSync(p)) return nodeEnvWith(await loadCatalog(p))
+  }
+  return nodeEnvWith()
 }

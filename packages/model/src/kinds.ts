@@ -147,8 +147,10 @@ export const calendarSchema = tagged('kind', {
   solar: obj({
     name: name(),
     kind: oneOf(['solar']),
-    dayLength_s: num({ above: 0, sig: 15 }),
-    yearLength_s: num({ above: 0, sig: 15 }),
+    /** Follow a body's own solar day and year; or give them as numbers below. */
+    body: opt(ref('body')),
+    dayLength_s: opt(num({ above: 0, sig: 15 })),
+    yearLength_s: opt(num({ above: 0, sig: 15 })),
     epoch: instantSchema,
     epochYear: num({ integer: true }),
     hoursPerDay: num({ integer: true, min: 1 }),
@@ -192,20 +194,24 @@ export const calendarKind: KindDef<CalendarFile> = {
 
 /**
  * A calendar file as the definition @malevo/core builds from. A script
- * calendar needs its sandboxed implementation; without one it has no
+ * calendar needs its sandboxed implementation, and a solar calendar that
+ * follows a body needs that body's day and year; without them there is no
  * definition (null).
  */
-export function calendarDef(c: CalendarFile, impl?: ScriptCalendarImpl): CalendarDef | null {
+export function calendarDef(c: CalendarFile, impl?: ScriptCalendarImpl, lengths?: { day_s: number; year_s: number }): CalendarDef | null {
   switch (c.kind) {
     case 'gregorian':
       return { kind: 'gregorian' }
     case 'fixed':
       return { kind: 'fixed', epoch: c.epoch.t_s, epochYear: c.epochYear, units: c.units, smallestUnit_s: c.smallestUnit_s }
-    case 'solar':
+    case 'solar': {
+      const day = c.body ? lengths?.day_s : c.dayLength_s
+      const year = c.body ? lengths?.year_s : c.yearLength_s
+      if (day === undefined || year === undefined) return null
       return {
         kind: 'solar',
-        dayLength_s: c.dayLength_s,
-        yearLength_s: c.yearLength_s,
+        dayLength_s: day,
+        yearLength_s: year,
         epoch: c.epoch.t_s,
         epochYear: c.epochYear,
         hoursPerDay: c.hoursPerDay,
@@ -214,6 +220,7 @@ export function calendarDef(c: CalendarFile, impl?: ScriptCalendarImpl): Calenda
         months: c.months,
         leapMonth: c.leapMonth
       }
+    }
     case 'era':
       return {
         kind: 'era',
@@ -270,4 +277,106 @@ export const eventKind: KindDef<EventFile> = {
 }
 
 /** Every kind, in the order files are reported. */
-export const KINDS: readonly KindDef[] = [physicsKind as KindDef, calendarKind as KindDef, eventKind as KindDef]
+// ---- stars, systems and bodies ----
+
+/** Settings for the generated faint stars (docs/PLAN.md §3.2: per-cell seeding, frozen as starfield@1). */
+export const starfieldSchema = obj({
+  /** Seed for the generated stars; absent means the world seed. */
+  seed: opt(num({ integer: true, min: 0, max: 0xffffffff })),
+  density_perLy3: num({ above: 0, sig: 9 }),
+  scaleHeight_ly: num({ above: 0, sig: 9 }),
+  cell_ly: num({ above: 0, sig: 9 }),
+  /** How far from Sol the star views fill in generated stars. */
+  radius_ly: num({ above: 0, sig: 9 }),
+  /** Generated stars are never brighter than this apparent magnitude from Sol. */
+  catalogMag: num({ sig: 9 }),
+  /** Within this distance of Sol the catalogue is taken as complete. */
+  catalogNear_ly: num({ min: 0, sig: 9 })
+})
+export type StarfieldSettings = Infer<typeof starfieldSchema>
+
+export const starfieldKind: KindDef<StarfieldSettings> = {
+  kind: 'starfield',
+  label: 'star field settings',
+  file: 'settings/stars.json',
+  schema: starfieldSchema
+}
+
+/** Catalogue ids (hip.N, hyg.N) and generated ids (g.ix_iy_iz.k). */
+export const STAR_ID = /^(?:hip|hyg)\.\d+$|^g\.-?\d+_-?\d+_-?\d+\.\d+$/
+
+export const systemSchema = obj({
+  name: name(),
+  /** The star the system is built on. */
+  star: str({ pattern: STAR_ID, patternHint: 'is not a star id (hip.N, hyg.N or a generated g.… id)' }),
+  /** Values that replace the estimates made from the catalogue. */
+  starOverrides: opt(
+    obj({
+      mass_msun: opt(num({ above: 0, sig: 6 })),
+      luminosity_lsun: opt(num({ above: 0, sig: 6 })),
+      teff_k: opt(num({ above: 0, sig: 6 })),
+      radius_rsun: opt(num({ above: 0, sig: 6 }))
+    })
+  ),
+  tags: opt(arr(str({ min: 1, max: 40 })))
+})
+export type SystemFile = Infer<typeof systemSchema>
+
+export const systemKind: KindDef<SystemFile> = {
+  kind: 'system',
+  label: 'system',
+  folder: 'systems',
+  schema: systemSchema
+}
+
+export const BODY_CLASSES = ['rocky', 'ocean', 'ice-giant', 'gas-giant', 'dwarf', 'belt'] as const
+
+export const bodySchema = obj({
+  name: name(),
+  system: ref('system'),
+  /** The body it orbits; absent for a body that orbits the star. */
+  parent: opt(ref('body')),
+  class: oneOf(BODY_CLASSES),
+  orbit: obj({
+    /** Semi-major axis: give exactly one of a_au and a_km. */
+    a_au: opt(num({ above: 0, sig: 9 })),
+    a_km: opt(num({ above: 0, sig: 9 })),
+    e: num({ min: 0, max: 0.99, sig: 6 }),
+    i_deg: num({ min: 0, max: 180, sig: 6 }),
+    node_deg: num({ min: 0, max: 360, sig: 7 }),
+    peri_deg: num({ min: 0, max: 360, sig: 7 }),
+    meanAnomaly_deg: num({ min: 0, max: 360, sig: 7 }),
+    /** When the mean anomaly is the one given. */
+    epoch: instantSchema
+  }),
+  mass_mearth: num({ above: 0, sig: 6 }),
+  radius_km: num({ above: 0, sig: 6 }),
+  rotation: obj({
+    /** Sidereal rotation period, standard hours; negative for retrograde. Omit when tidally locked. */
+    period_h: opt(num({ sig: 7 })),
+    /** Always shows one face to what it orbits. */
+    locked: opt(bool()),
+    /** Axial tilt to its orbit, degrees. */
+    tilt_deg: num({ min: 0, max: 180, sig: 5 })
+  }),
+  /** Bond albedo; a typical value for the class is assumed when absent. */
+  albedo: opt(num({ min: 0, max: 1, sig: 4 })),
+  lock: opt(lockSchema)
+})
+export type BodyFile = Infer<typeof bodySchema>
+
+export const bodyKind: KindDef<BodyFile> = {
+  kind: 'body',
+  label: 'body',
+  folder: 'bodies',
+  schema: bodySchema
+}
+
+export const KINDS: readonly KindDef[] = [
+  physicsKind as KindDef,
+  starfieldKind as KindDef,
+  calendarKind as KindDef,
+  eventKind as KindDef,
+  systemKind as KindDef,
+  bodyKind as KindDef
+]

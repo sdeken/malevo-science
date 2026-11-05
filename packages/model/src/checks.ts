@@ -6,7 +6,9 @@
 import { compareStrings, formatInstant, parseInstant, type Calendar, type CalendarSet } from '@malevo/core'
 import { staleLocks } from './deps'
 import { resolveEvents, worldCalendars, type WorldEnv } from './events'
-import { calendarKind, entityKey, eventKind, physicsKind, type CalendarFile, type StoredInstant } from './kinds'
+import { systemInfo } from './systems'
+import { templateFiles } from './template'
+import { calendarKind, entityKey, eventKind, physicsKind, systemKind, type CalendarFile, type StoredInstant } from './kinds'
 import { entitiesOf, type Issue, type WorldData } from './load'
 
 export interface Check {
@@ -88,20 +90,99 @@ export const formatCheck: Check = {
   }
 }
 
-export const physicsCheck: Check = {
-  id: 'physics',
-  title: 'The world has physics settings',
-  run: (world) =>
-    world.entities.has(physicsKind.kind)
-      ? []
-      : [
-          {
+export const templateCheck: Check = {
+  id: 'template',
+  title: 'The world has its settings files',
+  run(world) {
+    const have = new Set([...world.entities.values()].map((e) => e.path))
+    return templateFiles()
+      .filter((f) => f.path.startsWith('settings/') && !have.has(f.path))
+      .map((f) => ({
+        severity: 'warning' as const,
+        check: 'template',
+        code: f.path === physicsKind.file ? 'no-physics' : 'missing-settings',
+        message: `There is no ${f.path}, so what depends on it cannot be worked out. Add the missing template files (Checks tool, or \`malevo template\`).`
+      }))
+  }
+}
+
+export const systemsCheck: Check = {
+  id: 'systems',
+  title: 'Systems sit on stars that exist, and their bodies have workable orbits',
+  run(world, env) {
+    const out: Issue[] = []
+    for (const e of entitiesOf(world, systemKind)) {
+      const info = systemInfo(world, env, e.id)
+      if (!info) continue
+      if (info.starError) {
+        const unavailable = info.starError.includes('not available')
+        out.push({
+          severity: unavailable ? 'info' : 'error',
+          check: 'systems',
+          code: unavailable ? 'no-catalogue' : 'missing-star',
+          message: info.starError,
+          path: e.path,
+          field: 'star'
+        })
+      } else if (info.star && info.star.physics.mass === null) {
+        out.push({
+          severity: 'warning',
+          check: 'systems',
+          code: 'star-mass-unknown',
+          message: `The star (${info.star.record.spect || 'unknown type'}) is not on the main sequence, so its mass cannot be estimated. Give it one in starOverrides.mass_msun.`,
+          path: e.path,
+          field: 'starOverrides'
+        })
+      }
+      const byId = new Map(info.bodies.map((b) => [b.id, b]))
+      for (const b of info.bodies) {
+        const path = `bodies/${b.id}.json`
+        if (b.error && !(info.starError && !b.parent))
+          out.push({ severity: 'error', check: 'systems', code: 'bad-body', message: b.error, path })
+        if (!b.elements) continue
+        const peri = b.elements.a * (1 - b.elements.e)
+        const parent = b.parent ? byId.get(b.parent) : null
+        if (parent && parent.hill !== null && b.elements.a * (1 + b.elements.e) > parent.hill * 0.5) {
+          out.push({
             severity: 'warning',
-            check: 'physics',
-            code: 'no-physics',
-            message: `There is no ${physicsKind.file}, so nothing that depends on the setting's physics can be worked out. \`malevo template\` adds a starting copy.`
+            check: 'systems',
+            code: 'moon-unbound',
+            message: `Its orbit reaches beyond half of ${parent.name}'s Hill sphere, where moons are not stable.`,
+            path
+          })
+        }
+        const hostRadius = parent ? parent.radius : (info.star?.physics.radius ?? 0) * 6.957e8
+        if (peri < hostRadius * 1.05)
+          out.push({
+            severity: 'error',
+            check: 'systems',
+            code: 'inside-host',
+            message: `Its orbit dips inside ${parent ? parent.name : 'the star'}.`,
+            path
+          })
+      }
+      // Neighbouring orbits around the same host that cross.
+      const groups = new Map<string | null, typeof info.bodies>()
+      for (const b of info.bodies) if (b.elements && b.cls !== 'belt') groups.set(b.parent, [...(groups.get(b.parent) ?? []), b])
+      for (const list of groups.values()) {
+        const sorted = [...list].sort((x, y) => x.elements!.a - y.elements!.a)
+        for (let i = 1; i < sorted.length; i++) {
+          const inner = sorted[i - 1].elements!
+          const outer = sorted[i].elements!
+          if (inner.a * (1 + inner.e) > outer.a * (1 - outer.e)) {
+            out.push({
+              severity: 'warning',
+              check: 'systems',
+              code: 'crossing-orbits',
+              message: `Its orbit crosses ${sorted[i - 1].name}'s; that rarely lasts.`,
+              path: `bodies/${sorted[i].id}.json`
+            })
           }
-        ]
+        }
+      }
+    }
+    return out
+  }
 }
 
 export const calendarsCheck: Check = {
@@ -227,7 +308,8 @@ export const BUILTIN_CHECKS: readonly Check[] = [
   locksCheck,
   calendarsCheck,
   eventsCheck,
-  physicsCheck,
+  systemsCheck,
+  templateCheck,
   formatCheck
 ]
 

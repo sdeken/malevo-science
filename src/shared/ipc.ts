@@ -22,6 +22,7 @@ export const IPC = {
   worldSnapshot: 'world:snapshot',
   worldSetEntity: 'world:setEntity',
   worldDeleteEntity: 'world:deleteEntity',
+  worldDeleteEntities: 'world:deleteEntities',
   worldSetScript: 'world:setScript',
   worldUndo: 'world:undo',
   worldRedo: 'world:redo',
@@ -30,6 +31,12 @@ export const IPC = {
   worldFork: 'world:fork',
   worldCompare: 'world:compare',
   worldTake: 'world:take',
+
+  starsNear: 'stars:near',
+  starsGet: 'stars:get',
+  starsSearch: 'stars:search',
+  systemsRoll: 'systems:roll',
+  systemsKeep: 'systems:keep',
 
   calTicks: 'cal:ticks',
   calFormat: 'cal:format',

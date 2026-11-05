@@ -130,7 +130,7 @@ describe('reading a world', () => {
   it('reads the template cleanly', () => {
     const world = readWorld(worldFiles())
     expect(world.issues).toEqual([])
-    expect([...world.entities.keys()].sort()).toEqual(['calendar/gregorian', 'physics'])
+    expect([...world.entities.keys()].sort()).toEqual(['calendar/gregorian', 'physics', 'starfield'])
     expect(runChecks(world)).toEqual([])
     const foam = foamSettings(world.entities.get('physics')!.value as never)
     expect(foam.rule).toBe('max-eigen')
@@ -305,7 +305,7 @@ describe('world folders on disk', () => {
     const changed = await applyFixes(tmp, canonicalFixes(await loadWorld(tmp)))
     expect(changed).toEqual(['calendars/gregorian.json'])
     expect(await applyFixes(tmp, canonicalFixes(await loadWorld(tmp)))).toEqual([])
-    expect(await addMissingTemplateFiles(tmp)).toEqual(['settings/physics.json'])
+    expect(await addMissingTemplateFiles(tmp)).toEqual(['settings/physics.json', 'settings/stars.json'])
     expect(await addMissingTemplateFiles(tmp)).toEqual([])
     expect(JSON.parse(await fs.readFile(path.join(tmp, 'calendars', 'gregorian.json'), 'utf8')).name).toBe('Mine')
     expect(runChecks(await loadWorld(tmp))).toEqual([])

@@ -220,7 +220,16 @@ function CalendarEditor({
       <p className="muted">{KINDS.find((k) => k.kind === value.kind)?.about}</p>
 
       {value.kind === 'fixed' && <FixedFields value={value} save={save} others={others} />}
-      {value.kind === 'solar' && <SolarFields value={value} save={save} others={others} />}
+      {value.kind === 'solar' && (
+        <SolarFields
+          value={value}
+          save={save}
+          others={others}
+          bodies={snapshot.systems.flatMap((sys) =>
+            sys.bodies.map((b) => ({ id: b.id, name: `${b.name} (${sys.name})`, solarDay: b.solarDay, year: b.year }))
+          )}
+        />
+      )}
       {value.kind === 'era' && <EraFields value={value} save={save} others={others} />}
       {value.kind === 'offset' && <OffsetFields value={value} save={save} others={others} />}
       {value.kind === 'script' && <ScriptFields cal={cal} value={value} save={save} />}
@@ -481,31 +490,67 @@ function FixedFields({
 function SolarFields({
   value,
   save,
-  others
+  others,
+  bodies
 }: {
   value: CalValue
   save(p: Record<string, unknown>): void
   others: CalendarInfo[]
+  bodies: { id: string; name: string; solarDay: number | null; year: number | null }[]
 }): React.JSX.Element {
-  const day = value.dayLength_s as number
-  const year = value.yearLength_s as number
+  const followed = value.body ? bodies.find((b) => b.id === value.body) : undefined
+  const day = (followed ? followed.solarDay : value.dayLength_s) as number
+  const year = (followed ? followed.year : value.yearLength_s) as number
   const months = (value.months as { name: string; days: number }[] | undefined) ?? []
   const perYear = year / day
   const total = months.reduce((s, m) => s + m.days, 0)
+  const leap = `${+perYear.toFixed(4)} local days, so a leap day about ${perYear % 1 ? `every ${+(1 / (perYear % 1)).toFixed(2)} years` : 'never'}`
   return (
     <>
-      <NumberField
-        label="Length of the local day (noon to noon), seconds"
-        value={day}
-        hint={duration(day)}
-        onCommit={(dayLength_s) => save({ dayLength_s })}
-      />
-      <NumberField
-        label="Length of the year it follows, seconds"
-        value={year}
-        hint={`${duration(year)}; ${+perYear.toFixed(4)} local days, so a leap day about ${perYear % 1 ? `every ${+(1 / (perYear % 1)).toFixed(2)} years` : 'never'}`}
-        onCommit={(yearLength_s) => save({ yearLength_s })}
-      />
+      <label className="field">
+        Follows
+        <select
+          value={value.body ? String(value.body) : ''}
+          onChange={(e) =>
+            e.target.value
+              ? save({ body: e.target.value, dayLength_s: undefined, yearLength_s: undefined })
+              : save({
+                  body: undefined,
+                  dayLength_s: Number.isFinite(day) && day > 0 ? day : 86400,
+                  yearLength_s: Number.isFinite(year) && year > 0 ? year : 365.2422 * 86400
+                })
+          }
+        >
+          <option value="">the day and year given below</option>
+          {bodies.map((b) => (
+            <option key={b.id} value={b.id}>
+              {b.name}
+            </option>
+          ))}
+        </select>
+      </label>
+      {value.body ? (
+        <p className="muted">
+          {followed && Number.isFinite(day) && day > 0
+            ? `A day of ${duration(day)} (noon to noon) and a year of ${duration(year)}: ${leap}. They follow the body, so editing its orbit or spin changes them.`
+            : 'That body has no solar day to follow (it is missing, or always shows the same face to its star).'}
+        </p>
+      ) : (
+        <>
+          <NumberField
+            label="Length of the local day (noon to noon), seconds"
+            value={day}
+            hint={duration(day)}
+            onCommit={(dayLength_s) => save({ dayLength_s })}
+          />
+          <NumberField
+            label="Length of the year it follows, seconds"
+            value={year}
+            hint={`${duration(year)}; ${leap}`}
+            onCommit={(yearLength_s) => save({ yearLength_s })}
+          />
+        </>
+      )}
       <EpochField value={value} others={others} save={save} />
       <NumberField
         label="Number of the epoch year"

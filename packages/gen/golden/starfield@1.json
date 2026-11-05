@@ -1,0 +1,174 @@
+{
+  "generator": "starfield@1",
+  "note": "Pinned output hashes of a frozen generator. Never edit; see packages/gen/tests/golden.test.ts.",
+  "cases": [
+    {
+      "seed": 1,
+      "input": {
+        "params": {
+          "density": 0.004,
+          "scaleHeight": 1000,
+          "cell": 25,
+          "catalogMag": 8,
+          "catalogNear": 25
+        },
+        "cell": [0, 0, 0]
+      },
+      "hash": "0d314ad34e7afb"
+    },
+    {
+      "seed": 1,
+      "input": {
+        "params": {
+          "density": 0.004,
+          "scaleHeight": 1000,
+          "cell": 25,
+          "catalogMag": 8,
+          "catalogNear": 25
+        },
+        "cell": [3, -2, 1]
+      },
+      "hash": "0181b169ddcc52"
+    },
+    {
+      "seed": 1,
+      "input": {
+        "params": {
+          "density": 0.004,
+          "scaleHeight": 1000,
+          "cell": 25,
+          "catalogMag": 8,
+          "catalogNear": 25
+        },
+        "cell": [-7, 5, 0]
+      },
+      "hash": "1feeb8566b30e7"
+    },
+    {
+      "seed": 1,
+      "input": {
+        "params": {
+          "density": 0.004,
+          "scaleHeight": 1000,
+          "cell": 25,
+          "catalogMag": 8,
+          "catalogNear": 25
+        },
+        "cell": [9, 9, -1]
+      },
+      "hash": "0e68254a7c527a"
+    },
+    {
+      "seed": 42,
+      "input": {
+        "params": {
+          "density": 0.004,
+          "scaleHeight": 1000,
+          "cell": 25,
+          "catalogMag": 8,
+          "catalogNear": 25
+        },
+        "cell": [0, 0, 0]
+      },
+      "hash": "1facb0ddb3d73b"
+    },
+    {
+      "seed": 42,
+      "input": {
+        "params": {
+          "density": 0.004,
+          "scaleHeight": 1000,
+          "cell": 25,
+          "catalogMag": 8,
+          "catalogNear": 25
+        },
+        "cell": [3, -2, 1]
+      },
+      "hash": "1915b5536db979"
+    },
+    {
+      "seed": 42,
+      "input": {
+        "params": {
+          "density": 0.004,
+          "scaleHeight": 1000,
+          "cell": 25,
+          "catalogMag": 8,
+          "catalogNear": 25
+        },
+        "cell": [-7, 5, 0]
+      },
+      "hash": "0e09cefad88ac3"
+    },
+    {
+      "seed": 42,
+      "input": {
+        "params": {
+          "density": 0.004,
+          "scaleHeight": 1000,
+          "cell": 25,
+          "catalogMag": 8,
+          "catalogNear": 25
+        },
+        "cell": [9, 9, -1]
+      },
+      "hash": "08cf1206b24ef5"
+    },
+    {
+      "seed": 4242,
+      "input": {
+        "params": {
+          "density": 0.004,
+          "scaleHeight": 1000,
+          "cell": 25,
+          "catalogMag": 8,
+          "catalogNear": 25
+        },
+        "cell": [0, 0, 0]
+      },
+      "hash": "1774bf92890771"
+    },
+    {
+      "seed": 4242,
+      "input": {
+        "params": {
+          "density": 0.004,
+          "scaleHeight": 1000,
+          "cell": 25,
+          "catalogMag": 8,
+          "catalogNear": 25
+        },
+        "cell": [3, -2, 1]
+      },
+      "hash": "131c757347ac0a"
+    },
+    {
+      "seed": 4242,
+      "input": {
+        "params": {
+          "density": 0.004,
+          "scaleHeight": 1000,
+          "cell": 25,
+          "catalogMag": 8,
+          "catalogNear": 25
+        },
+        "cell": [-7, 5, 0]
+      },
+      "hash": "0e447c3f7daff7"
+    },
+    {
+      "seed": 4242,
+      "input": {
+        "params": {
+          "density": 0.004,
+          "scaleHeight": 1000,
+          "cell": 25,
+          "catalogMag": 8,
+          "catalogNear": 25
+        },
+        "cell": [9, 9, -1]
+      },
+      "hash": "158e674fed3a48"
+    }
+  ]
+}

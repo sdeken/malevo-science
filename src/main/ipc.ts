@@ -34,7 +34,7 @@ export async function confirmLeave(world: WorldSession, win: BrowserWindow | nul
   return true
 }
 
-const EDITABLE: readonly EditableKind[] = ['event', 'calendar', 'physics']
+const EDITABLE: readonly EditableKind[] = ['event', 'calendar', 'physics', 'system', 'body']
 const asKind = (k: unknown): EditableKind => {
   if (!EDITABLE.includes(k as EditableKind)) throw new Error(`"${String(k)}" cannot be edited.`)
   return k as EditableKind
@@ -109,6 +109,11 @@ export function registerIpc(deps: IpcDeps): void {
   ipcMain.handle(IPC.worldSnapshot, () => world.snapshot())
   ipcMain.handle(IPC.worldSetEntity, (_e, kind: unknown, id: unknown, value: unknown) => world.setEntity(asKind(kind), String(id), value))
   ipcMain.handle(IPC.worldDeleteEntity, (_e, kind: unknown, id: unknown) => world.deleteEntity(asKind(kind), String(id)))
+  ipcMain.handle(IPC.worldDeleteEntities, (_e, items: unknown) =>
+    world.deleteEntities(
+      Array.isArray(items) ? items.map((i) => ({ kind: asKind((i as { kind: unknown }).kind), id: String((i as { id: unknown }).id) })) : []
+    )
+  )
   ipcMain.handle(IPC.worldSetScript, (_e, id: unknown, code: unknown) => world.setScript(String(id), code === null ? null : String(code)))
   ipcMain.handle(IPC.worldUndo, () => world.undo())
   ipcMain.handle(IPC.worldRedo, () => world.redo())
@@ -119,6 +124,18 @@ export function registerIpc(deps: IpcDeps): void {
   ipcMain.handle(IPC.worldTake, (_e, other: unknown, keys: unknown) =>
     world.take(String(other), Array.isArray(keys) ? keys.map(String) : [])
   )
+
+  ipcMain.handle(IPC.starsNear, (_e, center: unknown, radius: unknown, generated: unknown) => {
+    const c =
+      Array.isArray(center) && center.length === 3
+        ? (center.map(Number) as [number, number, number])
+        : ([0, 0, 0] as [number, number, number])
+    return world.starsNear(c, Number(radius) || 20, Boolean(generated))
+  })
+  ipcMain.handle(IPC.starsGet, (_e, id: unknown) => world.star(String(id)))
+  ipcMain.handle(IPC.starsSearch, (_e, text: unknown) => world.searchStars(String(text)))
+  ipcMain.handle(IPC.systemsRoll, (_e, id: unknown, roll: unknown) => world.roll(String(id), Number(roll)))
+  ipcMain.handle(IPC.systemsKeep, (_e, id: unknown, roll: unknown) => world.keep(String(id), Number(roll)))
 
   ipcMain.handle(IPC.calTicks, (_e, cal: unknown, t0: unknown, t1: unknown, target: unknown) =>
     world.ticks(String(cal), Number(t0), Number(t1), Number(target))

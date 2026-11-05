@@ -30,8 +30,8 @@ npm run dev          # the app with hot reload
   the file system.
 - **`src/renderer`** is the tool host: the welcome screen, sidebar, current-date bar and status
   bar. Tools live in `src/renderer/src/tools/<id>/` and are listed in
-  `src/renderer/src/tools/index.ts`. The tools are Timeline, Calendars, Fork & compare, Checks
-  and World.
+  `src/renderer/src/tools/index.ts`. The tools are Timeline, Stars, Systems, Calendars,
+  Fork & compare, Checks and World.
 - **The world session lives in main** (`src/main/world.ts`): the open world, its unsaved changes
   (a `WorldEditor`), and every calendar operation. The renderer gets snapshots pushed to it, and
   sends edits and calendar requests back.
@@ -158,6 +158,46 @@ module.exports = {
   The checks test this across ±10,000 years.
 - **Scripts run only in the main process and in `malevo`.** The renderer asks main for every
   date it shows.
+
+### Stars, systems and bodies
+
+- **The catalogue** is `assets/catalog/hyg-stars.json`: the HYG database, CC BY-SA 4.0 (see its
+  README). It ships beside the installed app, and the app adds Sol, which the file leaves out.
+  - Catalogue stars are `hip.<n>`, or `hyg.<n>` without a Hipparcos number; Sol is `hyg.0`.
+  - These ids appear in world files, so a rebuilt catalogue must keep every one of them.
+- **Generated faint stars** fill in what the catalogue can't see, one 25 ly cell at a time.
+  - They come from `starfield@1`, the prototype's generator ported exactly, using the world's
+    `settings/stars.json`. Without a `seed` there, the world seed is used.
+  - Their ids are `g.<ix>_<iy>_<iz>.<k>`.
+  - Changing those settings changes the generated stars, and the checks flag any system left
+    without its star.
+- **Star physics** are estimated from the catalogue:
+  - temperature from the B−V colour (Ballesteros 2012), or from the M-dwarf main sequence for cool
+    dwarfs;
+  - luminosity through the bolometric correction (Torres 2010);
+  - mass from the main sequence, which is unknown for giants;
+  - radius from luminosity and temperature.
+
+  A system's `starOverrides` replaces any of these.
+- **A system** is `systems/<id>.json`: `name`, `star` and optional `starOverrides`.
+- **A body** is `bodies/<id>.json`:
+  - `system`, and `parent` if it orbits another body;
+  - `class`;
+  - `orbit`: `a_au` or `a_km`, `e`, angles in degrees, `meanAnomaly_deg` at `epoch`;
+  - `mass_mearth`, `radius_km`;
+  - `rotation`: `period_h`, negative for retrograde, or `locked`; plus `tilt_deg`;
+  - optional `albedo`.
+
+  Everything else is derived and shown, never stored: periods, positions at any date, sunlight,
+  temperature, gravity, solar day, Hill sphere, foam collapse radius, and daylight by latitude.
+- **`planets@1`** proposes a planetary system for a star.
+  - Each roll number is its own keyed stream, so roll *n* of a system is always the same.
+  - Keeping a roll writes locked bodies, recording `planets@1` and the seed. It replaces bodies
+    kept from an earlier roll of that system; bodies you made or edited stay.
+  - Editing a kept body removes its lock: from then on it's yours.
+- **A planet-local calendar** can `follow` a body. Its day and year are then that body's solar
+  day and the year of the planet it belongs to. A planet locked to its star has no solar day to
+  follow.
 
 ### Editing, saving, undo
 

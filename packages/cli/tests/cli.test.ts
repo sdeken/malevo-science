@@ -66,7 +66,7 @@ describe('malevo template', () => {
     await createWorld(tmp, 'T', 1)
     await fs.rm(path.join(tmp, 'settings'), { recursive: true })
     expect(await run(['template', '.'], io())).toBe(0)
-    expect(lines).toEqual(['added settings/physics.json'])
+    expect(lines).toEqual(['added settings/physics.json', 'added settings/stars.json'])
     lines.length = 0
     expect(await run(['template'], io())).toBe(0)
     expect(lines).toEqual(['The world already has every template file.'])

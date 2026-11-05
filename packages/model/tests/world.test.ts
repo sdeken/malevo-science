@@ -56,7 +56,7 @@ describe('world folders', () => {
     const world = await createWorld(dir, 'Scratch', 42)
     expect(world.manifest.seed).toBe(42)
     expect((await fs.readdir(dir)).sort()).toEqual(['calendars', 'settings', 'world.json'])
-    expect(await fs.readdir(path.join(dir, 'settings'))).toEqual(['physics.json'])
+    expect((await fs.readdir(path.join(dir, 'settings'))).sort()).toEqual(['physics.json', 'stars.json'])
     expect(await fs.readdir(path.join(dir, 'calendars'))).toEqual(['gregorian.json'])
     expect((await openWorld(dir)).manifest.name).toBe('Scratch')
   })

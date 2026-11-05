@@ -12,9 +12,20 @@ import { EventEmitter } from 'node:events'
 import { randomInt } from 'node:crypto'
 import { promises as fs } from 'node:fs'
 import path from 'node:path'
-import { calendarTicks, compareStrings, formatInstant, parseInstant, type Calendar } from '@malevo/core'
+import {
+  calendarTicks,
+  compareStrings,
+  formatInstant,
+  parseInstant,
+  starDistance,
+  starPhysics,
+  type Calendar,
+  type StarRecord
+} from '@malevo/core'
+import { planets, runGenerator } from '@malevo/gen'
 import {
   WorldError,
+  bodyKind,
   calendarKind,
   canonicalFixes,
   compareWorlds,
@@ -26,8 +37,15 @@ import {
   resolveEvents,
   runChecks,
   serializeWorldManifest,
+  systemInfo,
+  systemKind,
   worldCalendars,
+  worldStars,
+  type BodyInfo,
   type KindDef,
+  type PhysicsSettings,
+  type SystemInfo,
+  type WorldEnv,
   type ResolvedTime,
   type WorldData
 } from '@malevo/model'
@@ -37,13 +55,14 @@ import {
   applyFixes,
   createWorld,
   inspectFolder,
+  entityText,
   loadWorld,
-  nodeEnv,
   openWorld,
   type FileChange,
   type OpenWorld
 } from '@malevo/model/node'
 import type {
+  BodyInfoDto,
   CalendarInfo,
   CheckReport,
   CompareReport,
@@ -51,6 +70,11 @@ import type {
   EventInfo,
   FolderInfo,
   ParsedDate,
+  PlanetProposal,
+  StarField,
+  StarInfoDto,
+  StarSearchHit,
+  SystemInfoDto,
   TickInfo,
   TimeInfo,
   WorldInfo,
@@ -61,13 +85,20 @@ import type {
 const KIND_DEFS: Record<EditableKind, KindDef> = {
   event: eventKind as KindDef,
   calendar: calendarKind as KindDef,
-  physics: physicsKind as KindDef
+  physics: physicsKind as KindDef,
+  system: systemKind as KindDef,
+  body: bodyKind as KindDef
 }
 
 export class WorldSession extends EventEmitter {
   private current: OpenWorld | null = null
   private editor: WorldEditor | null = null
   private version = 0
+
+  /** Script sandbox and star catalogue (see index.ts). */
+  constructor(private readonly env: WorldEnv) {
+    super()
+  }
 
   info(): WorldInfo | null {
     return this.current ? toInfo(this.current) : null
@@ -116,7 +147,7 @@ export class WorldSession extends EventEmitter {
   }
 
   private calendar(id: string): Calendar {
-    const cal = worldCalendars(this.world(), nodeEnv).set.get(String(id))
+    const cal = worldCalendars(this.world(), this.env).set.get(String(id))
     if (!cal) throw new WorldError('io', `There is no usable calendar "${id}".`)
     return cal
   }
@@ -124,7 +155,7 @@ export class WorldSession extends EventEmitter {
   snapshot(): WorldSnapshot | null {
     if (!this.current || !this.editor) return null
     const world = this.editor.world()
-    const cals = worldCalendars(world, nodeEnv)
+    const cals = worldCalendars(world, this.env)
     const calendars: CalendarInfo[] = [...world.entities.values()]
       .filter((e) => e.kind.kind === calendarKind.kind)
       .sort((a, b) => compareStrings(a.id, b.id))
@@ -160,7 +191,12 @@ export class WorldSession extends EventEmitter {
           warnings: r?.warnings ?? []
         }
       })
-    const issues = runChecks(world, nodeEnv)
+    const systems: SystemInfoDto[] = [...world.entities.values()]
+      .filter((e) => e.kind.kind === systemKind.kind && e.value !== undefined)
+      .sort((a, b) => compareStrings(a.id, b.id))
+      .map((e) => systemDto(systemInfo(world, this.env, e.id)!, e.path))
+    const physicsFile = world.entities.get(physicsKind.kind)?.value as PhysicsSettings | undefined
+    const issues = runChecks(world, this.env)
     const count = (s: string): number => issues.filter((i) => i.severity === s).length
     return {
       version: this.version,
@@ -170,6 +206,14 @@ export class WorldSession extends EventEmitter {
       canRedo: this.editor.canRedo,
       calendars,
       events,
+      systems,
+      physics: physicsFile
+        ? {
+            legLimit_ly: physicsFile.foam.legLimit_ly,
+            topSpeed_c: physicsFile.foam.topSpeed_c,
+            collapseRadius_au: physicsFile.foam.collapseRadius_au
+          }
+        : null,
       issueCounts: { error: count('error'), warning: count('warning'), info: count('info') }
     }
   }
@@ -212,7 +256,103 @@ export class WorldSession extends EventEmitter {
     if (!this.editor) return null
     // Checks report on what is on disk, which is what a commit would hold.
     const world = await loadWorld(this.editor.root)
-    return { issues: runChecks(world, nodeEnv), fixable: canonicalFixes(world).map((f) => f.path) }
+    return { issues: runChecks(world, this.env), fixable: canonicalFixes(world).map((f) => f.path) }
+  }
+
+  // ---- stars ----
+
+  /** Catalogue and generated stars within `radius` ly of `center`, packed for drawing. */
+  starsNear(center: [number, number, number], radius: number, includeGenerated: boolean): StarField {
+    const stars = worldStars(this.world(), this.env)
+    const found = stars.near(center, Math.min(Math.max(radius, 1), 400)).filter((s) => includeGenerated || !s.generated)
+    const n = found.length
+    const out: StarField = {
+      ids: new Array(n),
+      pos: new Float32Array(n * 3),
+      absmag: new Float32Array(n),
+      ci: new Float32Array(n),
+      names: {},
+      generated: new Uint8Array(n)
+    }
+    found.forEach((s, i) => {
+      out.ids[i] = s.id
+      out.pos.set(s.pos, i * 3)
+      out.absmag[i] = s.absmag
+      out.ci[i] = s.ci
+      out.generated[i] = s.generated ? 1 : 0
+      if (s.name) out.names[i] = s.name
+    })
+    return out
+  }
+
+  star(id: string): StarInfoDto | null {
+    const rec = worldStars(this.world(), this.env).get(String(id))
+    return rec ? starDto(rec, starPhysics(rec), []) : null
+  }
+
+  /** Stars by name (catalogue names and the names of systems on them), nearest to Sol first. */
+  searchStars(text: string, limit = 20): StarSearchHit[] {
+    const q = String(text).trim().toLowerCase()
+    if (!q) return []
+    const world = this.world()
+    const stars = worldStars(world, this.env)
+    const hits = new Map<string, StarSearchHit>()
+    const sol = stars.get('hyg.0')
+    const dist = (r: StarRecord): number => (sol ? starDistance(sol, r) : Math.hypot(...r.pos))
+    for (const e of world.entities.values()) {
+      if (e.kind.kind !== systemKind.kind || e.value === undefined) continue
+      const v = e.value as { name: string; star: string }
+      const rec = stars.get(v.star)
+      if (rec && (v.name.toLowerCase().includes(q) || e.id.includes(q)))
+        hits.set(rec.id, { id: rec.id, name: v.name, system: e.id, distance: dist(rec) })
+    }
+    for (const r of this.env.catalog?.stars ?? []) {
+      if (hits.size >= limit * 4) break
+      if (r.name?.toLowerCase().includes(q) || r.id === q)
+        if (!hits.has(r.id)) hits.set(r.id, { id: r.id, name: r.name ?? r.id, system: null, distance: dist(r) })
+    }
+    const direct = stars.get(q)
+    if (direct && !hits.has(direct.id))
+      hits.set(direct.id, { id: direct.id, name: direct.name ?? direct.id, system: null, distance: dist(direct) })
+    return [...hits.values()]
+      .sort((a, b) => Number(b.system !== null) - Number(a.system !== null) || a.distance - b.distance)
+      .slice(0, limit)
+  }
+
+  // ---- planets@1: roll, then keep ----
+
+  roll(systemId: string, roll: number): PlanetProposal {
+    const world = this.world()
+    const sys = systemInfo(world, this.env, String(systemId))
+    if (!sys?.star) throw new WorldError('io', sys?.starError ?? `There is no system "${systemId}".`)
+    const p = sys.star.physics
+    if (p.mass === null) throw new WorldError('io', "The star's mass is unknown; give it one in the star overrides first.")
+    const input = {
+      system: sys.id,
+      systemName: sys.file.name,
+      star: { mass_msun: p.mass, luminosity_lsun: p.luminosity, cls: sys.star.record.cls },
+      roll: Math.max(0, Math.trunc(roll))
+    }
+    const out = runGenerator(planets, input, world.manifest!.seed)
+    return { roll: input.roll, bodies: out.bodies.map((b) => ({ id: b.id, value: b.value as unknown as Record<string, unknown> })) }
+  }
+
+  /** Keep a roll: write its bodies, replacing bodies kept from an earlier roll of planets@1. One undoable, unsaved step. */
+  keep(systemId: string, roll: number): string[] {
+    const world = this.world()
+    const proposal = this.roll(systemId, roll)
+    const changes: FileChange[] = []
+    const newIds = new Set(proposal.bodies.map((b) => b.id))
+    for (const e of world.entities.values()) {
+      if (e.kind.kind !== bodyKind.kind || e.value === undefined) continue
+      const v = e.value as { system: string; lock?: { gen: string } }
+      if (v.system === systemId && v.lock?.gen?.startsWith('planets@') && !newIds.has(e.id)) changes.push({ path: e.path, text: null })
+    }
+    for (const b of proposal.bodies)
+      changes.push({ path: entityPath(bodyKind as KindDef, b.id), text: entityText(bodyKind as KindDef, b.value) })
+    this.editor!.edit(changes)
+    this.changed()
+    return proposal.bodies.map((b) => b.id)
   }
 
   // ---- editing (unsaved until save) ----
@@ -226,13 +366,19 @@ export class WorldSession extends EventEmitter {
 
   /** Delete an entity and the note and script beside it. */
   deleteEntity(kind: EditableKind, id: string): void {
-    const def = KIND_DEFS[kind]
-    if (!def?.folder) throw new WorldError('io', `"${kind}" entities cannot be deleted.`)
-    const base = entityPath(def, String(id)).replace(/\.json$/, '')
-    const files = this.editor!.files().map((f) => f.path)
-    const changes: FileChange[] = [`${base}.json`, `${base}.md`, `${base}.js`]
-      .filter((p) => files.includes(p))
-      .map((p) => ({ path: p, text: null }))
+    this.deleteEntities([{ kind, id }])
+  }
+
+  /** Delete several entities (with their notes and scripts) as one undoable step. */
+  deleteEntities(items: readonly { kind: EditableKind; id: string }[]): void {
+    const files = new Set(this.editor!.files().map((f) => f.path))
+    const changes: FileChange[] = []
+    for (const { kind, id } of items) {
+      const def = KIND_DEFS[kind]
+      if (!def?.folder) throw new WorldError('io', `"${kind}" entities cannot be deleted.`)
+      const base = entityPath(def, String(id)).replace(/\.json$/, '')
+      for (const p of [`${base}.json`, `${base}.md`, `${base}.js`]) if (files.has(p)) changes.push({ path: p, text: null })
+    }
     this.editor!.edit(changes)
     this.changed()
   }
@@ -326,8 +472,8 @@ export class WorldSession extends EventEmitter {
       label: e.kind.label,
       name: nameOf(e.value, e.id)
     })
-    const rHere = resolveEvents(here, worldCalendars(here, nodeEnv))
-    const rThere = resolveEvents(other, worldCalendars(other, nodeEnv))
+    const rHere = resolveEvents(here, worldCalendars(here, this.env))
+    const rThere = resolveEvents(other, worldCalendars(other, this.env))
     const timeChanges: CompareReport['timeChanges'] = []
     for (const e of entitiesOf(here, eventKind)) {
       const a = rHere.get(e.id)
@@ -414,4 +560,72 @@ function toInfo(w: OpenWorld): WorldInfo {
 
 function timeInfo(r: ResolvedTime): TimeInfo {
   return { t: r.t, cal: r.cal, precision: r.precision, circa: r.circa, range: r.range }
+}
+
+function starDto(
+  rec: StarRecord,
+  p: { teff: number; luminosity: number; radius: number; mass: number | null; massSource: string },
+  overridden: string[]
+): StarInfoDto {
+  return {
+    id: rec.id,
+    name: rec.name,
+    spect: rec.spect,
+    absmag: rec.absmag,
+    mag: rec.mag,
+    ci: rec.ci,
+    pos: [rec.pos[0], rec.pos[1], rec.pos[2]],
+    generated: rec.generated,
+    teff: p.teff,
+    luminosity: p.luminosity,
+    radius: p.radius,
+    mass: p.mass,
+    massSource: p.massSource,
+    overridden
+  }
+}
+
+function bodyDto(b: BodyInfo): BodyInfoDto {
+  const lock = (b.file as { lock?: { gen?: string } }).lock
+  return {
+    id: b.id,
+    path: `bodies/${b.id}.json`,
+    name: b.name,
+    cls: b.cls,
+    parent: b.parent,
+    depth: b.depth,
+    value: b.file as unknown as Record<string, unknown>,
+    error: b.error,
+    elements: b.elements,
+    mass: b.mass,
+    radius: b.radius,
+    tilt: b.tilt,
+    rotation: b.rotation,
+    period: b.period,
+    year: b.year,
+    solarDay: b.solarDay,
+    hill: b.hill,
+    collapse: b.collapse,
+    surfaceGravity: b.surfaceGravity,
+    escapeVelocity: b.escapeVelocity,
+    density: b.density,
+    insolation: b.insolation,
+    equilibriumTemp: b.equilibriumTemp,
+    generatedBy: lock?.gen ?? null
+  }
+}
+
+function systemDto(sys: SystemInfo, path: string): SystemInfoDto {
+  return {
+    id: sys.id,
+    path,
+    name: sys.file.name,
+    starId: sys.file.star,
+    value: sys.file as unknown as Record<string, unknown>,
+    star: sys.star ? starDto(sys.star.record, sys.star.physics, sys.star.overridden) : null,
+    starError: sys.starError,
+    habitableZone: sys.habitableZone ? [sys.habitableZone.inner, sys.habitableZone.outer] : null,
+    collapse: sys.collapse,
+    bodies: sys.bodies.map(bodyDto)
+  }
 }

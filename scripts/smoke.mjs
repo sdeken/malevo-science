@@ -83,7 +83,7 @@ try {
     }
     return out
   }
-  const EXPECTED_FILES = '["calendars/gregorian.json","settings/physics.json","world.json"]'
+  const EXPECTED_FILES = '["calendars/gregorian.json","settings/physics.json","settings/stars.json","world.json"]'
   const files = await listAll(worldDir)
   check(JSON.stringify(files) === EXPECTED_FILES, `the world folder holds world.json and the template, nothing else (${files.join(', ')})`)
   const text = await fs.readFile(path.join(worldDir, 'world.json'), 'utf8')
@@ -169,7 +169,7 @@ try {
   await page.locator('.checks-fix button.primary').click()
   await page.waitForSelector('.ok', { timeout: 10_000 })
   check(
-    (await page.locator('.ok').textContent()) === 'Added settings/physics.json, calendars/gregorian.json.',
+    (await page.locator('.ok').textContent()) === 'Added settings/physics.json, settings/stars.json, calendars/gregorian.json.',
     'the Checks tool adds the missing template files'
   )
   check((await page.locator('.checks-summary').textContent()) === 'No problems found.', 'after which the old world checks clean')
@@ -327,6 +327,82 @@ try {
   await page.evaluate(() => window.malevo.world.discard())
   await page.waitForFunction(() => document.querySelector('.status-saved') !== null)
   check(JSON.stringify(await listAll(forkDir)).includes('events/new-event.json'), 'the fork is a complete world folder')
+
+  // 12. Phase 3: stars, a system on one, rolled planets, a calendar that follows a body.
+  await tool('Stars')
+  await page.waitForSelector('.star-map', { timeout: 15_000 })
+  await page.waitForFunction(() => /\d+ stars/.test(document.querySelector('.stars-side')?.textContent ?? ''), null, { timeout: 30_000 })
+  check(true, 'the Stars tool loads the stars around Sol')
+  await page.locator('#starSearch').fill('Proxima')
+  await page.locator('[data-hit="hip.70890"]').click()
+  await page.waitForSelector('[data-star="hip.70890"]', { timeout: 15_000 })
+  check((await page.locator('.star-card h3').textContent()) === 'Proxima Centauri', 'searching finds Proxima Centauri and selects it')
+  const card = (await page.locator('.star-card').textContent()) ?? ''
+  check(/M5Ve/.test(card) && /4\.2\d* ly/.test(card), `its card shows its type and distance (${card.slice(0, 120)}…)`)
+  await page.screenshot({ path: path.join(shots, '07-stars.png') })
+  await page.locator('#newSystemHere').click()
+  await page.waitForSelector('[data-system-detail="proxima-centauri"]', { timeout: 15_000 })
+  check(true, 'a new system on the star opens in the Systems tool')
+  await page.locator('#rollPlanets').click()
+  await page.waitForSelector('.roll-panel', { timeout: 15_000 })
+  const firstRoll = await page.locator('.roll-panel table').textContent()
+  await page.locator('#rollAgain').click()
+  await page.waitForFunction((before) => document.querySelector('.roll-panel table')?.textContent !== before, firstRoll)
+  await page.locator('.roll-panel button', { hasText: 'Roll again' }).click()
+  await page.waitForFunction(() => document.querySelector('.roll-panel h3')?.textContent === 'Roll 2')
+  check(true, 'rolling again gives a different system')
+  await page.locator('#keepRoll').click()
+  await page.waitForSelector('[data-body-row]', { timeout: 15_000 })
+  const kept = await page.locator('[data-body-row]').count()
+  check(kept > 0, `keeping a roll adds its planets (${kept})`)
+  const firstRow = page.locator('[data-body-row]').first()
+  await firstRow.click()
+  await page.waitForSelector('.body-editor', { timeout: 10_000 })
+  check(/Orbital period/.test((await page.locator('.body-editor').textContent()) ?? ''), 'a body shows what follows from it')
+  await page.screenshot({ path: path.join(shots, '08-system.png') })
+  await page.locator('.status-save').click()
+  await page.waitForFunction(() => document.querySelector('.status-saved') !== null)
+  const sysFile = JSON.parse(await fs.readFile(path.join(worldDir, 'systems/proxima-centauri.json'), 'utf8'))
+  check(sysFile.star === 'hip.70890', 'saving writes the system on its star')
+  const bodyFiles = (await fs.readdir(path.join(worldDir, 'bodies'))).filter((f) => f.startsWith('proxima-centauri-'))
+  check(bodyFiles.length === kept, 'and one file per kept planet')
+  const planetFile = JSON.parse(await fs.readFile(path.join(worldDir, 'bodies', bodyFiles[0]), 'utf8'))
+  check(
+    planetFile.lock?.gen === 'planets@1' && Number.isInteger(planetFile.lock.seed),
+    'kept planets record the generator and seed that made them'
+  )
+  // A planet-local calendar that follows the first planet (if it has a day to follow).
+  const planetId = bodyFiles[0].replace(/\.json$/, '')
+  await page.evaluate(
+    (id) =>
+      window.malevo.world.setEntity('calendar', 'local-days', {
+        name: 'Local days',
+        kind: 'solar',
+        body: id,
+        epoch: { t_s: 0 },
+        epochYear: 1,
+        hoursPerDay: 24,
+        minutesPerHour: 60,
+        secondsPerMinute: 60
+      }),
+    planetId
+  )
+  const snap = await page.evaluate(() => window.malevo.world.snapshot())
+  const local = snap.calendars.find((c) => c.id === 'local-days')
+  const planet = snap.systems.find((x) => x.id === 'proxima-centauri').bodies.find((b) => b.id === planetId)
+  check(
+    Number.isFinite(planet.solarDay) ? local.error === null : /same face/.test(local.error ?? ''),
+    'a planet-local calendar follows its body (or says why it cannot)'
+  )
+  await page.evaluate(() => window.malevo.world.discard())
+  await tool('Checks')
+  await page.locator('.checks-bar button').click()
+  await page.waitForFunction(() => /No problems found|notes/.test(document.querySelector('.checks-summary')?.textContent ?? ''))
+  const summary = (await page.locator('.checks-summary').textContent()) ?? ''
+  check(
+    summary === 'No problems found.' || / 0 errors, 0 warnings/.test(` ${summary}`),
+    `the world with its new system checks clean (${summary})`
+  )
 
   // 10. The update status reports a dev build.
   const status = await page.evaluate(() => window.malevo.updates.status())

@@ -48,6 +48,11 @@ export function AboutDialog({ update, onClose }: Props): React.JSX.Element {
             </p>
           </>
         )}
+        <h3>Credits</h3>
+        <p className="muted small">
+          Star data: the HYG database v4.1 by David Nash (astronexus), codeberg.org/astronexus/hyg, licensed CC BY-SA 4.0. The catalogue
+          that ships with the app is derived from it under the same licence.
+        </p>
         <div className="modal-actions">
           <button className="primary" autoFocus onClick={onClose}>
             Close

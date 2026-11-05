@@ -13,7 +13,8 @@ import { compareStrings } from '@malevo/core'
 import { promises as fs } from 'node:fs'
 import path from 'node:path'
 import { KINDS, entityPath, type KindDef } from './kinds'
-import type { WorldEnv } from './events'
+import { SOL, starFromRow, type CatalogRow } from '@malevo/core'
+import { catalogFrom, type StarCatalog, type WorldEnv } from './env'
 import { readWorld, serializeEntity, type WorldData, type WorldFile } from './load'
 import { sandboxedCalendar } from './sandbox'
 import { templateFiles } from './template'
@@ -193,3 +194,14 @@ export { ScriptError, sandboxedCalendar } from './sandbox'
 
 /** The environment for checks and calendars in Node: script calendars run in the vm sandbox. */
 export const nodeEnv: WorldEnv = { loadScript: (code, file) => sandboxedCalendar(code, file) }
+
+/** The star catalogue asset (assets/catalog/hyg-stars.json), with Sol added. */
+export async function loadCatalog(file: string): Promise<StarCatalog> {
+  const raw = JSON.parse(await fs.readFile(file, 'utf8')) as { stars: CatalogRow[] }
+  return catalogFrom([SOL, ...raw.stars.map(starFromRow)])
+}
+
+/** A Node environment: script calendars in the sandbox, and the catalogue if one is given. */
+export function nodeEnvWith(catalog?: StarCatalog): WorldEnv {
+  return { loadScript: nodeEnv.loadScript, catalog }
+}

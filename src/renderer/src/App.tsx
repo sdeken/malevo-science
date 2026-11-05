@@ -30,6 +30,7 @@ export function App(): React.JSX.Element {
   const [dialog, setDialog] = useState<'new' | 'about' | null>(null)
   const [message, setMessage] = useState<{ kind: 'error' | 'ok'; text: string; open?: string } | null>(null)
   const [toolId, setToolId] = useState(loadSelectedTool)
+  const [focus, setFocus] = useState<string | null>(null)
   const snapshot = useSnapshot(world !== null)
 
   useEffect(() => {
@@ -124,8 +125,9 @@ export function App(): React.JSX.Element {
     return () => window.removeEventListener('keydown', onKey)
   }, [])
 
-  const selectTool = (id: string): void => {
+  const selectTool = (id: string, to: string | null = null): void => {
     setToolId(id)
+    setFocus(to)
     writePref(TOOL_KEY, id)
   }
 
@@ -171,7 +173,7 @@ export function App(): React.JSX.Element {
             </ul>
           </nav>
           {snapshot && snapshot.world.root === world.root ? (
-            <WorldPane snapshot={snapshot} world={world} toolId={tool.id} />
+            <WorldPane snapshot={snapshot} world={world} toolId={tool.id} focus={focus} navigate={(id, to) => selectTool(id, to ?? null)} />
           ) : (
             <main className="tool-pane" />
           )}
@@ -200,7 +202,19 @@ export function App(): React.JSX.Element {
 }
 
 /** The current date bar and the selected tool, for the open world. */
-function WorldPane({ snapshot, world, toolId }: { snapshot: WorldSnapshot; world: WorldInfo; toolId: string }): React.JSX.Element {
+function WorldPane({
+  snapshot,
+  world,
+  toolId,
+  focus,
+  navigate
+}: {
+  snapshot: WorldSnapshot
+  world: WorldInfo
+  toolId: string
+  focus: string | null
+  navigate(toolId: string, focus?: string): void
+}): React.JSX.Element {
   const usable = useMemo(() => snapshot.calendars.filter((c) => !c.error).map((c) => c.id), [snapshot.calendars])
   const [storedCal, setDisplayCal] = useWorldPref<string | null>(world.root, 'displayCalendar', null)
   const displayCal = storedCal && usable.includes(storedCal) ? storedCal : usable.includes('gregorian') ? 'gregorian' : (usable[0] ?? null)
@@ -212,7 +226,16 @@ function WorldPane({ snapshot, world, toolId }: { snapshot: WorldSnapshot; world
     <main className="tool-pane" data-tool={tool.id}>
       <DateBar snapshot={snapshot} now={now} setNow={setNow} displayCal={displayCal} setDisplayCal={setDisplayCal} />
       <div className="tool-body">
-        <tool.View world={world} snapshot={snapshot} now={now} setNow={setNow} displayCal={displayCal} setDisplayCal={setDisplayCal} />
+        <tool.View
+          world={world}
+          snapshot={snapshot}
+          now={now}
+          setNow={setNow}
+          displayCal={displayCal}
+          setDisplayCal={setDisplayCal}
+          navigate={navigate}
+          focus={focus}
+        />
       </div>
     </main>
   )
