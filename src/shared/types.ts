@@ -574,6 +574,9 @@ export interface TerrainRasterDto {
   heights: Float32Array
   rgba: Uint8ClampedArray
   stats: { ocean: number; highest: number; lowest: number; meanTemp: number | null; minTemp: number | null; maxTemp: number | null }
+  /** Cloud coverage 0–255 per pixel, when there is a cloud layer; drawn over rgba only when shown. */
+  clouds: Uint8ClampedArray | null
+  cloudColour: [number, number, number] | null
 }
 
 // ---- Phase 9: cities ----

@@ -21,7 +21,18 @@ import {
   perlin3,
   type Vec3
 } from '@malevo/core'
-import { DEFAULT_BANDS, bands, bandsField, contextFor, terrain, terrainField, type TerrainField } from '@malevo/gen'
+import {
+  DEFAULT_BANDS,
+  DEFAULT_CLOUDS,
+  bands,
+  bandsField,
+  clouds,
+  cloudsField,
+  contextFor,
+  terrain,
+  terrainField,
+  type TerrainField
+} from '@malevo/gen'
 import type { WorldEnv } from './env'
 import { bodyKind, terrainKind, type BodyFile, type TerrainFile } from './kinds'
 import { entitiesOf, type WorldData } from './load'
@@ -256,6 +267,9 @@ export interface TerrainRaster {
   /** Colour map, shaded, RGBA. */
   rgba: Uint8ClampedArray
   stats: { ocean: number; highest: number; lowest: number; meanTemp: number | null; minTemp: number | null; maxTemp: number | null }
+  /** Cloud coverage (clouds@1), 0–255 per pixel, when the terrain has a cloud layer over a surface. */
+  clouds: Uint8ClampedArray | null
+  cloudColour: [number, number, number] | null
 }
 
 /** An equirectangular height and colour map. */
@@ -309,11 +323,28 @@ export function terrainRaster(
       const shade = Math.max(0.55, Math.min(1.35, 1 + (heights[k] - e + (heights[k] - so)) * 0.35))
       for (let c = 0; c < 3; c++) rgba[k * 4 + c] = rgba[k * 4 + c] * shade
     }
+  // The cloud layer, kept apart so it can be shown or hidden.
+  const file = terrainOf(world, bodyId)?.file
+  let cloudMap: Uint8ClampedArray | null = null
+  let cloudColour: [number, number, number] | null = null
+  if (file?.clouds && !file.bands) {
+    const cctx = contextFor(clouds, world.manifest?.seed ?? 0)
+    const cf = cloudsField(file.clouds, (purpose) => cctx.stream(bodyId, `roll-${file.roll}:clouds:${purpose}`))
+    cloudMap = new Uint8ClampedArray(n)
+    for (let j = 0; j < height; j++) {
+      const lat = (90 - ((j + 0.5) * 180) / height) * DEG
+      for (let i = 0; i < width; i++) cloudMap[j * width + i] = cf.cover(fromLatLon(lat, (-180 + ((i + 0.5) * 360) / width) * DEG)) * 255
+    }
+    const hx = file.clouds.colour ?? '#ffffff'
+    cloudColour = [parseInt(hx.slice(1, 3), 16), parseInt(hx.slice(3, 5), 16), parseInt(hx.slice(5, 7), 16)]
+  }
   return {
     width,
     height,
     heights,
     rgba,
+    clouds: cloudMap,
+    cloudColour,
     stats: {
       ocean: wet / area,
       highest: hi,
@@ -338,6 +369,27 @@ export function newTerrain(bodyId: string, cls: BodyFile['class']): TerrainFile 
       roughness: 0.5
     }
   }
+}
+
+/** A cloud layer at the defaults (Earth-like: three cells, 60% cover). */
+export function newClouds(): NonNullable<TerrainFile['clouds']> {
+  return { ...DEFAULT_CLOUDS }
+}
+
+/** Clouds drawn over a colour map: `alpha` of the cloud colour where they are (0–1 of opacity at full cover). */
+export function withClouds(
+  rgba: Uint8ClampedArray,
+  clouds: Uint8ClampedArray,
+  colour: [number, number, number],
+  opacity = 0.9
+): Uint8ClampedArray {
+  const out = new Uint8ClampedArray(rgba)
+  for (let k = 0; k < clouds.length; k++) {
+    const a = (clouds[k] / 255) * opacity
+    if (a <= 0) continue
+    for (let c = 0; c < 3; c++) out[k * 4 + c] = out[k * 4 + c] * (1 - a) + colour[c] * a
+  }
+  return out
 }
 
 /** A new giant's cloud bands, at the defaults for its class. */

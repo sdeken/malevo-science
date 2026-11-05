@@ -209,15 +209,26 @@ export function registerIpc(deps: IpcDeps): void {
     if ('error' in r) return null
     const win = winOf(e)
     const heightMap = what === 'height'
+    const cloudMap = what === 'clouds' && r.clouds !== null
     const opts = {
       title: 'Export map',
-      defaultPath: `${String(body)}-${heightMap ? 'height' : 'colour'}.png`,
+      defaultPath: `${String(body)}-${heightMap ? 'height' : cloudMap ? 'clouds' : 'colour'}.png`,
       filters: [{ name: 'PNG', extensions: ['png'] }]
     }
     const res = win ? await dialog.showSaveDialog(win, opts) : await dialog.showSaveDialog(opts)
     if (res.canceled || !res.filePath) return null
     const bgra = Buffer.alloc(r.width * r.height * 4)
     for (let k = 0; k < r.width * r.height; k++) {
+      if (cloudMap) {
+        // The cloud colour, with the coverage as transparency, to lay over the colour map.
+        // createFromBitmap takes premultiplied alpha, so the colour is scaled by the coverage.
+        const a = r.clouds![k]
+        bgra[k * 4] = Math.round((r.cloudColour![2] * a) / 255)
+        bgra[k * 4 + 1] = Math.round((r.cloudColour![1] * a) / 255)
+        bgra[k * 4 + 2] = Math.round((r.cloudColour![0] * a) / 255)
+        bgra[k * 4 + 3] = a
+        continue
+      }
       if (heightMap) {
         const v = Math.round(((r.heights[k] - r.stats.lowest) / Math.max(1e-9, r.stats.highest - r.stats.lowest)) * 255)
         bgra[k * 4] = bgra[k * 4 + 1] = bgra[k * 4 + 2] = v

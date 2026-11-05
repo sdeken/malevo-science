@@ -2,6 +2,7 @@ import { generatorId, type Generator } from './generator'
 import { history } from './history'
 import { terrain } from './terrain'
 import { bands } from './bands'
+import { clouds } from './clouds'
 import { cityplan } from './cityplan'
 import { placeholderNames } from './names'
 import { planets } from './planets'
@@ -32,6 +33,7 @@ export {
   type CityService,
   type Vehicle
 } from './cityplan'
+export { clouds, cloudsField, DEFAULT_CLOUDS, type CloudsInput, type CloudsParams, type CloudsField } from './clouds'
 export { bands, bandsField, DEFAULT_BANDS, type BandsInput, type BandsParams, type BandsField } from './bands'
 export { terrain, terrainField, DEFAULT_TERRAIN, type TerrainInput, type TerrainParams, type TerrainField } from './terrain'
 export {
@@ -52,6 +54,7 @@ export const GENERATORS: readonly Generator<never, unknown>[] = [
   history as Generator<never, unknown>,
   terrain as Generator<never, unknown>,
   bands as Generator<never, unknown>,
+  clouds as Generator<never, unknown>,
   cityplan as Generator<never, unknown>
 ]
 

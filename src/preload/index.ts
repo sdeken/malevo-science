@@ -142,7 +142,8 @@ const api = {
     raster: (body: string, width: number, height: number): Promise<TerrainRasterDto | { error: string }> =>
       ipcRenderer.invoke(IPC.terrainRaster, body, width, height),
     /** Save a 2048×1024 colour or height map where the author chooses. Resolves to the path, or null if cancelled. */
-    export: (body: string, what: 'colour' | 'height'): Promise<string | null> => ipcRenderer.invoke(IPC.terrainExport, body, what)
+    export: (body: string, what: 'colour' | 'height' | 'clouds'): Promise<string | null> =>
+      ipcRenderer.invoke(IPC.terrainExport, body, what)
   },
   approach: {
     info: (q: ApproachQueryDto): Promise<ApproachInfoDto | { error: string }> => ipcRenderer.invoke(IPC.approachInfo, q),

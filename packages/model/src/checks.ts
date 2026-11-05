@@ -559,6 +559,15 @@ export const terrainCheck: Check = {
           path: e.path,
           field: 'params'
         })
+      else if (body && giant && e.value.clouds)
+        out.push({
+          severity: 'info',
+          check: 'terrain',
+          code: 'giant-clouds-unused',
+          message: `${body.name ?? e.value.body} is a ${body.class}: its cloud bands are its clouds, so the cloud layer (clouds) is not drawn.`,
+          path: e.path,
+          field: 'clouds'
+        })
       else if (body && !giant && !e.value.params)
         out.push({
           severity: 'error',

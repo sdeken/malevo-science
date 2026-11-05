@@ -252,6 +252,14 @@ module.exports = {
   `params`: the number of bands, contrast, turbulence, storms and a palette. **bands@1**
   (`packages/gen/src/bands.ts`) colours points on the sphere: bands by latitude bent by
   turbulence, streaks sheared along them, and swirling storm ovals.
+- **Clouds** are an optional layer over a surface: `clouds {cover, cells, turbulence, storms,
+  colour}` in the terrain file. **clouds@1** (`packages/gen/src/clouds.ts`) gives coverage from
+  0 to 1: belts from the circulation cells (Earth has three per hemisphere, so cloudy at the
+  equator and near 60°, clear near 30°), eddying weather, and spiral cyclones. Its threshold is
+  calibrated so the average cover is `cover`. The clouds are weather to look at, not a record of
+  the sky at any moment. They re-roll with the terrain. The Terrain tool draws them over the map
+  and globe with a **Show clouds** toggle, and exports them as a separate PNG whose transparency
+  is the coverage. A giant's bands are its clouds, so a cloud layer on a giant is not drawn.
 - **Rasters** (height and colour maps) are derived in the main process and cached per world
   version; nothing is written to the world. **Export** saves a 2048×1024 PNG wherever you choose,
   for reference.

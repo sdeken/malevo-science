@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import type { BodyInfoDto, EntityDto, TerrainRasterDto, WorldSnapshot } from '../../../../shared/types'
 import { NumberField, sig } from '../../components/fields'
+import { newClouds, withClouds } from '@malevo/model'
 import { useWorldPref } from '../../state'
 import type { ToolDefinition, ToolProps } from '../registry'
 
@@ -17,6 +18,7 @@ interface TerrainValue {
   roll: number
   params?: { plates: number; continents: number; ocean: number; mountains_km: number; roughness: number }
   bands?: { bands: number; contrast: number; turbulence: number; storms: number; palette: string[] }
+  clouds?: { cover: number; cells: number; turbulence: number; storms: number; colour?: string }
   climate?: { greenhouse_K?: number; heatTransport?: number; temperature_K?: number; water?: boolean; rock?: string }
   shapes?: Shape[]
   lock?: { gen: string; seed?: number; inputs: Record<string, string> }
@@ -101,7 +103,15 @@ function TerrainDetail({
   const [drawState, setDrawing] = useState<{ kind: ShapeKind; points: [number, number][] } | null>(null)
   const drawing = drawState
   const [note, setNote] = useState<string | null>(null)
+  const [showClouds, setShowClouds] = useState(true)
   const id = entity?.id ?? body.id
+  const shown = useMemo(
+    () =>
+      raster && showClouds && raster.clouds && raster.cloudColour
+        ? { ...raster, rgba: withClouds(raster.rgba, raster.clouds, raster.cloudColour) }
+        : raster,
+    [raster, showClouds]
+  )
 
   useEffect(() => {
     if (!v) {
@@ -194,7 +204,7 @@ function TerrainDetail({
       })
     setDrawing(null)
   }
-  const exportMap = async (what: 'colour' | 'height'): Promise<void> => {
+  const exportMap = async (what: 'colour' | 'height' | 'clouds'): Promise<void> => {
     const p = await window.malevo.terrain.export(body.id, what)
     if (p) setNote(`Saved ${p}. Exports are for reference, outside the world.`)
   }
@@ -229,6 +239,7 @@ function TerrainDetail({
           </label>
           <button onClick={() => void exportMap('colour')}>Export colour map…</button>
           <button onClick={() => void exportMap('height')}>Export height map…</button>
+          {!giant && v.clouds && <button onClick={() => void exportMap('clouds')}>Export cloud map…</button>}
         </div>
       </div>
       <p className="muted small">
@@ -240,9 +251,15 @@ function TerrainDetail({
       {error && <p className="error">{error}</p>}
 
       <div className="terrain-views">
-        <TerrainMap raster={raster} shapes={shapes} drawing={drawing} setDrawing={setDrawing} finish={finish} busy={busy} />
-        <Globe raster={raster} />
+        <TerrainMap raster={shown} shapes={shapes} drawing={drawing} setDrawing={setDrawing} finish={finish} busy={busy} />
+        <Globe raster={shown} />
       </div>
+      {!giant && v.clouds && (
+        <label className="check">
+          <input type="checkbox" checked={showClouds} onChange={(e) => setShowClouds(e.target.checked)} id="showClouds" />
+          Show clouds
+        </label>
+      )}
 
       {s && giant && (
         <p className="muted small" id="terrainStats">
@@ -261,6 +278,7 @@ function TerrainDetail({
         </p>
       )}
 
+      {!giant && v.params && <CloudsEditor value={v.clouds} onChange={(c) => save({ ...v, clouds: c })} />}
       {giant && v.bands && <BandsEditor value={v.bands} locked={locked} onChange={(b) => save({ ...v, bands: b })} />}
       {!giant && v.params && (
         <>
@@ -461,6 +479,68 @@ function BandsEditor({
       </div>
       {locked && <p className="muted small">Unlock to change the bands.</p>}
     </fieldset>
+  )
+}
+
+function CloudsEditor({
+  value,
+  onChange
+}: {
+  value: TerrainValue['clouds']
+  onChange(c: TerrainValue['clouds']): void
+}): React.JSX.Element {
+  const clamp01 = (x: number): number => Math.max(0, Math.min(1, x))
+  if (!value)
+    return (
+      <div className="plain" id="cloudsEditor">
+        <h3>Clouds</h3>
+        <p className="muted small">
+          An optional cloud layer (clouds@1): weather to make the world look lived-in, not a record of the sky at any moment. It is drawn
+          over the map and globe and can be hidden.
+        </p>
+        <button onClick={() => onChange(newClouds())} id="addClouds">
+          Add a cloud layer
+        </button>
+      </div>
+    )
+  const set = (patch: Partial<NonNullable<TerrainValue['clouds']>>): void => onChange({ ...value, ...patch })
+  return (
+    <div className="plain" id="cloudsEditor">
+      <h3>Clouds</h3>
+      <div className="field-row">
+        <NumberField label="Cover, 0–1" value={value.cover} onCommit={(x) => x !== undefined && set({ cover: clamp01(x) })} />
+        <NumberField
+          label="Cells, equator to pole"
+          value={value.cells}
+          onCommit={(x) => x !== undefined && set({ cells: Math.max(1, Math.min(9, Math.round(x))) })}
+        />
+        <NumberField
+          label="Turbulence, 0–1"
+          value={value.turbulence}
+          onCommit={(x) => x !== undefined && set({ turbulence: clamp01(x) })}
+        />
+        <NumberField
+          label="Storms"
+          value={value.storms}
+          onCommit={(x) => x !== undefined && set({ storms: Math.max(0, Math.min(40, Math.round(x))) })}
+        />
+        <label className="field">
+          Colour
+          <input
+            type="color"
+            value={value.colour ?? '#ffffff'}
+            onChange={(e) => set({ colour: e.target.value === '#ffffff' ? undefined : e.target.value })}
+          />
+        </label>
+        <button className="danger" onClick={() => onChange(undefined)}>
+          Remove clouds
+        </button>
+      </div>
+      <p className="muted small">
+        Earth has three circulation cells: cloudy at the equator and near 60°, clear near 30°. A slowly turning world has one. The cloud
+        layer re-rolls with the terrain.
+      </p>
+    </div>
   )
 }
 

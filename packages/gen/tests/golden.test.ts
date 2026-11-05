@@ -78,6 +78,13 @@ const CASES: Record<string, { seed: number; input: unknown }[]> = {
       { bands: 8, contrast: 0.25, turbulence: 0.3, storms: 1, palette: ['#a8d8e4', '#8cc4d6'] }
     ].map((params, k) => ({ seed, input: { body: `giant-${k}`, roll: k, params, points: TERRAIN_POINTS } }))
   ),
+  'clouds@1': [1, 42].flatMap((seed) =>
+    [
+      { cover: 0.6, cells: 3, turbulence: 0.5, storms: 8 },
+      { cover: 0.95, cells: 1, turbulence: 0.2, storms: 0 },
+      { cover: 0.2, cells: 5, turbulence: 0.9, storms: 20 }
+    ].map((params, k) => ({ seed, input: { body: `world-${k}`, roll: k, params, points: TERRAIN_POINTS } }))
+  ),
   'cityplan@1': [1, 42].map((seed) => ({ seed, input: syntheticPlan() })),
   'placeholder-names@1': [1, 42, 4242, 0xffffffff].flatMap((seed) =>
     [0, 1, 2, 3, 4, 5, 6, 7].map((palette) => ({ seed, input: { ids: ['a', 'b', 'c', 'sys-001', 'sys-002', 'x.y_z'], palette } }))

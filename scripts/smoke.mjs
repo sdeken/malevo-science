@@ -637,6 +637,15 @@ try {
   )
 
   await tool('Terrain')
+  await page.locator('[data-terrain-body="earth"]').click()
+  await page.locator('#addClouds').click()
+  await page.waitForSelector('#showClouds', { timeout: 30_000 })
+  await page.waitForTimeout(1500)
+  await page.screenshot({ path: path.join(shots, '17b-clouds.png') })
+  check(true, 'a cloud layer can be added over the surface')
+  await page.evaluate(() => window.malevo.world.discard())
+
+  await tool('Terrain')
   await page.locator('[data-terrain-body="jupiter"]').click()
   await page.locator('#makeTerrain').click()
   await page.waitForSelector('#bandsEditor', { timeout: 30_000 })

@@ -640,6 +640,17 @@ export const terrainSchema = obj({
       palette: arr(COLOR, { min: 2, max: 8 })
     })
   ),
+  /** An optional cloud layer over a surface (clouds@1): weather to look at, not a record of any moment. */
+  clouds: opt(
+    obj({
+      cover: num({ min: 0, max: 1, sig: 4 }),
+      cells: num({ integer: true, min: 1, max: 9 }),
+      turbulence: num({ min: 0, max: 1, sig: 4 }),
+      storms: num({ integer: true, min: 0, max: 40 }),
+      /** The clouds' colour; white when absent. */
+      colour: opt(COLOR)
+    })
+  ),
   climate: opt(
     obj({
       /** Warming by the air, K. Absent: worked out from the surface pressure. */
