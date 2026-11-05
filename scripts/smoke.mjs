@@ -363,12 +363,17 @@ try {
   check(true, 'a new system on the star opens in the Systems tool')
   await page.locator('#rollPlanets').click()
   await page.waitForSelector('.roll-panel', { timeout: 15_000 })
-  const firstRoll = await page.locator('.roll-panel table').textContent()
-  await page.locator('#rollAgain').click()
-  await page.waitForFunction((before) => document.querySelector('.roll-panel table')?.textContent !== before, firstRoll)
-  await page.locator('.roll-panel button', { hasText: 'Roll again' }).click()
-  await page.waitForFunction(() => document.querySelector('.roll-panel h3')?.textContent === 'Roll 2')
-  check(true, 'rolling again gives a different system')
+  const rollNo = async () => Number(/Roll (\d+)/.exec((await page.locator('.roll-panel h3').textContent()) ?? '')?.[1] ?? -1)
+  const rollOnce = async () => {
+    const before = await rollNo()
+    await page.locator('.roll-panel button', { hasText: 'Roll again' }).click()
+    await page.waitForFunction((n) => document.querySelector('.roll-panel h3')?.textContent === `Roll ${n}`, before + 1)
+  }
+  await rollOnce()
+  await rollOnce()
+  check((await rollNo()) === 2, 'rolling again gives a different system')
+  // The world's seed is new every run, and now and then a small red dwarf rolls no planets: roll on until one has some.
+  for (let k = 0; k < 20 && (await page.locator('.roll-panel tbody tr').count()) === 0; k++) await rollOnce()
   await page.locator('#keepRoll').click()
   await page.waitForSelector('[data-body-row]', { timeout: 15_000 })
   const kept = await page.locator('[data-body-row]').count()
