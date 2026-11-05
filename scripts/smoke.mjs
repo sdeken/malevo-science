@@ -662,6 +662,8 @@ try {
     /local solar time/.test((await page.locator('#conditions').textContent()) ?? ''),
     'a new city shows the conditions there at the current date'
   )
+  // Coordinate clicks miss anything outside the window, and layouts differ by platform.
+  await page.locator('#placeMap').scrollIntoViewIfNeeded()
   const placeBox = await page.locator('#placeMap').boundingBox()
   await page.mouse.click(placeBox.x + placeBox.width * 0.5, placeBox.y + placeBox.height * 0.25)
   await page.waitForFunction(() => Math.abs(Number(document.querySelector('#cityLat')?.value) - 45) < 1)
@@ -682,8 +684,12 @@ try {
   await page.waitForSelector('#planPanel')
   await page.waitForFunction(() => /boxes from cityplan@1/.test(document.querySelector('.plan-canvas')?.textContent ?? ''))
   await page.locator('#drawRegion').selectOption('buildings')
+  await page.locator('.plan-svg').scrollIntoViewIfNeeded()
   const svgBox = await page.locator('.plan-svg').boundingBox()
-  const at = (fx, fy) => [svgBox.x + svgBox.width * fx, svgBox.y + svgBox.height * fy]
+  const viewH = await page.evaluate(() => window.innerHeight)
+  // Fractions of the part of the canvas inside the window.
+  const visH = Math.min(svgBox.height, viewH - svgBox.y - 4)
+  const at = (fx, fy) => [svgBox.x + svgBox.width * fx, svgBox.y + visH * fy]
   for (const [fx, fy] of [
     [0.35, 0.3],
     [0.65, 0.3],
