@@ -27,6 +27,10 @@ describe('the collapse surface', () => {
     expect(jr).toBeLessThan(1.3 * (collapseRadius(M_JUPITER, s) / AU))
     // The star's outline is its own circle, not reaching out to the giant's separate region.
     for (const p of collapseSlice(regions[0], s, [star, far], X, Y, 72)) expect(Math.hypot(...p) / AU).toBeLessThan(2.8)
+    // Along the star–giant line both tides stretch the same way and add, the star's more on its near side:
+    // the giant's region reaches a little farther toward the star than across. Physics, not a drawing fault.
+    expect(regions[1].radial([-1, 0, 0])).toBeGreaterThan(regions[1].radial([1, 0, 0]))
+    expect(regions[1].radial([1, 0, 0])).toBeGreaterThan(regions[1].radial([0, 1, 0]))
     // Every outline point is on the surface: load 1.
     for (const p of collapseSlice(regions[1], s, [star, far], X, Y, 24)) expect(foamLoad(p, [star, far], s)).toBeCloseTo(1, 1)
 

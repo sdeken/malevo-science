@@ -1566,3 +1566,12 @@ fieldset.plain {
   padding: 0;
   margin: 0;
 }
+
+.orbit-view svg.inside-collapse {
+  background: color-mix(in srgb, var(--now) 7%, transparent);
+}
+
+.ov-inside {
+  fill: var(--now);
+  font-size: 10px;
+}

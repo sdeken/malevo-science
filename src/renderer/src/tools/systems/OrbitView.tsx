@@ -105,6 +105,21 @@ export function OrbitView({ system, foam, now, selected, onSelect, center, bodie
     return p
   }, [center, system, now])
 
+  // Zoomed in on a body, the whole view can lie inside a collapse region far bigger than it: say so.
+  const enclosing = useMemo(() => {
+    if (center === null) return null
+    for (const c of collapse) {
+      if (c.points.length < 3) continue
+      const d = c.points.map((p) => Math.hypot(p[0] - hostPos[0], p[1] - hostPos[1]))
+      const inside = pointInPolygon([hostPos[0], hostPos[1]], c.points)
+      if (inside && Math.min(...d) > outer) {
+        const r = Math.min(...d)
+        return r > 0.01 * AU ? `${sig(r / AU, 3)} AU out at its nearest` : `${sig(r / 1000, 3)} km out at its nearest`
+      }
+    }
+    return null
+  }, [collapse, center, hostPos, outer])
+
   const orbits = useMemo(
     () =>
       shown.map((b) => {
@@ -138,6 +153,7 @@ export function OrbitView({ system, foam, now, selected, onSelect, center, bodie
         height={width}
         viewBox={`${-SIZE / 2} ${-SIZE / 2} ${SIZE} ${SIZE}`}
         onClick={() => onSelect(null)}
+        className={enclosing ? 'inside-collapse' : undefined}
         role="img"
         aria-label="Orbits"
       >
@@ -158,23 +174,6 @@ export function OrbitView({ system, foam, now, selected, onSelect, center, bodie
             <title>Habitable zone</title>
           </path>
         )}
-        {collapse.map((c, k) => {
-          const pts = c.points.map((p) => at(p[0] - hostPos[0], p[1] - hostPos[1]))
-          if (pts.length < 3) return null
-          const top = pts.reduce((a, b) => (b[1] < a[1] ? b : a))
-          return (
-            <g key={`c-${k}`} className="ov-collapse">
-              <polygon points={pts.map((p) => `${p[0].toFixed(1)},${p[1].toFixed(1)}`).join(' ')}>
-                <title>The foam collapses inside this line (every body's tide, at the current date)</title>
-              </polygon>
-              {c.star && center === null && system.collapse && (
-                <text x={top[0]} y={top[1] - 4}>
-                  collapse {sig(system.collapse / AU, 3)} AU
-                </text>
-              )}
-            </g>
-          )
-        })}
         {orbits
           .filter(({ b }) => b.extent && center === null)
           .map(({ b }) => (
@@ -233,6 +232,28 @@ export function OrbitView({ system, foam, now, selected, onSelect, center, bodie
               </text>
             </g>
           ))}
+        {collapse.map((c, k) => {
+          const pts = c.points.map((p) => at(p[0] - hostPos[0], p[1] - hostPos[1]))
+          if (pts.length < 3) return null
+          const top = pts.reduce((a, b) => (b[1] < a[1] ? b : a))
+          return (
+            <g key={`c-${k}`} className="ov-collapse" pointerEvents="none">
+              <polygon points={pts.map((p) => `${p[0].toFixed(1)},${p[1].toFixed(1)}`).join(' ')}>
+                <title>The foam collapses inside this line (every body's tide, at the current date)</title>
+              </polygon>
+              {c.star && center === null && system.collapse && (
+                <text x={top[0]} y={top[1] - 4}>
+                  collapse {sig(system.collapse / AU, 3)} AU
+                </text>
+              )}
+            </g>
+          )
+        })}
+        {enclosing && (
+          <text className="ov-inside" x={0} y={SIZE / 2 - 10} textAnchor="middle">
+            All of this lies inside {host?.name}’s collapse region, which reaches {enclosing}
+          </text>
+        )}
       </svg>
     </div>
   )
@@ -245,6 +266,16 @@ function parentOf(b: Drawn): string | null {
 function isMoonOf(b: Drawn, all: Drawn[]): boolean {
   const p = parentOf(b)
   return p !== null && all.some((x) => x.id === p)
+}
+
+function pointInPolygon(p: [number, number], poly: readonly (readonly number[])[]): boolean {
+  let inside = false
+  for (let i = 0, j = poly.length - 1; i < poly.length; j = i++) {
+    const [xi, yi] = poly[i]
+    const [xj, yj] = poly[j]
+    if (yi > p[1] !== yj > p[1] && p[0] < ((xj - xi) * (p[1] - yi)) / (yj - yi) + xi) inside = !inside
+  }
+  return inside
 }
 
 function toElements(e: ElementsInfo): OrbitalElements {
