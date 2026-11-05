@@ -324,6 +324,8 @@ export interface PhysicsSummary {
   topSpeed_c: number
   collapseRadius_au: number
   loadRule: 'max-eigen' | 'rss'
+  /** The world's torch settings, for travel times inside a system. */
+  torch: { exhaustSpeed_c: number; propellantFraction: number; cruiseAccel_g: number }
 }
 
 /** Stars near a point, packed for drawing. */

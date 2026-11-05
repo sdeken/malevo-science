@@ -1,4 +1,4 @@
-import { useLayoutEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { AU, M_SUN, collapseOutlines, stateAt, type MassPoint, type OrbitalElements, type Vec3 } from '@malevo/core'
 import type { ElementsInfo, PhysicsSummary, SystemInfoDto } from '../../../../shared/types'
 import { sig, starColour } from '../../components/fields'
@@ -27,6 +27,10 @@ interface Props {
   center: string | null
   bodies: Drawn[]
   scale: 'log' | 'linear'
+  /** Measuring: clicks report a place (relative to the star, in the system plane) or a body, instead of selecting. */
+  onMeasure?: (p: { body: string } | { pos: Vec3 }) => void
+  /** A measured leg to draw, star-relative positions. */
+  measureLine?: [Vec3, Vec3] | null
 }
 
 const SIZE = 440
@@ -40,8 +44,20 @@ const R = SIZE / 2 - 24
  * A giant out past the star's region has its own; a close one bulges the
  * star's region to take it in.
  */
-export function OrbitView({ system, foam, now, selected, onSelect, center, bodies, scale }: Props): React.JSX.Element {
+export function OrbitView({
+  system,
+  foam,
+  now,
+  selected,
+  onSelect,
+  center,
+  bodies,
+  scale,
+  onMeasure,
+  measureLine
+}: Props): React.JSX.Element {
   const box = useRef<HTMLDivElement>(null)
+  const svgRef = useRef<SVGSVGElement>(null)
   const [width, setWidth] = useState(SIZE)
   useLayoutEffect(() => {
     const el = box.current!
@@ -49,7 +65,39 @@ export function OrbitView({ system, foam, now, selected, onSelect, center, bodie
     ro.observe(el)
     return () => ro.disconnect()
   }, [])
-  const px = width / SIZE
+  // Pan and zoom: the view's centre in drawing units and how far it is magnified. Wheel zooms about the cursor,
+  // dragging pans; marks and labels keep their size on screen.
+  const [view, setView] = useState({ x: 0, y: 0, zoom: 1 })
+  useEffect(() => setView({ x: 0, y: 0, zoom: 1 }), [center, system.id, scale])
+  const zoom = view.zoom
+  const px = (width / SIZE) * zoom
+  const toUnits = (clientX: number, clientY: number): [number, number] => {
+    const r = svgRef.current!.getBoundingClientRect()
+    return [view.x + ((clientX - r.left) / r.width - 0.5) * (SIZE / zoom), view.y + ((clientY - r.top) / r.height - 0.5) * (SIZE / zoom)]
+  }
+  const viewRef = useRef(view)
+  viewRef.current = view
+  useEffect(() => {
+    const el = svgRef.current
+    if (!el) return
+    const onWheel = (e: WheelEvent): void => {
+      e.preventDefault()
+      const v = viewRef.current
+      const r = el.getBoundingClientRect()
+      const fx = (e.clientX - r.left) / r.width - 0.5
+      const fy = (e.clientY - r.top) / r.height - 0.5
+      const z = Math.max(1, Math.min(5000, v.zoom * Math.exp(-e.deltaY * 0.0015)))
+      // Keep the point under the cursor where it is.
+      const ux = v.x + (fx * SIZE) / v.zoom
+      const uy = v.y + (fy * SIZE) / v.zoom
+      setView(z === 1 ? { x: 0, y: 0, zoom: 1 } : { x: ux - (fx * SIZE) / z, y: uy - (fy * SIZE) / z, zoom: z })
+    }
+    el.addEventListener('wheel', onWheel, { passive: false })
+    return () => el.removeEventListener('wheel', onWheel)
+  }, [])
+  const drag = useRef<{ x: number; y: number; vx: number; vy: number; moved: boolean } | null>(null)
+  // Zoomed in, smaller collapse regions are worth tracing (in steps, so a wheel turn does not retrace every time).
+  const zoomBucket = Math.pow(4, Math.floor(Math.log(zoom) / Math.log(4)))
 
   const shown = bodies.filter((b) => (center === null ? !isMoonOf(b, bodies) : parentOf(b) === center))
   const extra: number[] = center === null ? [system.habitableZone?.[1] ?? 0, system.collapse ?? 0] : []
@@ -61,6 +109,8 @@ export function OrbitView({ system, foam, now, selected, onSelect, center, bodie
   const inner = Math.max(Math.min(...shown.map((b) => b.elements.a * (1 - b.elements.e)), outer / 50), outer / 1e4)
   const lo = Math.log10(inner * 0.5)
   const hi = Math.log10(outer * 1.08)
+  /** Drawing units back to a distance from the view's centre body (the inverse of `map`). */
+  const unmap = (m: number): number => (scale === 'linear' ? (m / R) * outer * 1.08 : Math.pow(10, lo + (m / R) * (hi - lo)))
   const map = (r: number): number => {
     if (scale === 'linear') return (r / (outer * 1.08)) * R
     if (r <= 0) return 0
@@ -75,28 +125,18 @@ export function OrbitView({ system, foam, now, selected, onSelect, center, bodie
   // The collapse surface at the current date, sliced in the system plane (positions relative to the star).
   const collapse = useMemo(() => {
     if (!foam || !system.star || system.star.mass === null) return []
-    const els = new Map(system.bodies.filter((b) => b.elements && b.cls !== 'belt').map((b) => [b.id, b]))
-    const abs = (id: string, guard = 0): Vec3 | null => {
-      const b = els.get(id)
-      if (!b || guard > 20) return null
-      const r = stateAt(toElements(b.elements!), now).r
-      const p = b.parent ? abs(b.parent, guard + 1) : [0, 0, 0]
-      return p ? [r[0] + p[0], r[1] + p[1], r[2] + p[2]] : null
-    }
-    const masses: MassPoint[] = [{ pos: [0, 0, 0], mass: system.star.mass * M_SUN }]
-    for (const id of els.keys()) {
-      const p = abs(id)
-      if (p) masses.push({ pos: p, mass: els.get(id)!.mass })
-    }
+    const { masses } = systemMasses(system, now)!
     const settings = { collapseRadius: foam.collapseRadius_au * AU, rule: foam.loadRule }
-    return collapseOutlines(masses, settings, [0, 0, 0], [1, 0, 0], [0, 1, 0], { minRadius: outer / 400, grid: 160 }).map((o) => ({
-      star: o.body === 0,
-      center: o.center,
-      // The outer boundary, then any holes.
-      loops: o.loops,
-      points: o.loops[0]
-    }))
-  }, [foam, system, now, outer])
+    return collapseOutlines(masses, settings, [0, 0, 0], [1, 0, 0], [0, 1, 0], { minRadius: outer / (1000 * zoomBucket), grid: 160 }).map(
+      (o) => ({
+        star: o.body === 0,
+        center: o.center,
+        // The outer boundary, then any holes.
+        loops: o.loops,
+        points: o.loops[0]
+      })
+    )
+  }, [foam, system, now, outer, zoomBucket])
   const hostPos = useMemo((): Vec3 => {
     if (center === null) return [0, 0, 0]
     const byId = new Map(system.bodies.map((b) => [b.id, b]))
@@ -128,8 +168,8 @@ export function OrbitView({ system, foam, now, selected, onSelect, center, bodie
       shown.map((b) => {
         const el = toElements(b.elements)
         const pts: string[] = []
-        for (let k = 0; k <= 96; k++) {
-          const r = stateAt({ ...el, meanAnomaly: (2 * Math.PI * k) / 96, epoch: 0 }, 0).r
+        for (let k = 0; k <= 360; k++) {
+          const r = stateAt({ ...el, meanAnomaly: (2 * Math.PI * k) / 360, epoch: 0 }, 0).r
           const [x, y] = at(r[0], r[1])
           pts.push(`${x.toFixed(1)},${y.toFixed(1)}`)
         }
@@ -152,10 +192,39 @@ export function OrbitView({ system, foam, now, selected, onSelect, center, bodie
   return (
     <div className="orbit-view" ref={box}>
       <svg
+        ref={svgRef}
         width={width}
         height={width}
-        viewBox={`${-SIZE / 2} ${-SIZE / 2} ${SIZE} ${SIZE}`}
-        onClick={() => onSelect(null)}
+        viewBox={`${view.x - SIZE / 2 / zoom} ${view.y - SIZE / 2 / zoom} ${SIZE / zoom} ${SIZE / zoom}`}
+        style={{ ['--ovs' as string]: String(1 / zoom), cursor: onMeasure ? 'crosshair' : drag.current?.moved ? 'grabbing' : undefined }}
+        onPointerDown={(e) => {
+          if (e.button !== 0) return
+          drag.current = { x: e.clientX, y: e.clientY, vx: view.x, vy: view.y, moved: false }
+        }}
+        onPointerMove={(e) => {
+          const d = drag.current
+          if (!d || zoom === 1) return
+          if (!d.moved && Math.hypot(e.clientX - d.x, e.clientY - d.y) < 4) return
+          d.moved = true
+          const k = SIZE / zoom / svgRef.current!.getBoundingClientRect().width
+          setView({ zoom, x: d.vx - (e.clientX - d.x) * k, y: d.vy - (e.clientY - d.y) * k })
+        }}
+        onPointerUp={() => {
+          // A drag is not a click: keep it from selecting or measuring.
+          if (drag.current?.moved) setTimeout(() => (drag.current = null))
+          else drag.current = null
+        }}
+        onClick={(e) => {
+          if (drag.current?.moved) return
+          if (onMeasure) {
+            const [ux, uy] = toUnits(e.clientX, e.clientY)
+            const m = Math.hypot(ux, uy)
+            const r = m === 0 ? 0 : unmap(m)
+            onMeasure({ pos: [hostPos[0] + (ux / (m || 1)) * r, hostPos[1] - (uy / (m || 1)) * r, 0] })
+            return
+          }
+          onSelect(null)
+        }}
         className={enclosing ? 'inside-collapse' : undefined}
         role="img"
         aria-label="Orbits"
@@ -163,7 +232,7 @@ export function OrbitView({ system, foam, now, selected, onSelect, center, bodie
         {rings.map((r) => (
           <g key={r} className="ov-ring">
             <circle r={map(r)} />
-            <text x={map(r) * 0.7071 + 3} y={-map(r) * 0.7071 - 3}>
+            <text x={map(r) * 0.7071 + 3 / zoom} y={-map(r) * 0.7071 - 3 / zoom}>
               {sig(r / unit, 2)} {unitLabel}
             </text>
           </g>
@@ -192,7 +261,7 @@ export function OrbitView({ system, foam, now, selected, onSelect, center, bodie
               <path fillRule="evenodd" d={annulus(b.extent![0], b.extent![1])}>
                 <title>{b.name}</title>
               </path>
-              <text className="ov-label" x={0} y={map(b.extent![1]) + 12}>
+              <text className="ov-label" x={0} y={map(b.extent![1]) + 12 / zoom}>
                 {b.name}
               </text>
             </g>
@@ -207,11 +276,11 @@ export function OrbitView({ system, foam, now, selected, onSelect, center, bodie
             />
           ))}
         {center === null ? (
-          <circle className="ov-star" r={7} fill={`rgb(${starRgb.map((c) => Math.round(c * 255)).join(',')})`} />
+          <circle className="ov-star" r={7 / zoom} fill={`rgb(${starRgb.map((c) => Math.round(c * 255)).join(',')})`} />
         ) : (
           <g>
-            <circle className="ov-host" r={6} />
-            <text className="ov-label" x={9} y={4}>
+            <circle className="ov-host" r={6 / zoom} />
+            <text className="ov-label" x={9 / zoom} y={4 / zoom}>
               {host?.name}
             </text>
           </g>
@@ -225,7 +294,9 @@ export function OrbitView({ system, foam, now, selected, onSelect, center, bodie
               transform={`translate(${pos[0]} ${pos[1]})`}
               onClick={(e) => {
                 e.stopPropagation()
-                if (!b.ghost) onSelect(b.id)
+                if (drag.current?.moved) return
+                if (onMeasure) onMeasure({ body: b.id })
+                else if (!b.ghost) onSelect(b.id)
               }}
               data-body={b.id}
             >
@@ -276,19 +347,38 @@ export function OrbitView({ system, foam, now, selected, onSelect, center, bodie
                 <title>The foam collapses inside this line (every body's tide, at the current date)</title>
               </path>
               {c.star && center === null && system.collapse && (
-                <text x={top[0]} y={top[1] - 4}>
+                <text x={top[0]} y={top[1] - 4 / zoom}>
                   collapse {sig(system.collapse / AU, 3)} AU
                 </text>
               )}
             </g>
           )
         })}
-        {enclosing && (
-          <text className="ov-inside" x={0} y={SIZE / 2 - 10} textAnchor="middle">
-            All of this lies inside {host?.name}’s collapse region, which reaches {enclosing}
-          </text>
+        {measureLine && (
+          <g className="ov-measure" pointerEvents="none">
+            {(() => {
+              const [a, b] = measureLine.map((p) => at(p[0] - hostPos[0], p[1] - hostPos[1]))
+              return (
+                <>
+                  <line x1={a[0]} y1={a[1]} x2={b[0]} y2={b[1]} />
+                  <circle cx={a[0]} cy={a[1]} r={3 / px} />
+                  <circle cx={b[0]} cy={b[1]} r={3 / px} />
+                </>
+              )
+            })()}
+          </g>
         )}
       </svg>
+      {zoom > 1 && (
+        <button className="ov-reset small" onClick={() => setView({ x: 0, y: 0, zoom: 1 })}>
+          Reset view ({sig(zoom, 2)}×)
+        </button>
+      )}
+      {enclosing && (
+        <p className="ov-inside small">
+          All of this lies inside {host?.name}’s collapse region, which reaches {enclosing}
+        </p>
+      )}
     </div>
   )
 }
@@ -310,6 +400,38 @@ function pointInPolygon(p: [number, number], poly: readonly (readonly number[])[
     if (yi > p[1] !== yj > p[1] && p[0] < ((xj - xi) * (p[1] - yi)) / (yj - yi) + xi) inside = !inside
   }
   return inside
+}
+
+/**
+ * Every body's position relative to the star at time t (m, the system's frame), and the masses for the foam:
+ * the star first, then each body with an orbit (belts left out). Null without a star of known mass.
+ */
+export function systemMasses(system: SystemInfoDto, t: number): { masses: MassPoint[]; ids: string[]; pos: Map<string, Vec3> } | null {
+  if (!system.star || system.star.mass === null) return null
+  const els = new Map(system.bodies.filter((b) => b.elements && b.cls !== 'belt').map((b) => [b.id, b]))
+  const pos = new Map<string, Vec3>()
+  const abs = (id: string, guard = 0): Vec3 | null => {
+    const hit = pos.get(id)
+    if (hit) return hit
+    const b = els.get(id)
+    if (!b || guard > 20) return null
+    const r = stateAt(toElements(b.elements!), t).r
+    const p = b.parent ? abs(b.parent, guard + 1) : [0, 0, 0]
+    if (!p) return null
+    const out: Vec3 = [r[0] + p[0], r[1] + p[1], r[2] + p[2]]
+    pos.set(id, out)
+    return out
+  }
+  const masses: MassPoint[] = [{ pos: [0, 0, 0], mass: system.star.mass * M_SUN }]
+  const ids = ['']
+  for (const id of els.keys()) {
+    const p = abs(id)
+    if (p) {
+      masses.push({ pos: p, mass: els.get(id)!.mass })
+      ids.push(id)
+    }
+  }
+  return { masses, ids, pos }
 }
 
 function toElements(e: ElementsInfo): OrbitalElements {

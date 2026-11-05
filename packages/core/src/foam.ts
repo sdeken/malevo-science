@@ -293,8 +293,11 @@ export interface CollapseOutline {
 }
 
 /**
- * Where the foam collapses in a plane through `origin` spanned by unit
- * vectors `u` and `v`: the contour where the load is 1, traced as it is.
+ * Where the foam collapses, seen in the plane through `origin` spanned by unit
+ * vectors `u` and `v`: the contour where the load is 1, traced as it is. Each
+ * area is cut at the height of the body at its heart (a plane parallel to
+ * this one), so a planet on an inclined orbit has its bubble cut through its
+ * middle; the loops' points are at that height.
  *
  * This is the exact slice of the 3D collapse surface, whatever its shape: two
  * bubbles stay apart until the load between them reaches 1, then join through
@@ -314,15 +317,14 @@ export function collapseOutlines(
 ): CollapseOutline[] {
   const n = Math.max(16, Math.round(opts.grid ?? 160))
   const nrm: Vec3 = [u[1] * v[2] - u[2] * v[1], u[2] * v[0] - u[0] * v[2], u[0] * v[1] - u[1] * v[0]]
+  // Each body's area is cut through a plane parallel to this one at the body's own height, so the bubble of a
+  // planet on an inclined orbit is cut through its middle instead of being missed.
+  let o3: Vec3 = origin
   const to2 = (p: Vec3): [number, number] => {
     const d = [p[0] - origin[0], p[1] - origin[1], p[2] - origin[2]]
     return [d[0] * u[0] + d[1] * u[1] + d[2] * u[2], d[0] * v[0] + d[1] * v[1] + d[2] * v[2]]
   }
-  const to3 = (x: number, y: number): Vec3 => [
-    origin[0] + x * u[0] + y * v[0],
-    origin[1] + x * u[1] + y * v[1],
-    origin[2] + x * u[2] + y * v[2]
-  ]
+  const to3 = (x: number, y: number): Vec3 => [o3[0] + x * u[0] + y * v[0], o3[1] + x * u[1] + y * v[1], o3[2] + x * u[2] + y * v[2]]
   const own = bodies.map((b) => collapseRadius(b.mass, s))
   const order = bodies.map((_, i) => i).sort((a, b) => bodies[b].mass - bodies[a].mass || a - b)
   const out: CollapseOutline[] = []
@@ -333,7 +335,7 @@ export function collapseOutlines(
     if (own[i] < (opts.minRadius ?? 0)) continue
     const [cx, cy] = flat[i]
     const off = (bodies[i].pos[0] - origin[0]) * nrm[0] + (bodies[i].pos[1] - origin[1]) * nrm[1] + (bodies[i].pos[2] - origin[2]) * nrm[2]
-    if (Math.abs(off) >= 1.6 * own[i]) continue
+    o3 = [origin[0] + off * nrm[0], origin[1] + off * nrm[1], origin[2] + off * nrm[2]]
     if (out.some((o) => pointInLoop([cx, cy], o.loops[0].map(to2)) && !o.loops.slice(1).some((h) => pointInLoop([cx, cy], h.map(to2)))))
       continue
     let reach = 1.6 * own[i]

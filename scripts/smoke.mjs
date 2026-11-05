@@ -399,6 +399,11 @@ try {
     planetFile.lock?.gen === 'planets@1' && Number.isInteger(planetFile.lock.seed),
     'kept planets record the generator and seed that made them'
   )
+  await page.locator('[data-system="sol"]').click()
+  await page.waitForFunction(() => /Nearest drop → Earth/.test(document.querySelector('#torchTable')?.textContent ?? ''))
+  check(true, 'the torch times give the warning from a drop at the collapse edge to Earth')
+  await page.locator('[data-system="proxima-centauri"]').click()
+  await page.waitForSelector('[data-system-detail="proxima-centauri"]')
   // A planet-local calendar that follows the first planet (if it has a day to follow).
   const planetId = bodyFiles[0].replace(/\.json$/, '')
   await page.evaluate(

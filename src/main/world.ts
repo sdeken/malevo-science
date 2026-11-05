@@ -314,7 +314,12 @@ export class WorldSession extends EventEmitter {
             legLimit_ly: physicsFile.foam.legLimit_ly,
             topSpeed_c: physicsFile.foam.topSpeed_c,
             collapseRadius_au: physicsFile.foam.collapseRadius_au,
-            loadRule: physicsFile.foam.loadRule
+            loadRule: physicsFile.foam.loadRule,
+            torch: {
+              exhaustSpeed_c: physicsFile.torch.exhaustSpeed_c,
+              propellantFraction: physicsFile.torch.propellantFraction,
+              cruiseAccel_g: physicsFile.torch.cruiseAccel_g
+            }
           }
         : null,
       issueCounts: { error: count('error'), warning: count('warning'), info: count('info') }

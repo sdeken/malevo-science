@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { AU, DEG, G, KM, M_EARTH, M_SUN } from '@malevo/core'
+import { AU, DEG, G, KM, M_EARTH, M_SUN, type Vec3 } from '@malevo/core'
 import { knownSystemOf } from '@malevo/model'
 import type { ElementsInfo, PlanetProposal, SystemInfoDto } from '../../../../shared/types'
 import { NumberField, TextField, duration, sig } from '../../components/fields'
@@ -7,7 +7,8 @@ import { slugId, useWorldPref } from '../../state'
 import type { ToolDefinition, ToolProps } from '../registry'
 import { BodyEditor } from './BodyEditor'
 import { HistoryEditor } from './HistoryEditor'
-import { OrbitView, type Drawn } from './OrbitView'
+import { OrbitView, systemMasses, type Drawn } from './OrbitView'
+import { TorchTimes, type MeasurePoint } from './TorchTimes'
 
 function SystemsView({ world, snapshot, now, displayCal, navigate, focus }: ToolProps): React.JSX.Element {
   const systems = snapshot.systems
@@ -105,6 +106,8 @@ function SystemDetail({
 }): React.JSX.Element {
   const [selectedBody, setSelectedBody] = useState<string | null>(null)
   const [center, setCenter] = useState<string | null>(null)
+  const [measuring, setMeasuring] = useState(false)
+  const [measurePts, setMeasurePts] = useState<MeasurePoint[]>([])
   const [scale, setScale] = useState<'log' | 'linear'>('log')
   const [proposal, setProposal] = useState<PlanetProposal | null>(null)
   const [error, setError] = useState<string | null>(null)
@@ -194,6 +197,7 @@ function SystemDetail({
           }
         })
   const moons = center ? system.bodies.filter((b) => b.parent === center) : []
+  const measurePos = measurePts.length === 2 ? systemMasses(system, now)?.pos : null
 
   return (
     <div className="tool-page wide system-detail" data-system-detail={system.id}>
@@ -312,7 +316,29 @@ function SystemDetail({
             center={center}
             bodies={drawn}
             scale={scale}
+            onMeasure={measuring && center === null ? (p) => setMeasurePts((pts) => (pts.length >= 2 ? [p] : [...pts, p])) : undefined}
+            measureLine={
+              center === null && measurePts.length === 2
+                ? (() => {
+                    const pos = (p: MeasurePoint): Vec3 | null => ('pos' in p ? p.pos : (measurePos?.get(p.body) ?? null))
+                    const a = pos(measurePts[0])
+                    const b = pos(measurePts[1])
+                    return a && b ? [a, b] : null
+                  })()
+                : null
+            }
           />
+          {center === null && (
+            <TorchTimes
+              system={system}
+              physics={snapshot.physics}
+              now={now}
+              measuring={measuring}
+              setMeasuring={setMeasuring}
+              points={measurePts}
+              setPoints={setMeasurePts}
+            />
+          )}
           {center && moons.length === 0 && <p className="muted small">No moons yet.</p>}
         </div>
         <div className="bodies-col">

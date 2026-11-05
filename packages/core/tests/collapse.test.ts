@@ -89,3 +89,16 @@ describe('collapse outlines in the system plane', () => {
     for (const p of loop) expect(foamLoad(p, [star, planet], s)).toBeCloseTo(1, 1)
   })
 })
+
+describe('collapse outlines of inclined orbits', () => {
+  it('cuts a planet’s bubble through its own height, not the star’s plane', () => {
+    // Saturn-like: 0.18 AU bubble, 0.4 AU above the star's plane.
+    const planet: MassPoint = { pos: [9.5 * AU, 0, 0.4 * AU], mass: 2.857e-4 * M_SUN }
+    const o = collapseOutlines([star, planet], s, [0, 0, 0], X, Y)
+    expect(o.map((x) => x.body)).toEqual([0, 1])
+    const r = o[1].loops[0].map((p) => Math.hypot(p[0] - 9.5 * AU, p[1]) / AU)
+    expect(Math.min(...r)).toBeGreaterThan(0.15)
+    expect(Math.max(...r)).toBeLessThan(0.22)
+    expect(o[1].loops[0][0][2] / AU).toBeCloseTo(0.4, 5)
+  })
+})

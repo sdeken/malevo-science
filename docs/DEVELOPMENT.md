@@ -222,6 +222,23 @@ module.exports = {
   assume a region looks like a single blob from its centre, so they cannot show a neck or two
   bubbles side by side. The app does not draw them.
 
+### Moving around a system, and torch times
+
+- **The orbit view pans and zooms:** the wheel zooms about the cursor and dragging pans. Marks and
+  labels keep their size on screen, and **Reset view** goes back to the whole system. Zoomed in,
+  smaller collapse bubbles are traced too.
+- **Torch times** (under the orbit view, `TorchTimes.tsx`) use the world's torch settings and an
+  acceleration that defaults to the cruise setting (1 g).
+  - **From the drop:** the nearest and farthest points of the star's collapse edge to a chosen
+    body (the system's port by default), at the current date.
+  - **Any leg:** **Measure a leg** and click two places or bodies.
+  - **For each leg:** the distance, the light delay, the time to arrive at rest (flip halfway),
+    the time and speed flying by (burning all the way), and the **warning**: from when the
+    drop's light arrives to when a ship burning all the way does.
+  - **Assumptions:** trips start from rest and run in a straight line. Gravity and the target's
+    motion are ignored. The tanks (exhaust speed and propellant share) can cap the speed, and
+    hovering a time says which limit set it.
+
 ### Terrain
 
 - **A terrain** is `terrains/<id>.json`, one per body: a surface for rocky, ocean and dwarf
