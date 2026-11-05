@@ -12,6 +12,7 @@ import {
   solarSystemFor,
   systemFrame,
   systemInfo,
+  bodyPosition,
   templateFiles,
   type WorldEnv,
   type WorldFile
@@ -114,5 +115,44 @@ describe('the Solar System', () => {
     })
     expect(files.some((f) => f.id === 'earth')).toBe(false)
     expect(files.filter((f) => f.kind.kind === 'body').every((f) => (f.value as { system: string }).system === 'home')).toBe(true)
+  })
+})
+
+describe('where the planets are at a date', () => {
+  // Heliocentric ecliptic J2000 positions at 2000-01-01 12:00 TT (JPL Horizons), AU.
+  const J2000: Record<string, [number, number]> = {
+    earth: [-0.1771, 0.9672],
+    mars: [1.3908, -0.0134],
+    jupiter: [4.0012, 2.9385],
+    saturn: [6.4064, 6.5699]
+  }
+  const AU_M = 149_597_870_700
+  const at = (id: string, t: number): [number, number, number] => {
+    const sys = systemInfo(world(), env, 'sol')!
+    const p = bodyPosition(sys, id, t)!
+    return [p[0] / AU_M, p[1] / AU_M, p[2] / AU_M]
+  }
+
+  it('matches the published positions at J2000', () => {
+    for (const [id, [x, y]] of Object.entries(J2000)) {
+      const p = at(id, 0)
+      // JPL's approximate elements are good to about a fifth of a degree for Jupiter and Saturn, far better within.
+      expect(Math.hypot(p[0] - x, p[1] - y)).toBeLessThan(0.004 * Math.hypot(x, y))
+    }
+  })
+
+  it('moves them with the date: Earth half a year on is across the Sun, a year on back again', () => {
+    const year = 365.25636 * 86400
+    const e0 = at('earth', 0)
+    const half = at('earth', year / 2)
+    const full = at('earth', year)
+    expect(e0[0] * half[0] + e0[1] * half[1]).toBeLessThan(-0.9)
+    expect(Math.hypot(full[0] - e0[0], full[1] - e0[1])).toBeLessThan(0.002)
+    // Jupiter a quarter of its 11.86-year orbit on has turned about 90°.
+    const j0 = at('jupiter', 0)
+    const jq = at('jupiter', (11.862 * 365.25 * 86400) / 4)
+    const turn = Math.acos((j0[0] * jq[0] + j0[1] * jq[1]) / (Math.hypot(j0[0], j0[1]) * Math.hypot(jq[0], jq[1]))) / DEG
+    expect(turn).toBeGreaterThan(80)
+    expect(turn).toBeLessThan(100)
   })
 })

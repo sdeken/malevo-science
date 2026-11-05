@@ -60,6 +60,35 @@ export function LegView({ route, snapshot, now }: Props): React.JSX.Element | nu
     }
   }, [sysA, sysB, roll])
 
+  // The trip: the departure burn from the origin's port out to the foam, the foam, then the destination's crawl
+  // from the drop to its port (flip-and-burn: accelerate to the midpoint, then brake). The destination's approach is
+  // worked out at the moment of the drop, so its planets are where the ship finds them.
+  const legInfo = leg ? route.legs.find((l) => l.index === leg.i) : undefined
+  const foam = legInfo?.foam ?? null
+  const [apA, setApA] = useState<ApproachInfoDto | { error: string } | null>(null)
+  const [apB, setApB] = useState<ApproachInfoDto | { error: string } | null>(null)
+  const depart = apA && !('error' in apA) ? apA.crawl : null
+  const tDrop = now + (depart ?? 0) + (foam ?? 0)
+  useEffect(() => {
+    let live = true
+    setApA(null)
+    if (!sysA || !leg?.b) return
+    void window.malevo.approach.info({ system: sysA.id, from: leg.b, t: now }).then((r) => live && setApA(r))
+    return () => {
+      live = false
+    }
+  }, [sysA?.id, leg?.b, now, snapshot.version]) // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => {
+    let live = true
+    setApB(null)
+    if (!sysB || !leg?.a || !apA) return
+    void window.malevo.approach.info({ system: sysB.id, from: leg.a, t: tDrop }).then((r) => live && setApB(r))
+    return () => {
+      live = false
+    }
+  }, [sysB?.id, leg?.a, tDrop, apA, snapshot.version]) // eslint-disable-line react-hooks/exhaustive-deps
+  const arrive = apB && !('error' in apB) ? apB.crawl : null
+
   // Both panels to one scale: room for the larger collapse region.
   const extent = 1.6 * Math.max(sysA?.collapse ?? 0, sysB?.collapse ?? 0, 0.5 * AU)
   if (!legs.length) return null
@@ -86,21 +115,90 @@ export function LegView({ route, snapshot, now }: Props): React.JSX.Element | nu
       {sysA?.star && sysB?.star && axes && (
         <>
           <div className="leg-panels">
-            <End system={sysA} other={leg!.b!} axes={axes} snapshot={snapshot} now={now} outbound extent={extent} />
+            <End
+              system={sysA}
+              approach={apA && !('error' in apA) ? apA : null}
+              approachError={apA && 'error' in apA ? apA.error : null}
+              axes={axes}
+              snapshot={snapshot}
+              now={now}
+              outbound
+              extent={extent}
+            />
             <div className="leg-gap muted small">
               <span>{sig(axes.ly, 3)} ly</span>
               <span>→</span>
             </div>
-            <End system={sysB} other={leg!.a!} axes={axes} snapshot={snapshot} now={now} outbound={false} extent={extent} />
+            <End
+              system={sysB}
+              approach={apB && !('error' in apB) ? apB : null}
+              approachError={apB && 'error' in apB ? apB.error : null}
+              axes={axes}
+              snapshot={snapshot}
+              now={tDrop}
+              outbound={false}
+              extent={extent}
+            />
           </div>
+          <Stages depart={depart} foam={foam} arrive={arrive} />
           <p className="muted small">
             Seen side-on to the leg, which runs left to right; each system’s plane is tilted as it is against the other’s. Both panels are
             to the same scale. The dashed line is where the foam collapses, cut through the plane that holds the leg, with isolines at 1/8
-            to 8 times the collapse load. Planets are where they are at the current date: over a trip of days only the innermost move much,
-            and the collapse edge is set by the star and its giants.
+            to 8 times the collapse load. The origin is drawn at departure (the current date) and the destination at the moment of the drop,
+            so each system's planets are where the ship finds them.
           </p>
         </>
       )}
+    </div>
+  )
+}
+
+/** The four stages of the trip, as a bar to scale and their times. */
+function Stages({ depart, foam, arrive }: { depart: number | null; foam: number | null; arrive: number | null }): React.JSX.Element {
+  const stages = [
+    { key: 'depart', label: 'Departure burn', t: depart, note: 'from the port out to where the ship enters the foam' },
+    { key: 'foam', label: 'Foam', t: foam, note: 'between the stars' },
+    { key: 'accel', label: 'Acceleration burn', t: arrive === null ? null : arrive / 2, note: 'from the drop to the flip' },
+    { key: 'decel', label: 'Deceleration burn', t: arrive === null ? null : arrive / 2, note: 'from the flip to insertion at the port' }
+  ]
+  const known = stages.every((s) => s.t !== null)
+  const total = stages.reduce((a, s) => a + (s.t ?? 0), 0)
+  return (
+    <div className="leg-stages" id="legStages">
+      {known && total > 0 && (
+        <div className="leg-bar">
+          {stages.map((s) => (
+            <span
+              key={s.key}
+              className={`leg-seg leg-st-${s.key}`}
+              style={{ flexGrow: s.t! / total }}
+              title={`${s.label}: ${duration(s.t)}`}
+            />
+          ))}
+        </div>
+      )}
+      <table className="data small">
+        <tbody>
+          {stages.map((s) => (
+            <tr key={s.key}>
+              <td>
+                <span className={`leg-swatch leg-st-${s.key}`} /> {s.label}
+              </td>
+              <td>{s.t === null ? '…' : duration(s.t)}</td>
+              <td className="muted">{s.note}</td>
+            </tr>
+          ))}
+          <tr>
+            <td>
+              <strong>Port to port</strong>
+            </td>
+            <td>
+              <strong>{known ? duration(total) : '…'}</strong>
+            </td>
+            <td className="muted">at the world's cruise acceleration, from rest in orbit to rest in orbit</td>
+          </tr>
+        </tbody>
+      </table>
     </div>
   )
 }
@@ -112,7 +210,8 @@ function nameOf(snapshot: WorldSnapshot, node: string): string {
 
 function End({
   system,
-  other,
+  approach,
+  approachError,
   axes,
   snapshot,
   now,
@@ -122,31 +221,14 @@ function End({
   /** Half the panel's width, m: the same for both ends. */
   extent: number
   system: SystemInfoDto
-  other: string
+  approach: ApproachInfoDto | null
+  approachError: string | null
   axes: { e1: Vec3; e2: Vec3 }
   snapshot: WorldSnapshot
+  /** When this end is drawn: departure at the origin, the drop at the destination. */
   now: number
   outbound: boolean
 }): React.JSX.Element {
-  const [approach, setApproach] = useState<ApproachInfoDto | null>(null)
-  const [approachError, setApproachError] = useState<string | null>(null)
-  useEffect(() => {
-    let live = true
-    void window.malevo.approach.info({ system: system.id, from: other, t: now }).then((r) => {
-      if (!live) return
-      if ('error' in r) {
-        setApproach(null)
-        setApproachError(r.error)
-      } else {
-        setApproach(r)
-        setApproachError(null)
-      }
-    })
-    return () => {
-      live = false
-    }
-  }, [system.id, other, now, snapshot.version])
-
   const f = systemFrame(system.value as { frame?: { poleL_deg: number; poleB_deg: number; zero_deg?: number } })
   /** System frame → galactic. */
   const toG = (v: readonly number[]): Vec3 => [

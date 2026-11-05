@@ -226,6 +226,16 @@ module.exports = {
   - where the approach model drops ships out of the foam, and their crawl to the port.
 
   A slider turns the view about the leg.
+- **The trip in four stages** is shown under the leg, as a bar to scale and in a table. Each
+  stage is a burn at the world's cruise acceleration, from rest in orbit to rest in orbit:
+  - **Departure burn:** the origin's crawl from its port out to where ships enter the foam.
+  - **Foam:** the leg's time in the foam.
+  - **Acceleration and deceleration burns:** the destination's crawl from the drop to its port.
+    It is flip-and-burn, split at the flip.
+
+  The origin is drawn at departure (the current date). The destination is drawn, and its
+  approach worked out, at the moment of the drop, so each system's planets are where the ship
+  finds them.
 - **`collapseOutlines`** traces each body's area, cut at that body's own height. The torch
   times use it for the star's edge.
 - **`collapseRegions` and `collapseMesh`** give a 3D mesh found along rays from each centre. They

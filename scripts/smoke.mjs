@@ -556,6 +556,10 @@ try {
     timeout: 30_000
   })
   check(true, 'a leg between two systems shows both ends, tilted, with where ships drop out')
+  await page.waitForFunction(() => /Port to port\s*\d/.test(document.querySelector('#legStages')?.textContent ?? ''), null, {
+    timeout: 30_000
+  })
+  check(true, 'and the trip in four stages: departure burn, foam, acceleration and deceleration burns')
   await page.evaluate(() => window.malevo.world.undo())
 
   // 15. Phase 6: the sky from a kept planet, with the route's torches; an approach into the system.

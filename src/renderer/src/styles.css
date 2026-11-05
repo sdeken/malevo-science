@@ -1832,3 +1832,40 @@ fieldset.plain {
 .leg-drop {
   fill: var(--accent);
 }
+
+.leg-bar {
+  display: flex;
+  height: 10px;
+  border-radius: 5px;
+  overflow: hidden;
+  margin: 8px 0 4px;
+  background: var(--bg-sunken);
+}
+
+.leg-seg {
+  min-width: 2px;
+}
+
+.leg-swatch {
+  display: inline-block;
+  width: 10px;
+  height: 10px;
+  border-radius: 2px;
+  vertical-align: -1px;
+}
+
+.leg-st-depart {
+  background: #d9894a;
+}
+
+.leg-st-foam {
+  background: #6a7fd6;
+}
+
+.leg-st-accel {
+  background: #4fa38a;
+}
+
+.leg-st-decel {
+  background: #3c7d6a;
+}
