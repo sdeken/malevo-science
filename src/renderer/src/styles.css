@@ -1718,3 +1718,17 @@ fieldset.plain {
   stroke: rgba(0, 0, 0, 0.7);
   stroke-width: 0.25%;
 }
+
+.notice {
+  background: var(--bg-raised);
+  border: 1px solid var(--border);
+  border-left: 3px solid var(--accent);
+  border-radius: var(--radius);
+  padding: 6px 12px;
+  margin: 8px 0;
+}
+
+.notice ul {
+  margin: 4px 0;
+  padding-left: 18px;
+}

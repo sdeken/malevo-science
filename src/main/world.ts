@@ -51,6 +51,7 @@ import {
   historySettingsKind,
   proposeHistory,
   solarSystemFor,
+  knownPlanetsFor,
   terrainKind,
   terrainRaster,
   cityKind,
@@ -490,6 +491,15 @@ export class WorldSession extends EventEmitter {
     this.changed()
     const sys = files.find((f) => f.kind.kind === systemKind.kind)
     return sys?.id ?? (files[0].value as { system?: string }).system ?? null
+  }
+
+  /** Add a system's known planets (from published data) that it lacks: one undoable, unsaved step. Returns their ids. */
+  addKnownPlanets(systemId: string, candidates: boolean): string[] {
+    const files = knownPlanetsFor(this.world(), systemId, { candidates })
+    if (!files.length) return []
+    this.editor!.edit(files.map((f) => ({ path: f.path, text: entityText(f.kind, f.value) })))
+    this.changed()
+    return files.map((f) => f.id)
   }
 
   // ---- terrain: rasters are derived, cached here, never written to the world ----

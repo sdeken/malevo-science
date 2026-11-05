@@ -361,6 +361,11 @@ try {
   await page.locator('#newSystemHere').click()
   await page.waitForSelector('[data-system-detail="proxima-centauri"]', { timeout: 15_000 })
   check(true, 'a new system on the star opens in the Systems tool')
+  await page.waitForSelector('[data-body-row="proxima-b"]', { timeout: 15_000 })
+  check(
+    (await page.locator('[data-body-row="proxima-d"]').count()) === 1 && (await page.locator('[data-body-row="proxima-c"]').count()) === 0,
+    'a system on Proxima Centauri starts with its confirmed planets, b and d, not the disputed c'
+  )
   await page.locator('#rollPlanets').click()
   await page.waitForSelector('.roll-panel', { timeout: 15_000 })
   const rollNo = async () => Number(/Roll (\d+)/.exec((await page.locator('.roll-panel h3').textContent()) ?? '')?.[1] ?? -1)
@@ -375,8 +380,8 @@ try {
   // The world's seed is new every run, and now and then a small red dwarf rolls no planets: roll on until one has some.
   for (let k = 0; k < 20 && (await page.locator('.roll-panel tbody tr').count()) === 0; k++) await rollOnce()
   await page.locator('#keepRoll').click()
-  await page.waitForSelector('[data-body-row]', { timeout: 15_000 })
-  const kept = await page.locator('[data-body-row]').count()
+  await page.waitForSelector('[data-body-row^="proxima-centauri-"]', { timeout: 15_000 })
+  const kept = await page.locator('[data-body-row^="proxima-centauri-"]').count()
   check(kept > 0, `keeping a roll adds its planets (${kept})`)
   const firstRow = page.locator('[data-body-row]').first()
   await firstRow.click()

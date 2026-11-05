@@ -91,6 +91,7 @@ export function OrbitView({ system, foam, now, selected, onSelect, center, bodie
     const settings = { collapseRadius: foam.collapseRadius_au * AU, rule: foam.loadRule }
     return collapseRegions(masses, settings, { minRadius: outer / 400, steps: 160 }).map((r) => ({
       star: r.body === 0,
+      center: r.center,
       points: collapseSlice(r, settings, masses, [1, 0, 0], [0, 1, 0], 120)
     }))
   }, [foam, system, now, outer])
@@ -233,7 +234,20 @@ export function OrbitView({ system, foam, now, selected, onSelect, center, bodie
             </g>
           ))}
         {collapse.map((c, k) => {
-          const pts = c.points.map((p) => at(p[0] - hostPos[0], p[1] - hostPos[1]))
+          // On the log scale, a region away from the view's centre would be squashed toward its orbit (distances
+          // out from the centre shrink, distances along the orbit do not). Draw it in its true shape instead, at the
+          // scale along the orbit where its centre sits.
+          const cx = c.center[0] - hostPos[0]
+          const cy = c.center[1] - hostPos[1]
+          const rc = Math.hypot(cx, cy)
+          const local = scale === 'log' && rc > 1e-9 * outer
+          const [mx, my] = at(cx, cy)
+          const kl = local ? map(rc) / rc : 0
+          const pts = c.points.map((p) =>
+            local
+              ? ([mx + (p[0] - c.center[0]) * kl, my - (p[1] - c.center[1]) * kl] as [number, number])
+              : at(p[0] - hostPos[0], p[1] - hostPos[1])
+          )
           if (pts.length < 3) return null
           const top = pts.reduce((a, b) => (b[1] < a[1] ? b : a))
           return (

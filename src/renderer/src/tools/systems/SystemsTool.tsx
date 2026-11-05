@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { AU, DEG, G, KM, M_EARTH, M_SUN } from '@malevo/core'
+import { knownSystemOf } from '@malevo/model'
 import type { ElementsInfo, PlanetProposal, SystemInfoDto } from '../../../../shared/types'
 import { NumberField, TextField, duration, sig } from '../../components/fields'
 import { slugId, useWorldPref } from '../../state'
@@ -282,6 +283,8 @@ function SystemDetail({
         )}
       </details>
 
+      <KnownPlanets system={system} />
+
       {displayCal && <HistoryEditor system={system} snapshot={snapshot} now={now} displayCal={displayCal} />}
 
       <div className="orbit-layout">
@@ -463,4 +466,45 @@ export const systemsTool: ToolDefinition = {
   title: 'Systems',
   description: 'Star systems: their stars, planets and moons, and what follows from them',
   View: SystemsView
+}
+
+/** Planets found around the real star (Proxima Centauri's), offered when the system lacks some of them. */
+function KnownPlanets({ system }: { system: SystemInfoDto }): React.JSX.Element | null {
+  const known = knownSystemOf(system.starId)
+  if (!known) return null
+  const have = new Set(system.bodies.map((b) => b.id))
+  const missing = known.planets.filter((p) => !have.has(p.id))
+  if (!missing.length) return null
+  const confirmed = missing.filter((p) => !p.candidate)
+  const candidates = missing.filter((p) => p.candidate)
+  return (
+    <div className="notice" id="knownPlanets">
+      <p>
+        <strong>{known.name}</strong> has planets found by astronomers that this system does not have:
+      </p>
+      <ul className="small">
+        {missing.map((p) => (
+          <li key={p.id}>
+            <strong>{p.name}</strong>
+            {p.candidate ? ' (candidate)' : ''}: {sig(p.a_au, 3)} AU, at least {sig(p.msini_mearth, 2)} Earth masses. {p.note}
+          </li>
+        ))}
+      </ul>
+      <p className="muted small">
+        Orbits in the system plane with minimum masses; radii estimated from the masses. Sources: {known.sources}.
+      </p>
+      <div className="toolbar tight">
+        {confirmed.length > 0 && (
+          <button onClick={() => void window.malevo.world.addKnownPlanets(system.id, false)} id="addKnownPlanets">
+            Add the confirmed planets
+          </button>
+        )}
+        {candidates.length > 0 && (
+          <button onClick={() => void window.malevo.world.addKnownPlanets(system.id, true)}>
+            Add {confirmed.length ? 'them and ' : ''}the candidate{candidates.length > 1 ? 's' : ''}
+          </button>
+        )}
+      </div>
+    </div>
+  )
 }

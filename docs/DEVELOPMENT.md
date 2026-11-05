@@ -212,6 +212,10 @@ module.exports = {
 - **The orbit view** draws each region's slice in the system plane, at the current date. A giant
   out past the star's region shows its own; one close enough merges with the star's. A region is
   assumed star-shaped about its centre: a lee's dent shows, a hole deep inside does not.
+- **On the log scale** distances out from the star are squashed and distances along an orbit are
+  not, so a giant's region drawn point by point would come out as a sliver along its orbit. A
+  region not centred on the view is drawn in its true shape instead, at the scale along the
+  orbit where its centre lies. The star's own region is centred and drawn as it is.
 
 ### Terrain
 
@@ -348,6 +352,22 @@ module.exports = {
 - **Moons:** regular moons orbit in their planet's equator. Their sizes and periods are right;
   where they are along their orbits at a date is not, except the Moon's.
 - **Belts** are bodies of class `belt`, with their `extent` (inner and outer edge) drawn as a band.
+
+### Known planets of other stars
+
+- **Planets found around real stars** are in `packages/model/src/knownPlanets.ts`. So far only
+  Proxima Centauri's are listed:
+  - **d** (0.029 AU, at least 0.26 Earth masses), confirmed, too hot for liquid water;
+  - **b** (0.049 AU, at least 1.07 Earth masses), confirmed, in the habitable zone;
+  - **c** (1.5 AU, at least 7 Earth masses), a disputed candidate.
+- **A system made on the star** from the Stars tool starts with the confirmed planets. The
+  Systems tool offers any that are missing, and the candidate on request.
+- **What is not measured is placeholder:**
+  - The orbits lie in the system plane, since the inclination is unknown.
+  - Masses are minimum masses; radii are estimated from them.
+  - Positions along the orbits at a date are not the real ones.
+  - The inner planets are taken as tidally locked.
+- **Rolling planets** on such a star adds invented planets beside the known ones.
 
 ### Cultures, polities and relations
 

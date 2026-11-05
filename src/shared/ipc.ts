@@ -20,6 +20,7 @@ export const IPC = {
   worldFix: 'world:fix',
   worldAddTemplate: 'world:addTemplate',
   worldAddSolarSystem: 'world:addSolarSystem',
+  worldAddKnownPlanets: 'world:addKnownPlanets',
   worldSnapshot: 'world:snapshot',
   worldSetEntity: 'world:setEntity',
   worldDeleteEntity: 'world:deleteEntity',
