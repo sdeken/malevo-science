@@ -2,7 +2,15 @@ import { promises as fs } from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
-import { WORLD_FORMAT, WorldError, newWorldManifest, parseWorldManifest, serializeWorldManifest, templateFiles } from '@malevo/model'
+import {
+  WORLD_FORMAT,
+  WorldError,
+  newWorldManifest,
+  parseWorldManifest,
+  serializeWorldManifest,
+  solarSystem,
+  templateFiles
+} from '@malevo/model'
 import { createWorld, inspectFolder, openWorld } from '@malevo/model/node'
 
 describe('world.json', () => {
@@ -55,7 +63,10 @@ describe('world folders', () => {
     const dir = path.join(tmp, 'new', 'world')
     const world = await createWorld(dir, 'Scratch', 42)
     expect(world.manifest.seed).toBe(42)
-    expect((await fs.readdir(dir)).sort()).toEqual(['calendars', 'settings', 'world.json'])
+    expect((await fs.readdir(dir)).sort()).toEqual(['bodies', 'calendars', 'settings', 'systems', 'world.json'])
+    // The real Solar System comes with every new world.
+    expect(await fs.readdir(path.join(dir, 'systems'))).toEqual(['sol.json'])
+    expect((await fs.readdir(path.join(dir, 'bodies'))).length).toBe(solarSystem().length - 1)
     expect((await fs.readdir(path.join(dir, 'settings'))).sort()).toEqual(
       templateFiles()
         .map((f) => f.path)
@@ -86,7 +97,7 @@ describe('world folders', () => {
     const after = await fs.stat(file)
     expect(after.mtimeMs).toBe(before.mtimeMs)
     expect(await fs.readFile(file, 'utf8')).toBe(text)
-    expect((await fs.readdir(tmp)).sort()).toEqual(['calendars', 'settings', 'world.json'])
+    expect((await fs.readdir(tmp)).sort()).toEqual(['bodies', 'calendars', 'settings', 'systems', 'world.json'])
   })
 
   it('reports what a folder is', async () => {

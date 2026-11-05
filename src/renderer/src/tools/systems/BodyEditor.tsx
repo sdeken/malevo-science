@@ -255,7 +255,7 @@ export function BodyEditor({ body, system, calendars, displayCal, version, onDel
             : `${sig(body.equilibriumTemp, 3)} K (${sig(body.equilibriumTemp - 273.15, 3)} °C), before any greenhouse`}
         </dd>
         <dt>Surface gravity</dt>
-        <dd>{sig(body.surfaceGravity, 3)} g</dd>
+        <dd>{body.cls === 'belt' ? '— (a belt has no surface)' : `${sig(body.surfaceGravity, 3)} g`}</dd>
         <dt>Escape velocity</dt>
         <dd>{sig(body.escapeVelocity / 1000, 3)} km/s</dd>
         <dt>Density</dt>

@@ -15,15 +15,32 @@ function SystemsView({ world, snapshot, now, displayCal, navigate, focus }: Tool
     if (focus && systems.some((s) => s.id === focus)) setSelectedId(focus)
   }, [focus]) // eslint-disable-line react-hooks/exhaustive-deps
   const system = systems.find((s) => s.id === selectedId) ?? systems[0] ?? null
+  const hasSol = systems.some((s) => s.starId === 'hyg.0' && s.bodies.some((b) => b.name === 'Earth'))
+  const addSol = async (): Promise<void> => {
+    const id = await window.malevo.world.addSolarSystem()
+    if (id) setSelectedId(id)
+  }
+  const solButton = !hasSol && (
+    <button
+      onClick={() => void addSol()}
+      id="addSolarSystem"
+      title="Sol, its planets, dwarf planets, major moons and belts, from published data"
+    >
+      Add the Solar System
+    </button>
+  )
 
   if (!system) {
     return (
       <div className="tool-page">
         <h1>Systems</h1>
         <p>There are no systems yet. A system is built on a star: pick one in the Stars tool and choose “New system here”.</p>
-        <button className="primary" onClick={() => navigate('stars')}>
-          Go to Stars
-        </button>
+        <div className="inspector-actions">
+          <button className="primary" onClick={() => navigate('stars')}>
+            Go to Stars
+          </button>
+          {solButton}
+        </div>
       </div>
     )
   }
@@ -50,6 +67,7 @@ function SystemsView({ world, snapshot, now, displayCal, navigate, focus }: Tool
           ))}
         </ul>
         <button onClick={() => navigate('stars')}>New system on a star…</button>
+        {solButton}
       </nav>
       <div className="split-detail">
         <SystemDetail
@@ -162,7 +180,18 @@ function SystemDetail({
       }))
     : system.bodies
         .filter((b) => b.elements)
-        .map((b) => ({ id: b.id, name: b.name, cls: b.cls, radius: b.radius, parent: b.parent, elements: b.elements! }))
+        .map((b) => {
+          const ext = (b.value as { extent?: { inner_au: number; outer_au: number } }).extent
+          return {
+            id: b.id,
+            name: b.name,
+            cls: b.cls,
+            radius: b.radius,
+            parent: b.parent,
+            elements: b.elements!,
+            extent: ext ? ([ext.inner_au * AU, ext.outer_au * AU] as [number, number]) : undefined
+          }
+        })
   const moons = center ? system.bodies.filter((b) => b.parent === center) : []
 
   return (
@@ -363,8 +392,10 @@ function SystemDetail({
                       </td>
                       <td>{b.elements ? (b.parent ? `${sig(b.elements.a / 1000, 3)} km` : `${sig(b.elements.a / AU, 3)} AU`) : '—'}</td>
                       <td>{duration(b.parent ? b.period : b.year)}</td>
-                      <td>{b.solarDay !== null && !Number.isFinite(b.solarDay) ? 'locked' : duration(b.solarDay)}</td>
-                      <td>{sig(b.surfaceGravity, 2)} g</td>
+                      <td>
+                        {b.cls === 'belt' ? '—' : b.solarDay !== null && !Number.isFinite(b.solarDay) ? 'locked' : duration(b.solarDay)}
+                      </td>
+                      <td>{b.cls === 'belt' ? '—' : `${sig(b.surfaceGravity, 2)} g`}</td>
                       <td>{b.equilibriumTemp === null ? '—' : `${sig(b.equilibriumTemp, 3)} K`}</td>
                     </tr>
                   ))}

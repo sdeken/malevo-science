@@ -12,6 +12,8 @@ export interface Drawn {
   elements: ElementsInfo
   /** A proposal, not yet kept. */
   ghost?: boolean
+  /** For a belt: inner and outer edges, m. */
+  extent?: [number, number]
 }
 
 interface Props {
@@ -88,6 +90,9 @@ export function OrbitView({ system, now, selected, onSelect, center, bodies, sca
   const host = center ? bodies.find((b) => b.id === center) : null
   const starRgb = system.star ? starColour(system.star.ci) : [1, 0.9, 0.6]
 
+  const annulus = (r0: number, r1: number): string =>
+    `M ${map(r1)} 0 A ${map(r1)} ${map(r1)} 0 1 0 ${-map(r1)} 0 A ${map(r1)} ${map(r1)} 0 1 0 ${map(r1)} 0 Z M ${map(r0)} 0 A ${map(r0)} ${map(r0)} 0 1 0 ${-map(r0)} 0 A ${map(r0)} ${map(r0)} 0 1 0 ${map(r0)} 0 Z`
+
   return (
     <div className="orbit-view" ref={box}>
       <svg
@@ -125,13 +130,35 @@ export function OrbitView({ system, now, selected, onSelect, center, bodies, sca
             </text>
           </g>
         )}
-        {orbits.map(({ b, path }) => (
-          <polyline
-            key={`o-${b.id}`}
-            className={`ov-orbit${b.ghost ? ' ghost' : ''}${b.id === selected ? ' selected' : ''}`}
-            points={path}
-          />
-        ))}
+        {orbits
+          .filter(({ b }) => b.extent && center === null)
+          .map(({ b }) => (
+            <g
+              key={`belt-${b.id}`}
+              className={`ov-belt${b.id === selected ? ' selected' : ''}`}
+              data-body={b.id}
+              onClick={(e) => {
+                e.stopPropagation()
+                onSelect(b.id)
+              }}
+            >
+              <path fillRule="evenodd" d={annulus(b.extent![0], b.extent![1])}>
+                <title>{b.name}</title>
+              </path>
+              <text className="ov-label" x={0} y={map(b.extent![1]) + 12}>
+                {b.name}
+              </text>
+            </g>
+          ))}
+        {orbits
+          .filter(({ b }) => !b.extent)
+          .map(({ b, path }) => (
+            <polyline
+              key={`o-${b.id}`}
+              className={`ov-orbit${b.ghost ? ' ghost' : ''}${b.id === selected ? ' selected' : ''}`}
+              points={path}
+            />
+          ))}
         {center === null ? (
           <circle className="ov-star" r={7} fill={`rgb(${starRgb.map((c) => Math.round(c * 255)).join(',')})`} />
         ) : (
@@ -142,23 +169,25 @@ export function OrbitView({ system, now, selected, onSelect, center, bodies, sca
             </text>
           </g>
         )}
-        {orbits.map(({ b, pos }) => (
-          <g
-            key={`b-${b.id}`}
-            className={`ov-body ov-${b.cls}${b.ghost ? ' ghost' : ''}${b.id === selected ? ' selected' : ''}`}
-            transform={`translate(${pos[0]} ${pos[1]})`}
-            onClick={(e) => {
-              e.stopPropagation()
-              if (!b.ghost) onSelect(b.id)
-            }}
-            data-body={b.id}
-          >
-            <circle r={Math.max(2.5, Math.min(9, 2 + Math.log10(b.radius / 1e6 + 1) * 6)) / px} />
-            <text className="ov-label" x={8 / px} y={4 / px}>
-              {b.name}
-            </text>
-          </g>
-        ))}
+        {orbits
+          .filter(({ b }) => !b.extent)
+          .map(({ b, pos }) => (
+            <g
+              key={`b-${b.id}`}
+              className={`ov-body ov-${b.cls}${b.ghost ? ' ghost' : ''}${b.id === selected ? ' selected' : ''}`}
+              transform={`translate(${pos[0]} ${pos[1]})`}
+              onClick={(e) => {
+                e.stopPropagation()
+                if (!b.ghost) onSelect(b.id)
+              }}
+              data-body={b.id}
+            >
+              <circle r={Math.max(2.5, Math.min(9, 2 + Math.log10(b.radius / 1e6 + 1) * 6)) / px} />
+              <text className="ov-label" x={8 / px} y={4 / px}>
+                {b.name}
+              </text>
+            </g>
+          ))}
       </svg>
     </div>
   )

@@ -13,6 +13,7 @@ export * from './cultures'
 export * from './routes'
 export * from './sky'
 export * from './history'
+export * from './solarSystem'
 export * from './compare'
 export { templateFiles } from './template'
 export {

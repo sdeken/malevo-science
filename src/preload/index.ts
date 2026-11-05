@@ -67,6 +67,8 @@ const api = {
     fix: (paths: string[]): Promise<string[]> => ipcRenderer.invoke(IPC.worldFix, paths),
     /** Add any new-world template files the world is missing. Resolves to the paths added. */
     addTemplate: (): Promise<string[]> => ipcRenderer.invoke(IPC.worldAddTemplate),
+    /** Add the real Solar System, or the parts of it the world lacks (unsaved, undoable). Resolves to Sol's system id. */
+    addSolarSystem: (): Promise<string | null> => ipcRenderer.invoke(IPC.worldAddSolarSystem),
     snapshot: (): Promise<WorldSnapshot | null> => ipcRenderer.invoke(IPC.worldSnapshot),
     onSnapshot: (cb: (snapshot: WorldSnapshot | null) => void): Unsubscribe => on(IPC.evSnapshot, cb),
     onChanged: (cb: (world: WorldInfo | null) => void): Unsubscribe => on(IPC.evWorldChanged, cb),

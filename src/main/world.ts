@@ -50,6 +50,7 @@ import {
   meridianForNoon,
   historySettingsKind,
   proposeHistory,
+  solarSystemFor,
   newsArrival,
   KINDS,
   type HistoryProposal,
@@ -448,6 +449,16 @@ export class WorldSession extends EventEmitter {
 
   skyNoon(body: string, lon: number, t: number): number | null {
     return meridianForNoon(this.world(), this.env, body, lon, t)
+  }
+
+  /** Add the real Solar System (or what of it is missing): one undoable, unsaved step. Returns the system's id. */
+  addSolarSystem(): string | null {
+    const files = solarSystemFor(this.world())
+    if (!files.length) return null
+    this.editor!.edit(files.map((f) => ({ path: f.path, text: entityText(f.kind, f.value) })))
+    this.changed()
+    const sys = files.find((f) => f.kind.kind === systemKind.kind)
+    return sys?.id ?? (files[0].value as { system?: string }).system ?? null
   }
 
   // ---- history ----

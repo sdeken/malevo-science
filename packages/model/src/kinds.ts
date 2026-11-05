@@ -341,10 +341,18 @@ export const systemSchema = obj({
   /**
    * Which way the system's reference plane (the plane its orbits' inclinations
    * are measured from) faces: its north pole in galactic longitude and
-   * latitude. Absent: the galactic plane itself. The x axis is the plane's
-   * ascending node on the galactic plane.
+   * latitude. Absent: the galactic plane itself. Longitudes are measured from
+   * the plane's ascending node on the galactic plane, turned on by `zero_deg`
+   * (for the Solar System, to the vernal equinox, so published ecliptic
+   * elements can be used as they are).
    */
-  frame: opt(obj({ poleL_deg: num({ min: 0, max: 360, sig: 7 }), poleB_deg: num({ min: -90, max: 90, sig: 7 }) })),
+  frame: opt(
+    obj({
+      poleL_deg: num({ min: 0, max: 360, sig: 7 }),
+      poleB_deg: num({ min: -90, max: 90, sig: 7 }),
+      zero_deg: opt(num({ min: 0, max: 360, sig: 7 }))
+    })
+  ),
   /** The body ships dock at; absent means a habitable distance from the star (1 AU × √luminosity). */
   port: opt(ref('body')),
   /** Declared net imbalance of ship traffic, ships/day: positive for a sink (a graveyard), negative for a source (a shipyard). */
@@ -406,6 +414,8 @@ export const bodySchema = obj({
     /** Where its prime meridian points at universal time 0, degrees from the equinox direction. Default 0. Ignored when locked. */
     meridian_deg: opt(num({ min: 0, max: 360, sig: 7 }))
   }),
+  /** For a belt: its inner and outer edges (the orbit above is its typical member's). */
+  extent: opt(obj({ inner_au: num({ above: 0, sig: 6 }), outer_au: num({ above: 0, sig: 6 }) })),
   /** Bond albedo; a typical value for the class is assumed when absent. */
   albedo: opt(num({ min: 0, max: 1, sig: 4 })),
   /** Air, if it has any: what the sky view scatters light in. */

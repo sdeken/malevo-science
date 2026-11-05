@@ -219,8 +219,11 @@ describe('system checks', () => {
     expect(codes).toContain('bodies/d.json bad-body')
     expect(codes).toContain('bodies/far.json moon-unbound')
     expect(codes).toContain('bodies/spin.json bad-body')
-    // Without the catalogue, a catalogue star is only noted, not an error.
-    expect(runChecks(world).map((i) => `${i.path} ${i.code}`)).toContain('systems/sol.json no-catalogue')
+    // Without the catalogue, a catalogue star is only noted, not an error; Sol, built in, is always known.
+    const bare = readWorld(files([...solSystem, json('systems/prox.json', { name: 'Prox', star: 'hip.70890' })]))
+    const noCat = runChecks(bare).map((i) => `${i.path} ${i.code}`)
+    expect(noCat).toContain('systems/prox.json no-catalogue')
+    expect(noCat).not.toContain('systems/sol.json no-catalogue')
   })
 
   it('answers daylight questions directly', () => {

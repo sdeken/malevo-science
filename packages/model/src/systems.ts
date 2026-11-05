@@ -31,6 +31,7 @@ import {
   solarDeclination,
   starPhysics,
   stateAt,
+  SOL,
   type OrbitalElements,
   type StarPhysics,
   type StarRecord,
@@ -94,7 +95,8 @@ export function worldStars(world: WorldData, env: WorldEnv = {}): WorldStars {
     catalogAvailable: Boolean(env.catalog),
     get(id) {
       const g = parseGeneratedId(id)
-      if (!g) return env.catalog?.get(id)
+      // Sol is part of the core, so its star is known even without the catalogue.
+      if (!g) return env.catalog?.get(id) ?? (id === SOL.id ? SOL : undefined)
       if (!params) return undefined
       return cell(...g.cell).find((s) => s.id === id)
     },

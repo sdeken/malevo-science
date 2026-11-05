@@ -202,6 +202,27 @@ module.exports = {
   day and the year of the planet it belongs to. A planet locked to its star has no solar day to
   follow.
 
+### The Solar System
+
+- **Every new world starts with the real Solar System** (`packages/model/src/solarSystem.ts`):
+  - Sol;
+  - the eight planets, plus Pluto, from JPL's J2000 elements;
+  - Ceres, Haumea, Makemake and Eris;
+  - the Moon, and the regular moons of Mars, Jupiter, Saturn, Uranus and Pluto, plus Triton;
+  - the main belt and the Kuiper belt.
+
+  It is astronomy, not a setting; change or delete any of it.
+- **Worlds made before it** get it from the Systems tool's **Add the Solar System**. If a
+  system already sits on Sol, the bodies join it; bodies whose ids are taken are left out.
+- **Orientation and rotation** come from the IAU's poles, prime meridians and rotation rates,
+  converted to tilt, equinox and meridian. Earth's seasons and clock are real: at J2000 noon the
+  Sun stands about 15.5° up, due south, over Greenwich.
+- **Sol's `frame`** is the J2000 ecliptic. Its `zero_deg` puts longitude 0 at the vernal equinox,
+  so the published elements are used as they are.
+- **Moons:** regular moons orbit in their planet's equator. Their sizes and periods are right;
+  where they are along their orbits at a date is not, except the Moon's.
+- **Belts** are bodies of class `belt`, with their `extent` (inner and outer edge) drawn as a band.
+
 ### Cultures, polities and relations
 
 - **`settings/cultures.json`** defines the traits cultures are described by, as id, label,

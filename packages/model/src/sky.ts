@@ -60,7 +60,15 @@ export function systemFrame(file: Pick<SystemFile, 'frame'>): { x: Vec3; y: Vec3
   const len = Math.hypot(n[0], n[1])
   const x: Vec3 = len < 1e-9 ? [1, 0, 0] : [n[0] / len, n[1] / len, 0]
   const y: Vec3 = [z[1] * x[2] - z[2] * x[1], z[2] * x[0] - z[0] * x[2], z[0] * x[1] - z[1] * x[0]]
-  return { x, y, z }
+  const a = (file.frame?.zero_deg ?? 0) * DEG
+  if (!a) return { x, y, z }
+  const c = Math.cos(a)
+  const s = Math.sin(a)
+  return {
+    x: [c * x[0] + s * y[0], c * x[1] + s * y[1], c * x[2] + s * y[2]],
+    y: [c * y[0] - s * x[0], c * y[1] - s * x[1], c * y[2] - s * x[2]],
+    z
+  }
 }
 
 export function galacticToSystem(f: ReturnType<typeof systemFrame>, g: Vec3): Vec3 {

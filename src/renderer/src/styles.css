@@ -1509,3 +1509,14 @@ table.units.services select {
 .history-conflicts ul {
   padding-left: 18px;
 }
+
+.ov-belt path {
+  fill: rgba(170, 150, 120, 0.18);
+  stroke: rgba(170, 150, 120, 0.35);
+  stroke-dasharray: 2 3;
+  cursor: pointer;
+}
+
+.ov-belt.selected path {
+  fill: rgba(220, 190, 140, 0.3);
+}

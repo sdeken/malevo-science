@@ -19,6 +19,7 @@ export const IPC = {
   worldCheck: 'world:check',
   worldFix: 'world:fix',
   worldAddTemplate: 'world:addTemplate',
+  worldAddSolarSystem: 'world:addSolarSystem',
   worldSnapshot: 'world:snapshot',
   worldSetEntity: 'world:setEntity',
   worldDeleteEntity: 'world:deleteEntity',

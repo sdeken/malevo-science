@@ -85,9 +85,19 @@ try {
   }
   // A new world holds world.json and a copy of the template (packages/model/template, less its README).
   const TEMPLATE_FILES = (await listAll(path.join(appRoot, 'packages/model/template'))).filter((p) => p !== 'README.md')
-  const EXPECTED_FILES = JSON.stringify([...TEMPLATE_FILES, 'world.json'].sort())
   const files = await listAll(worldDir)
-  check(JSON.stringify(files) === EXPECTED_FILES, `the world folder holds world.json and the template, nothing else (${files.join(', ')})`)
+  // Every new world also starts with the real Solar System: Sol and its bodies.
+  const solBodies = files.filter((p) => p.startsWith('bodies/'))
+  check(
+    ['bodies/earth.json', 'bodies/moon.json', 'bodies/main-belt.json', 'bodies/jupiter.json'].every((p) => solBodies.includes(p)) &&
+      solBodies.length >= 30,
+    `a new world starts with the Solar System (${solBodies.length} bodies)`
+  )
+  const EXPECTED_FILES = JSON.stringify([...TEMPLATE_FILES, ...solBodies, 'systems/sol.json', 'world.json'].sort())
+  check(
+    JSON.stringify(files) === EXPECTED_FILES,
+    `the world folder holds world.json, the template and the Solar System, nothing else (${files.join(', ')})`
+  )
   const text = await fs.readFile(path.join(worldDir, 'world.json'), 'utf8')
   const manifest = JSON.parse(text)
   check(manifest.format === 1 && manifest.name === 'Smoke World', 'world.json has format 1 and the name')
