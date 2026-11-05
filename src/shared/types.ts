@@ -164,6 +164,7 @@ export interface WorldSnapshot {
   /** settings/history.json, if the world has it. */
   historySettings: Record<string, unknown> | null
   terrains: EntityDto[]
+  cities: CityInfoDto[]
   issueCounts: { error: number; warning: number; info: number }
 }
 
@@ -229,6 +230,7 @@ export type EditableKind =
   | 'viewpoint'
   | 'historySettings'
   | 'terrain'
+  | 'city'
 
 // ---- Phase 3: stars, systems, bodies ----
 
@@ -570,4 +572,48 @@ export interface TerrainRasterDto {
   heights: Float32Array
   rgba: Uint8ClampedArray
   stats: { ocean: number; highest: number; lowest: number; meanTemp: number | null; minTemp: number | null; maxTemp: number | null }
+}
+
+// ---- Phase 9: cities ----
+
+export interface CityInfoDto {
+  id: string
+  path: string
+  value: Record<string, unknown>
+  founded: number | null
+  /** Population points, resolved and in time order. */
+  population: { index: number; t: number; people: number }[]
+  errors: string[]
+}
+
+export interface ConditionsDto {
+  t: number
+  localHours: number | null
+  localHour_s: number | null
+  sun: { alt: number; az: number }
+  season: { name: string; hemisphere: 'north' | 'south'; declination: number; seasons: boolean }
+  daylight: {
+    day: number | null
+    civil: number | null
+    nautical: number | null
+    astronomical: number | null
+    sunrise: number | null
+    sunset: number | null
+    polar: 'day' | 'night' | null
+  }
+  tide: {
+    main: string | null
+    trend: 'rising' | 'falling' | 'slack'
+    level: number
+    nextHigh_s: number | null
+    spring: number | null
+  } | null
+  polity: string | null
+  population: number
+  port: {
+    arriving: { route: string; neighbour: string; perDay: number; underway: number }[]
+    leaving: { route: string; neighbour: string; perDay: number; underway: number }[]
+    inPort: number
+  } | null
+  errors: string[]
 }

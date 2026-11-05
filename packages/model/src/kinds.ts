@@ -660,6 +660,33 @@ export type TerrainFile = Infer<typeof terrainSchema>
 
 export const terrainKind: KindDef<TerrainFile> = { kind: 'terrain', label: 'terrain', folder: 'terrains', schema: terrainSchema }
 
+// ---- cities ----
+
+/** A settlement at a place on a body, with its population over time. */
+export const citySchema = obj({
+  name: name(),
+  body: ref('body'),
+  lat_deg: num({ min: -90, max: 90, sig: 7 }),
+  /** East longitude. */
+  lon_deg: num({ min: -180, max: 360, sig: 7 }),
+  elevation_m: opt(num({ sig: 6 })),
+  founded: opt(whenSchema),
+  /** Its people at dates; between two, it grows (or shrinks) steadily by the same factor each year. */
+  population: opt(arr(obj({ from: whenSchema, people: num({ min: 0, sig: 6 }) }))),
+  /** Whether ships dock here: the system's port takes its traffic. */
+  port: opt(oneOf(['main', 'minor'])),
+  /** Who holds it, when that differs from who holds its system. */
+  polity: opt(ref('polity')),
+  region: opt(str({ max: 100 })),
+  /** The calendar its people use; absent: one that follows its body, or the display calendar. */
+  calendar: opt(ref('calendar')),
+  note: opt(str({ max: 400 })),
+  tags: opt(arr(str({ min: 1, max: 40 })))
+})
+export type CityFile = Infer<typeof citySchema>
+
+export const cityKind: KindDef<CityFile> = { kind: 'city', label: 'city', folder: 'cities', schema: citySchema }
+
 // ---- the history generator's settings ----
 
 /** What history@1 plays out: where it starts, which events unlock what, and how it behaves. */
@@ -742,5 +769,6 @@ export const KINDS: readonly KindDef[] = [
   routeKind as KindDef,
   viewpointKind as KindDef,
   historySettingsKind as KindDef,
-  terrainKind as KindDef
+  terrainKind as KindDef,
+  cityKind as KindDef
 ]

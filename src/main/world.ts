@@ -53,6 +53,9 @@ import {
   solarSystemFor,
   terrainKind,
   terrainRaster,
+  cityKind,
+  cityInfos,
+  conditionsAt,
   newsArrival,
   KINDS,
   type HistoryProposal,
@@ -122,6 +125,7 @@ import type {
   HistoryProposalDto,
   NewsDto,
   TerrainRasterDto,
+  ConditionsDto,
   StarField,
   StarInfoDto,
   StarSearchHit,
@@ -148,7 +152,8 @@ const KIND_DEFS: Record<EditableKind, KindDef> = {
   route: routeKind as KindDef,
   viewpoint: viewpointKind as KindDef,
   historySettings: historySettingsKind as KindDef,
-  terrain: terrainKind as KindDef
+  terrain: terrainKind as KindDef,
+  city: cityKind as KindDef
 }
 
 export class WorldSession extends EventEmitter {
@@ -282,6 +287,16 @@ export class WorldSession extends EventEmitter {
       viewpoints: entityDtos(world, viewpointKind.kind),
       historySettings: (world.entities.get(historySettingsKind.kind)?.value as Record<string, unknown> | undefined) ?? null,
       terrains: entityDtos(world, terrainKind.kind),
+      cities: cityInfos(world, this.env)
+        .sort((a, b) => compareStrings(a.id, b.id))
+        .map((c) => ({
+          id: c.id,
+          path: `${cityKind.folder}/${c.id}.json`,
+          value: c.file as unknown as Record<string, unknown>,
+          founded: c.founded,
+          population: c.population,
+          errors: c.errors
+        })),
       physics: physicsFile
         ? {
             legLimit_ly: physicsFile.foam.legLimit_ly,
@@ -480,6 +495,10 @@ export class WorldSession extends EventEmitter {
     if (this.rasters.size > 12) this.rasters.clear()
     this.rasters.set(key, r)
     return r
+  }
+
+  cityConditions(id: string, t: number): ConditionsDto | { error: string } {
+    return conditionsAt(this.world(), this.env, id, t)
   }
 
   // ---- history ----

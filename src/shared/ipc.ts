@@ -50,6 +50,7 @@ export const IPC = {
   approachMap: 'approach:map',
   approachSeries: 'approach:series',
   terrainRaster: 'terrain:raster',
+  cityConditions: 'city:conditions',
   terrainExport: 'terrain:export',
 
   calTicks: 'cal:ticks',

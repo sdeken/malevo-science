@@ -17,9 +17,6 @@ function SkyView({ world, snapshot, now, setNow, displayCal, navigate }: ToolPro
   const bodies = snapshot.systems.flatMap((s) => s.bodies.filter((b) => b.cls !== 'belt').map((b) => ({ ...b, systemName: s.name })))
   const [vp, setVp] = useWorldPref<ViewpointDto | null>(world.root, 'skyViewpoint', null)
   const [cam, setCam] = useWorldPref<SkyCamera>(world.root, 'skyCamera', { az: Math.PI, alt: 25 * DEG, fov: 100 * DEG })
-  const [scene, setScene] = useState<SkySceneDto | null>(null)
-  const [error, setError] = useState<string | null>(null)
-  const [stars, setStars] = useState<{ system: string; data: SkyStarsDto } | null>(null)
   const [picked, setPicked] = useState<SkyPick | null>(null)
   const [playing, setPlaying] = useState(false)
   const formatted = useFormattedOne(displayCal, now, 'minute', snapshot.version)
@@ -33,31 +30,7 @@ function SkyView({ world, snapshot, now, setNow, displayCal, navigate }: ToolPro
         : bodies[0]
           ? { body: bodies[0].id, lat_deg: 30, lon_deg: 0 }
           : null
-  const vpKey = current ? `${current.body}|${current.lat_deg}|${current.lon_deg}|${current.elevation_m ?? 0}` : ''
-
-  useEffect(() => {
-    if (!current) return
-    let live = true
-    void window.malevo.sky.scene(current, now).then((s) => {
-      if (!live) return
-      if ('error' in s) {
-        setError(s.error)
-        setScene(null)
-      } else {
-        setError(null)
-        setScene(s)
-      }
-    })
-    return () => {
-      live = false
-    }
-  }, [vpKey, now, snapshot.version]) // eslint-disable-line react-hooks/exhaustive-deps
-
-  const system = scene?.system ?? null
-  useEffect(() => {
-    if (!system || stars?.system === system) return
-    void window.malevo.sky.stars(system).then((data) => data && setStars({ system, data }))
-  }, [system, snapshot.version]) // eslint-disable-line react-hooks/exhaustive-deps
+  const { scene, error, picture, model } = useSky(current, now, snapshot)
 
   const nowRef = useRef(now)
   nowRef.current = now
@@ -66,58 +39,6 @@ function SkyView({ world, snapshot, now, setNow, displayCal, navigate }: ToolPro
     const h = setInterval(() => setNow(nowRef.current + 6 * MINUTE), 120)
     return () => clearInterval(h)
   }, [playing]) // eslint-disable-line react-hooks/exhaustive-deps
-
-  const picture: SkyPicture | null = useMemo(() => {
-    if (!scene) return null
-    const f = scene.frame
-    const L = (v: [number, number, number]): Vec3 => toLocal(f, v)
-    const points: SkyPoint[] = []
-    if (stars && stars.system === scene.system) {
-      const d = stars.data
-      for (let i = 0; i < d.ids.length; i++)
-        points.push({
-          id: d.ids[i],
-          kind: 'star',
-          dir: L([d.dir[i * 3], d.dir[i * 3 + 1], d.dir[i * 3 + 2]]),
-          mag: d.mag[i],
-          color: starColor(d.ci[i]),
-          label: d.names[i]
-        })
-    }
-    for (const t of scene.torches)
-      if (!t.dark)
-        points.push({
-          id: `torch:${t.route}:${t.service}:${t.kind}:${Math.round(t.tau)}`,
-          kind: 'torch',
-          dir: L(t.dir),
-          mag: t.mag,
-          color: TORCH_COLOR,
-          label: routeName(snapshot, t.route)
-        })
-    for (const b of scene.bodies)
-      points.push({
-        id: b.id,
-        kind: 'body',
-        dir: L(b.dir),
-        mag: b.mag,
-        color: BODY_COLOR,
-        label: b.name,
-        radius: b.radius,
-        lit: L(b.lit),
-        phase: b.phase
-      })
-    points.push({
-      id: 'sun',
-      kind: 'sun',
-      dir: L(scene.sun.dir),
-      mag: scene.sun.mag,
-      color: SUN_COLOR,
-      radius: scene.sun.radius,
-      label: 'Sun'
-    })
-    return { sun: L(scene.sun.dir), atmosphere: scene.atmosphere, galPole: L(scene.galPole), galCentre: L(scene.galCentre), points }
-  }, [scene, stars, snapshot])
-  const model = useMemo(() => (picture ? pictureModel(picture) : null), [picture])
 
   const sunAlt = picture ? altAz(picture.sun).alt / DEG : null
   const zenith = model ? model.light([0, 0, 1]) : null
@@ -318,7 +239,96 @@ function SkyView({ world, snapshot, now, setNow, displayCal, navigate }: ToolPro
   )
 }
 
-function twilight(alt: number): string {
+/** The sky from a viewpoint at an instant: the scene from main, the stars for its system, and the picture and sky model to draw. */
+export function useSky(
+  current: ViewpointDto | null,
+  now: number,
+  snapshot: WorldSnapshot
+): { scene: SkySceneDto | null; error: string | null; picture: SkyPicture | null; model: ReturnType<typeof pictureModel> | null } {
+  const [scene, setScene] = useState<SkySceneDto | null>(null)
+  const [error, setError] = useState<string | null>(null)
+  const [stars, setStars] = useState<{ system: string; data: SkyStarsDto } | null>(null)
+  const vpKey = current ? `${current.body}|${current.lat_deg}|${current.lon_deg}|${current.elevation_m ?? 0}` : ''
+
+  useEffect(() => {
+    if (!current) return
+    let live = true
+    void window.malevo.sky.scene(current, now).then((s) => {
+      if (!live) return
+      if ('error' in s) {
+        setError(s.error)
+        setScene(null)
+      } else {
+        setError(null)
+        setScene(s)
+      }
+    })
+    return () => {
+      live = false
+    }
+  }, [vpKey, now, snapshot.version]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  const system = scene?.system ?? null
+  useEffect(() => {
+    if (!system || stars?.system === system) return
+    void window.malevo.sky.stars(system).then((data) => data && setStars({ system, data }))
+  }, [system, snapshot.version]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  const picture: SkyPicture | null = useMemo(() => {
+    if (!scene) return null
+    const f = scene.frame
+    const L = (v: [number, number, number]): Vec3 => toLocal(f, v)
+    const points: SkyPoint[] = []
+    if (stars && stars.system === scene.system) {
+      const d = stars.data
+      for (let i = 0; i < d.ids.length; i++)
+        points.push({
+          id: d.ids[i],
+          kind: 'star',
+          dir: L([d.dir[i * 3], d.dir[i * 3 + 1], d.dir[i * 3 + 2]]),
+          mag: d.mag[i],
+          color: starColor(d.ci[i]),
+          label: d.names[i]
+        })
+    }
+    for (const t of scene.torches)
+      if (!t.dark)
+        points.push({
+          id: `torch:${t.route}:${t.service}:${t.kind}:${Math.round(t.tau)}`,
+          kind: 'torch',
+          dir: L(t.dir),
+          mag: t.mag,
+          color: TORCH_COLOR,
+          label: routeName(snapshot, t.route)
+        })
+    for (const b of scene.bodies)
+      points.push({
+        id: b.id,
+        kind: 'body',
+        dir: L(b.dir),
+        mag: b.mag,
+        color: BODY_COLOR,
+        label: b.name,
+        radius: b.radius,
+        lit: L(b.lit),
+        phase: b.phase
+      })
+    points.push({
+      id: 'sun',
+      kind: 'sun',
+      dir: L(scene.sun.dir),
+      mag: scene.sun.mag,
+      color: SUN_COLOR,
+      radius: scene.sun.radius,
+      label: 'Sun'
+    })
+    return { sun: L(scene.sun.dir), atmosphere: scene.atmosphere, galPole: L(scene.galPole), galCentre: L(scene.galCentre), points }
+  }, [scene, stars, snapshot])
+  const model = useMemo(() => (picture ? pictureModel(picture) : null), [picture])
+  return { scene, error, picture, model }
+}
+
+export function twilight(alt: number): string {
   if (alt > -0.833) return 'day'
   if (alt > -6) return 'civil twilight'
   if (alt > -12) return 'nautical twilight'
@@ -378,7 +388,7 @@ function PickCard({ pick, scene, snapshot }: { pick: SkyPick; scene: SkySceneDto
   )
 }
 
-function SkyCanvas({
+export function SkyCanvas({
   picture,
   model,
   cam,

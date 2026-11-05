@@ -30,7 +30,7 @@ npm run dev          # the app with hot reload
   the file system.
 - **`src/renderer`** is the tool host: the welcome screen, sidebar, current-date bar and status
   bar. Tools live in `src/renderer/src/tools/<id>/` and are listed in
-  `src/renderer/src/tools/index.ts`. The tools are Timeline, Stars, Systems, Terrain, Routes, Sky, Approach, Cultures, History, Calendars,
+  `src/renderer/src/tools/index.ts`. The tools are Timeline, Stars, Systems, Terrain, Population, Routes, Sky, Approach, Cultures, History, Calendars,
   Fork & compare, Checks and World.
 - **The world session lives in main** (`src/main/world.ts`): the open world, its unsaved changes
   (a `WorldEditor`), and every calendar operation. The renderer gets snapshots pushed to it, and
@@ -250,6 +250,31 @@ module.exports = {
 - **Rasters** (height and colour maps) are derived in the main process and cached per world
   version; nothing is written to the world. **Export** saves a 2048×1024 PNG wherever you choose,
   for reference.
+
+### Cities and conditions
+
+- **A city** is `cities/<id>.json`. It holds:
+  - a body, latitude and east longitude, and elevation;
+  - its `population` as counts at dates (written like event dates), growing by the same factor
+    each year between counts and holding after the last;
+  - a `port` role (the system's `main` port, or `minor`);
+  - a `polity` that overrides its system's history;
+  - a region, and the calendar its people use.
+- **Conditions at a time** (`conditionsAt` in `packages/model/src/cities.ts`) come from the shared
+  model:
+  - **Local solar time:** the star's hour angle about the body's pole, in local hours (24 to a
+    solar day), and the date in the city's calendar.
+  - **Season:** from the star's declination and whether it is climbing.
+  - **Day:** its length, civil, nautical and astronomical twilight, and sunrise and sunset.
+  - **Tide:** the equilibrium tide from every body's pull, with whether it is rising, its level
+    in the day's range, the next high water, and springs or neaps.
+  - **Held by:** who holds the city.
+  - **Port:** for the main port, the ships arriving and leaving (the route network's own torches)
+    and about how many are alongside (arrivals × stopover).
+- **The Population tool** places cities by clicking the body's terrain map, edits population
+  counts with a chart, and embeds the same sky as the Sky tool (`useSky` and `SkyCanvas`).
+- **The `cities` check** flags a city under the sea on its body's terrain, and notes cities on
+  bodies with no surface.
 
 ### The Solar System
 

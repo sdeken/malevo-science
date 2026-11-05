@@ -1575,3 +1575,66 @@ fieldset.plain {
   fill: var(--now);
   font-size: 10px;
 }
+
+/* ---- Population ---- */
+
+.city-layout {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 28px;
+  align-items: flex-start;
+}
+
+.conditions {
+  flex: 1;
+  min-width: 340px;
+}
+
+.city-sky {
+  height: 320px;
+  margin-top: 10px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  overflow: hidden;
+  display: flex;
+}
+
+.city-sky .sky-canvas {
+  flex: 1;
+}
+
+.population-row {
+  display: flex;
+  gap: 10px;
+  align-items: flex-end;
+  border-top: 1px solid var(--border);
+  padding-top: 6px;
+  margin-top: 6px;
+}
+
+.city-mark circle {
+  fill: #fff;
+  stroke: #000;
+  stroke-width: 1;
+}
+
+.city-mark.current circle {
+  fill: #e0a43c;
+}
+
+.city-mark text {
+  fill: #fff;
+  font-size: 10px;
+  paint-order: stroke;
+  stroke: rgba(0, 0, 0, 0.7);
+  stroke-width: 2px;
+}
+
+.pop-point {
+  fill: #2f9b87;
+}
+
+.city-layout > div:first-child {
+  width: 530px;
+  flex: none;
+}

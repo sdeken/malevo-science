@@ -631,6 +631,28 @@ try {
     'saving writes the terrain as text, locked to terrain@1'
   )
 
+  // 18. Phase 9: a city on Earth, placed on the map, with conditions there.
+  await tool('Population')
+  await page.locator('#addCity').click()
+  await page.waitForSelector('[data-city-detail="new-city"]')
+  await page.waitForSelector('#conditions dl', { timeout: 30_000 })
+  check(
+    /local solar time/.test((await page.locator('#conditions').textContent()) ?? ''),
+    'a new city shows the conditions there at the current date'
+  )
+  const placeBox = await page.locator('#placeMap').boundingBox()
+  await page.mouse.click(placeBox.x + placeBox.width * 0.5, placeBox.y + placeBox.height * 0.25)
+  await page.waitForFunction(() => Math.abs(Number(document.querySelector('#cityLat')?.value) - 45) < 1)
+  check(true, 'clicking the map places it')
+  await page.screenshot({ path: path.join(shots, '18-population.png') })
+  await page.locator('.status-save').click()
+  await page.waitForFunction(() => document.querySelector('.status-saved') !== null)
+  const cityFile = JSON.parse(await fs.readFile(path.join(worldDir, 'cities/new-city.json'), 'utf8'))
+  check(
+    cityFile.body === 'earth' && Math.abs(cityFile.lat_deg - 45) < 1 && cityFile.population?.length === 1,
+    'saving writes the city, its place and its people'
+  )
+
   // 10. The update status reports a dev build.
   const status = await page.evaluate(() => window.malevo.updates.status())
   check(status.state === 'unavailable', 'an unpackaged build reports updates as unavailable')

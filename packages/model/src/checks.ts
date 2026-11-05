@@ -3,14 +3,24 @@
  * none of them writes. Findings are advice: a half-finished world is normal,
  * so nothing here blocks saving.
  */
-import { compareStrings, formatInstant, parseGeneratedId, parseInstant, type Calendar, type CalendarSet } from '@malevo/core'
+import {
+  DEG,
+  compareStrings,
+  formatInstant,
+  fromLatLon,
+  parseGeneratedId,
+  parseInstant,
+  type Calendar,
+  type CalendarSet
+} from '@malevo/core'
 import { staleLocks } from './deps'
 import { cultureSettings, relationId, systemHistory } from './cultures'
 import { resolveEvents, whenResolver, worldCalendars, type WorldEnv } from './events'
 import { systemInfo, worldStars } from './systems'
 import { allRoutes, nodePath, routeWorld, trafficReport, waypointNode } from './routes'
 import { historySettings } from './history'
-import { SURFACE_CLASSES } from './terrain'
+import { SURFACE_CLASSES, terrainSampler } from './terrain'
+import { cityInfos } from './cities'
 import { templateFiles } from './template'
 import {
   calendarKind,
@@ -553,6 +563,44 @@ export const terrainCheck: Check = {
   }
 }
 
+export const citiesCheck: Check = {
+  id: 'cities',
+  title: 'Cities stand on dry ground, on bodies with a surface',
+  run(world, env) {
+    const out: Issue[] = []
+    for (const c of cityInfos(world, env)) {
+      const path = `cities/${c.id}.json`
+      for (const m of c.errors) out.push({ severity: 'error', check: 'cities', code: 'bad-date', message: m, path })
+      const body = world.entities.get(`body/${c.file.body}`)?.value as { class?: string; name?: string } | undefined
+      if (!body) continue
+      if (!SURFACE_CLASSES.includes(body.class as never)) {
+        out.push({
+          severity: 'info',
+          check: 'cities',
+          code: 'no-surface',
+          message: `${body.name ?? c.file.body} is a ${body.class}: this city floats, or is in orbit.`,
+          path,
+          field: 'body'
+        })
+        continue
+      }
+      const s = terrainSampler(world, env, c.file.body)
+      if ('error' in s) continue
+      const h = s.height(fromLatLon(c.file.lat_deg * DEG, c.file.lon_deg * DEG))
+      if (h < 0 && s.climate?.water)
+        out.push({
+          severity: 'warning',
+          check: 'cities',
+          code: 'under-water',
+          message: `It stands ${Math.round(-h * 1000)} m under the sea on ${body.name ?? c.file.body}'s terrain.`,
+          path,
+          field: 'lat_deg'
+        })
+    }
+    return out
+  }
+}
+
 export const BUILTIN_CHECKS: readonly Check[] = [
   filesCheck,
   referencesCheck,
@@ -564,6 +612,7 @@ export const BUILTIN_CHECKS: readonly Check[] = [
   routesCheck,
   historyCheck,
   terrainCheck,
+  citiesCheck,
   templateCheck,
   formatCheck
 ]

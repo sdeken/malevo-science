@@ -50,7 +50,8 @@ const EDITABLE: readonly EditableKind[] = [
   'route',
   'viewpoint',
   'historySettings',
-  'terrain'
+  'terrain',
+  'city'
 ]
 const asKind = (k: unknown): EditableKind => {
   if (!EDITABLE.includes(k as EditableKind)) throw new Error(`"${String(k)}" cannot be edited.`)
@@ -187,6 +188,7 @@ export function registerIpc(deps: IpcDeps): void {
   )
   ipcMain.handle(IPC.historyAccept, (_e, keys: unknown) => world.historyAccept(Array.isArray(keys) ? keys.map(String) : []))
   ipcMain.handle(IPC.historyNews, (_e, event: unknown) => world.historyNews(String(event)))
+  ipcMain.handle(IPC.cityConditions, (_e, id: unknown, t: unknown) => world.cityConditions(String(id), Number(t) || 0))
   ipcMain.handle(IPC.terrainRaster, (_e, body: unknown, w: unknown, h: unknown) =>
     world.terrainRaster(
       String(body),

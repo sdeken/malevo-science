@@ -15,6 +15,7 @@ import type {
   HistoryProposalDto,
   NewsDto,
   TerrainRasterDto,
+  ConditionsDto,
   ApproachQueryDto,
   ApproachInfoDto,
   ApproachMapDto,
@@ -114,6 +115,10 @@ const api = {
     accept: (keys: string[]): Promise<number> => ipcRenderer.invoke(IPC.historyAccept, keys),
     /** When each system learned of an event. */
     news: (event: string): Promise<NewsDto | { error: string }> => ipcRenderer.invoke(IPC.historyNews, event)
+  },
+  cities: {
+    /** Conditions at a city at an instant: local time, season, daylight, tide, who holds it, its port. */
+    conditions: (id: string, t: number): Promise<ConditionsDto | { error: string }> => ipcRenderer.invoke(IPC.cityConditions, id, t)
   },
   terrain: {
     /** A derived height and colour map of a body's terrain (cached in main; never written to the world). */

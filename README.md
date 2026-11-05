@@ -8,7 +8,9 @@ cities. Every tool works from one shared model, so details stay consistent from 
 The app contains no setting and knows nothing about git. It reads and writes plain world folders
 of JSON. The author decides what is canon and commits it by hand to a repository of their own.
 
-**Status:** Phases 0–8 are built. Phase 8 added planet terrain: plates, mountains and seas
+**Status:** Phases 0–9 are built. Phase 9 added the population planner: cities on any body with
+their people over time, and the conditions there at any date (local time, season, daylight,
+tide, who holds it, ships in port) with the sky overhead. Phase 8 added planet terrain: plates, mountains and seas
 generated on the sphere, rolled and locked, shaped by hand as latitude/longitude text, and
 coloured by each world's own climate. Every new world also starts with the real Solar System.
 Phase 7 added the history generator. It plays settlement out

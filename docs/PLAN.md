@@ -719,7 +719,10 @@ rain shadows yet.
 - The spherical noise generator, roll and lock, vector hand shaping, climate colouring and
   cached rasters.
 
-### Phase 9: Population planner
+### Phase 9: Population planner — built
+
+Built; see [DEVELOPMENT.md](DEVELOPMENT.md). The tide is the equilibrium tide: the pull of the
+moons and the star, without coasts or basins. Ships in port are the arrivals times the stopover.
 
 - Cities on planets with population over time, the "conditions at a time" panel, and the sky view
   embedded.

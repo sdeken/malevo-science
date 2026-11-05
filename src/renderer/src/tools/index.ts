@@ -8,6 +8,7 @@ import { skyTool } from './sky/SkyTool'
 import { approachTool } from './approach/ApproachTool'
 import { historyTool } from './history/HistoryTool'
 import { terrainTool } from './terrain/TerrainTool'
+import { populationTool } from './population/PopulationTool'
 import { starsTool } from './stars/StarsTool'
 import { systemsTool } from './systems/SystemsTool'
 import { timelineTool } from './timeline/TimelineTool'
@@ -19,6 +20,7 @@ export const TOOLS = defineTools([
   starsTool,
   systemsTool,
   terrainTool,
+  populationTool,
   routesTool,
   skyTool,
   approachTool,
