@@ -14,6 +14,7 @@ import type {
   ViewpointDto,
   HistoryProposalDto,
   NewsDto,
+  TerrainRasterDto,
   ApproachQueryDto,
   ApproachInfoDto,
   ApproachMapDto,
@@ -113,6 +114,13 @@ const api = {
     accept: (keys: string[]): Promise<number> => ipcRenderer.invoke(IPC.historyAccept, keys),
     /** When each system learned of an event. */
     news: (event: string): Promise<NewsDto | { error: string }> => ipcRenderer.invoke(IPC.historyNews, event)
+  },
+  terrain: {
+    /** A derived height and colour map of a body's terrain (cached in main; never written to the world). */
+    raster: (body: string, width: number, height: number): Promise<TerrainRasterDto | { error: string }> =>
+      ipcRenderer.invoke(IPC.terrainRaster, body, width, height),
+    /** Save a 2048×1024 colour or height map where the author chooses. Resolves to the path, or null if cancelled. */
+    export: (body: string, what: 'colour' | 'height'): Promise<string | null> => ipcRenderer.invoke(IPC.terrainExport, body, what)
   },
   approach: {
     info: (q: ApproachQueryDto): Promise<ApproachInfoDto | { error: string }> => ipcRenderer.invoke(IPC.approachInfo, q),

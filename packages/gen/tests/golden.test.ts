@@ -39,6 +39,14 @@ const STARS = [
   { mass_msun: 0.75, luminosity_lsun: 0.3, cls: 'K' }
 ]
 
+/** 64 fixed points on the sphere, written out so the fixture does not depend on another function. */
+const TERRAIN_POINTS = Array.from({ length: 64 }, (_, i) => {
+  const z = 1 - (2 * (i + 0.5)) / 64
+  const r = Math.sqrt(1 - z * z)
+  const t = 2.399963229728653 * i
+  return [Math.round(r * Math.cos(t) * 1e6) / 1e6, Math.round(r * Math.sin(t) * 1e6) / 1e6, Math.round(z * 1e6) / 1e6]
+})
+
 const CASES: Record<string, { seed: number; input: unknown }[]> = {
   'starfield@1': [1, 42, 4242].flatMap((seed) =>
     [
@@ -58,6 +66,12 @@ const CASES: Record<string, { seed: number; input: unknown }[]> = {
       years: { slow: 300, foam: 650, end: 900, polities: 850 }
     })
   })),
+  'terrain@1': [1, 42].flatMap((seed) =>
+    [
+      { plates: 12, continents: 0.35, ocean: 0.7, mountains_km: 6, roughness: 0.5 },
+      { plates: 5, continents: 0.6, ocean: 0.3, mountains_km: 9, roughness: 0.9 }
+    ].map((params, k) => ({ seed, input: { body: `world-${k}`, roll: k, params, points: TERRAIN_POINTS } }))
+  ),
   'placeholder-names@1': [1, 42, 4242, 0xffffffff].flatMap((seed) =>
     [0, 1, 2, 3, 4, 5, 6, 7].map((palette) => ({ seed, input: { ids: ['a', 'b', 'c', 'sys-001', 'sys-002', 'x.y_z'], palette } }))
   )

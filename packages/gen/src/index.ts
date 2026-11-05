@@ -1,5 +1,6 @@
 import { generatorId, type Generator } from './generator'
 import { history } from './history'
+import { terrain } from './terrain'
 import { placeholderNames } from './names'
 import { planets } from './planets'
 import { starfield } from './starfield'
@@ -8,6 +9,7 @@ export * from './generator'
 export { PALETTES, nameFrom, placeholderNames, type NamesInput } from './names'
 export { planets, planetsStream, radiusFromMass, type PlanetFile, type PlanetsInput } from './planets'
 export { starfield, type StarfieldInput } from './starfield'
+export { terrain, terrainField, DEFAULT_TERRAIN, type TerrainInput, type TerrainParams, type TerrainField } from './terrain'
 export {
   history,
   type HistoryInput,
@@ -23,7 +25,8 @@ export const GENERATORS: readonly Generator<never, unknown>[] = [
   placeholderNames as Generator<never, unknown>,
   starfield as Generator<never, unknown>,
   planets as Generator<never, unknown>,
-  history as Generator<never, unknown>
+  history as Generator<never, unknown>,
+  terrain as Generator<never, unknown>
 ]
 
 export function findGenerator(id: string): Generator<never, unknown> | undefined {

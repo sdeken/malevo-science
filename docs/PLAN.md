@@ -709,7 +709,12 @@ propagation beyond radio and ships.
   diffs and information propagation.
 - This comes after phases 2–5 because it needs all of their entity types as inputs and outputs.
 
-### Phase 8: Planet terrain
+### Phase 8: Planet terrain — built
+
+Built; see [DEVELOPMENT.md](DEVELOPMENT.md). Gas and ice giants and belts have no terrain. Climate
+is a sketch: sunlight by latitude (or from the substellar point for a world locked to its star),
+greenhouse warming from the air, heat transport, and a lapse rate. There are no winds, currents or
+rain shadows yet.
 
 - The spherical noise generator, roll and lock, vector hand shaping, climate colouring and
   cached rasters.

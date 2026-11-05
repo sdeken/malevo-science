@@ -1521,3 +1521,48 @@ table.units.services select {
 .ov-belt.selected path {
   fill: rgba(220, 190, 140, 0.3);
 }
+
+/* ---- Terrain ---- */
+
+.terrain-views {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 20px;
+  align-items: center;
+  margin: 8px 0;
+}
+
+.terrain-map {
+  position: relative;
+  border: 1px solid var(--border);
+}
+
+.terrain-map canvas,
+.terrain-map svg {
+  position: absolute;
+  inset: 0;
+}
+
+.terrain-map svg.drawing {
+  cursor: crosshair;
+}
+
+.terrain-busy {
+  position: absolute;
+  right: 6px;
+  bottom: 4px;
+  background: rgba(0, 0, 0, 0.5);
+  color: #fff;
+  padding: 1px 6px;
+  border-radius: 3px;
+}
+
+.terrain-globe {
+  cursor: grab;
+}
+
+fieldset.plain {
+  border: 0;
+  padding: 0;
+  margin: 0;
+}

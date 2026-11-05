@@ -49,6 +49,8 @@ export const IPC = {
   historyNews: 'history:news',
   approachMap: 'approach:map',
   approachSeries: 'approach:series',
+  terrainRaster: 'terrain:raster',
+  terrainExport: 'terrain:export',
 
   calTicks: 'cal:ticks',
   calFormat: 'cal:format',

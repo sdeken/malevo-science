@@ -8,7 +8,10 @@ cities. Every tool works from one shared model, so details stay consistent from 
 The app contains no setting and knows nothing about git. It reads and writes plain world folders
 of JSON. The author decides what is canon and commits it by hand to a repository of their own.
 
-**Status:** Phases 0–7 are built. Phase 7 added the history generator. It plays settlement out
+**Status:** Phases 0–8 are built. Phase 8 added planet terrain: plates, mountains and seas
+generated on the sphere, rolled and locked, shaped by hand as latitude/longitude text, and
+coloured by each world's own climate. Every new world also starts with the real Solar System.
+Phase 7 added the history generator. It plays settlement out
 on the stars, gated by the timeline's technology events, and proposes systems, cultures, routes
 and events for the author to accept. It also shows when news of an event reached each system.
 Phase 6 added the sky view: stars, sun, moons and planets

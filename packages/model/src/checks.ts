@@ -10,6 +10,7 @@ import { resolveEvents, whenResolver, worldCalendars, type WorldEnv } from './ev
 import { systemInfo, worldStars } from './systems'
 import { allRoutes, nodePath, routeWorld, trafficReport, waypointNode } from './routes'
 import { historySettings } from './history'
+import { SURFACE_CLASSES } from './terrain'
 import { templateFiles } from './template'
 import {
   calendarKind,
@@ -20,6 +21,7 @@ import {
   polityKind,
   relationKind,
   systemKind,
+  terrainKind,
   type CalendarFile,
   type StoredInstant
 } from './kinds'
@@ -518,6 +520,39 @@ export const historyCheck: Check = {
   }
 }
 
+export const terrainCheck: Check = {
+  id: 'terrain',
+  title: 'Each terrain belongs to one body that has a surface',
+  run(world) {
+    const out: Issue[] = []
+    const seen = new Map<string, string>()
+    for (const e of [...entitiesOf(world, terrainKind)].sort((a, b) => compareStrings(a.id, b.id))) {
+      const body = world.entities.get(`body/${e.value.body}`)?.value as { class?: string; name?: string } | undefined
+      if (body && !SURFACE_CLASSES.includes(body.class as never))
+        out.push({
+          severity: 'warning',
+          check: 'terrain',
+          code: 'no-surface',
+          message: `${body.name ?? e.value.body} is a ${body.class}, which has no solid surface to shape.`,
+          path: e.path,
+          field: 'body'
+        })
+      const other = seen.get(e.value.body)
+      if (other)
+        out.push({
+          severity: 'error',
+          check: 'terrain',
+          code: 'two-terrains',
+          message: `${e.value.body} already has a terrain in ${other}.`,
+          path: e.path,
+          field: 'body'
+        })
+      else seen.set(e.value.body, e.path)
+    }
+    return out
+  }
+}
+
 export const BUILTIN_CHECKS: readonly Check[] = [
   filesCheck,
   referencesCheck,
@@ -528,6 +563,7 @@ export const BUILTIN_CHECKS: readonly Check[] = [
   culturesCheck,
   routesCheck,
   historyCheck,
+  terrainCheck,
   templateCheck,
   formatCheck
 ]

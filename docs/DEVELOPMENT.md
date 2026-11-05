@@ -30,7 +30,7 @@ npm run dev          # the app with hot reload
   the file system.
 - **`src/renderer`** is the tool host: the welcome screen, sidebar, current-date bar and status
   bar. Tools live in `src/renderer/src/tools/<id>/` and are listed in
-  `src/renderer/src/tools/index.ts`. The tools are Timeline, Stars, Systems, Routes, Sky, Approach, Cultures, History, Calendars,
+  `src/renderer/src/tools/index.ts`. The tools are Timeline, Stars, Systems, Terrain, Routes, Sky, Approach, Cultures, History, Calendars,
   Fork & compare, Checks and World.
 - **The world session lives in main** (`src/main/world.ts`): the open world, its unsaved changes
   (a `WorldEditor`), and every calendar operation. The renderer gets snapshots pushed to it, and
@@ -212,6 +212,44 @@ module.exports = {
 - **The orbit view** draws each region's slice in the system plane, at the current date. A giant
   out past the star's region shows its own; one close enough merges with the star's. A region is
   assumed star-shaped about its centre: a lee's dent shows, a hole deep inside does not.
+
+### Terrain
+
+- **A terrain** is `terrains/<id>.json`, one per body with a solid surface (rocky, ocean, dwarf).
+  It holds:
+  - `params` and `roll` for terrain@1;
+  - optional `climate` inputs;
+  - `shapes` drawn by hand;
+  - an optional `lock`.
+- **terrain@1** (`packages/gen/src/terrain.ts`) evaluates heights at points on the unit sphere,
+  so every size of map reads the same:
+  - tectonic plates (Voronoi cells, borders roughened by noise), continental or oceanic, each
+    drifting;
+  - mountains where plates converge, a ridge where they part;
+  - broad swells and fractal hills;
+  - sea level set so the share of the surface under water is the one asked for.
+
+  Its stream is keyed by body and roll. Re-rolling counts the roll up; locking records the
+  generator and stops re-rolling.
+- **Hand shaping** is text, in latitude/longitude degrees, never pixels:
+  - `land` and `sea` polygons force an area above or below sea level;
+  - `raise` and `lower` polygons lift or sink it, easing in over `width_deg` from the edge;
+  - `ridge` lines add a mountain range of `height_km` along the great circles between the points.
+- **The look follows the planet:**
+  - **Temperature:**
+    - mean surface temperature is the body's equilibrium temperature plus greenhouse warming
+      (from its air, or `climate.greenhouse_K`);
+    - spread by the yearly sunlight at each latitude for its tilt, or by angle from the
+      substellar point if it is locked to its star;
+    - evened out by `heatTransport`, and cooled 6.5 K per km of height.
+  - **Biomes:** temperature, height, surface water and a wandering dry belt either side of the
+    subtropics give seas, sea ice, ice, tundra, forests, grassland, savanna, desert and tropics.
+  - **Dry worlds** (`climate.water`, by default yes only with half an atmosphere or more) are
+    rock, with frost where it is very cold; `climate.rock` sets the rock's colour.
+  - `climate.temperature_K` fixes the mean temperature, so the look stops following the orbit.
+- **Rasters** (height and colour maps) are derived in the main process and cached per world
+  version; nothing is written to the world. **Export** saves a 2048×1024 PNG wherever you choose,
+  for reference.
 
 ### The Solar System
 

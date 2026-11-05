@@ -51,6 +51,8 @@ import {
   historySettingsKind,
   proposeHistory,
   solarSystemFor,
+  terrainKind,
+  terrainRaster,
   newsArrival,
   KINDS,
   type HistoryProposal,
@@ -119,6 +121,7 @@ import type {
   ViewpointDto,
   HistoryProposalDto,
   NewsDto,
+  TerrainRasterDto,
   StarField,
   StarInfoDto,
   StarSearchHit,
@@ -144,7 +147,8 @@ const KIND_DEFS: Record<EditableKind, KindDef> = {
   nebula: nebulaKind as KindDef,
   route: routeKind as KindDef,
   viewpoint: viewpointKind as KindDef,
-  historySettings: historySettingsKind as KindDef
+  historySettings: historySettingsKind as KindDef,
+  terrain: terrainKind as KindDef
 }
 
 export class WorldSession extends EventEmitter {
@@ -277,6 +281,7 @@ export class WorldSession extends EventEmitter {
       traffic,
       viewpoints: entityDtos(world, viewpointKind.kind),
       historySettings: (world.entities.get(historySettingsKind.kind)?.value as Record<string, unknown> | undefined) ?? null,
+      terrains: entityDtos(world, terrainKind.kind),
       physics: physicsFile
         ? {
             legLimit_ly: physicsFile.foam.legLimit_ly,
@@ -460,6 +465,21 @@ export class WorldSession extends EventEmitter {
     this.changed()
     const sys = files.find((f) => f.kind.kind === systemKind.kind)
     return sys?.id ?? (files[0].value as { system?: string }).system ?? null
+  }
+
+  // ---- terrain: rasters are derived, cached here, never written to the world ----
+
+  private rasters = new Map<string, TerrainRasterDto | { error: string }>()
+
+  terrainRaster(body: string, width: number, height: number): TerrainRasterDto | { error: string } {
+    const key = `${this.version}|${body}|${width}x${height}`
+    const hit = this.rasters.get(key)
+    if (hit) return hit
+    const r = terrainRaster(this.world(), this.env, body, width, height)
+    for (const k of [...this.rasters.keys()]) if (!k.startsWith(`${this.version}|`)) this.rasters.delete(k)
+    if (this.rasters.size > 12) this.rasters.clear()
+    this.rasters.set(key, r)
+    return r
   }
 
   // ---- history ----

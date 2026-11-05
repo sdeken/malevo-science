@@ -611,6 +611,55 @@ export const viewpointKind: KindDef<ViewpointFile> = {
   schema: viewpointSchema
 }
 
+// ---- terrain ----
+
+const LATLON = arr(num({ sig: 7 }), { min: 2, max: 2 })
+
+/** A body's surface: terrain@1's parameters and roll, the climate's inputs, and hand shaping in latitude/longitude. */
+export const terrainSchema = obj({
+  body: ref('body'),
+  /** Which roll of terrain@1: re-rolling counts up. */
+  roll: num({ integer: true, min: 0 }),
+  params: obj({
+    plates: num({ integer: true, min: 2, max: 60 }),
+    continents: num({ min: 0, max: 1, sig: 4 }),
+    ocean: num({ min: 0, max: 1, sig: 4 }),
+    mountains_km: num({ min: 0, max: 30, sig: 4 }),
+    roughness: num({ min: 0, max: 1, sig: 4 })
+  }),
+  climate: opt(
+    obj({
+      /** Warming by the air, K. Absent: worked out from the surface pressure. */
+      greenhouse_K: opt(num({ sig: 5 })),
+      /** How much the air and seas even out temperatures, 0–1. Absent: 0.35 with air, 0.05 without. */
+      heatTransport: opt(num({ min: 0, max: 1, sig: 4 })),
+      /** A fixed mean surface temperature, K: the look stops following the planet's orbit. */
+      temperature_K: opt(num({ above: 0, sig: 5 })),
+      /** Whether it has surface water. Absent: yes with half an atmosphere or more. */
+      water: opt(bool()),
+      /** The colour of bare rock and dust. */
+      rock: opt(COLOR)
+    })
+  ),
+  /** Hand shaping, drawn in latitude/longitude (degrees): stored as text, never as pixels. */
+  shapes: opt(
+    arr(
+      obj({
+        kind: oneOf(['land', 'sea', 'raise', 'lower', 'ridge']),
+        /** [lat, lon] pairs: a polygon, or a line for a ridge. */
+        points: arr(LATLON, { min: 2 }),
+        height_km: opt(num({ sig: 4 })),
+        width_deg: opt(num({ above: 0, sig: 4 })),
+        note: opt(str({ max: 200 }))
+      })
+    )
+  ),
+  lock: opt(lockSchema)
+})
+export type TerrainFile = Infer<typeof terrainSchema>
+
+export const terrainKind: KindDef<TerrainFile> = { kind: 'terrain', label: 'terrain', folder: 'terrains', schema: terrainSchema }
+
 // ---- the history generator's settings ----
 
 /** What history@1 plays out: where it starts, which events unlock what, and how it behaves. */
@@ -692,5 +741,6 @@ export const KINDS: readonly KindDef[] = [
   nebulaKind as KindDef,
   routeKind as KindDef,
   viewpointKind as KindDef,
-  historySettingsKind as KindDef
+  historySettingsKind as KindDef,
+  terrainKind as KindDef
 ]

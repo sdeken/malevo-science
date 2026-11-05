@@ -1,4 +1,5 @@
-import { app, dialog, ipcMain, shell, BrowserWindow } from 'electron'
+import { app, dialog, ipcMain, nativeImage, shell, BrowserWindow } from 'electron'
+import { promises as fs } from 'node:fs'
 import { WORLD_FORMAT } from '@malevo/model'
 import { IPC } from '../shared/ipc'
 import type { AppInfo, ApproachQueryDto, EditableKind, Settings, ViewpointDto, WorldResult } from '../shared/types'
@@ -48,7 +49,8 @@ const EDITABLE: readonly EditableKind[] = [
   'nebula',
   'route',
   'viewpoint',
-  'historySettings'
+  'historySettings',
+  'terrain'
 ]
 const asKind = (k: unknown): EditableKind => {
   if (!EDITABLE.includes(k as EditableKind)) throw new Error(`"${String(k)}" cannot be edited.`)
@@ -185,6 +187,41 @@ export function registerIpc(deps: IpcDeps): void {
   )
   ipcMain.handle(IPC.historyAccept, (_e, keys: unknown) => world.historyAccept(Array.isArray(keys) ? keys.map(String) : []))
   ipcMain.handle(IPC.historyNews, (_e, event: unknown) => world.historyNews(String(event)))
+  ipcMain.handle(IPC.terrainRaster, (_e, body: unknown, w: unknown, h: unknown) =>
+    world.terrainRaster(
+      String(body),
+      Math.max(16, Math.min(4096, Math.trunc(Number(w)) || 512)),
+      Math.max(8, Math.min(2048, Math.trunc(Number(h)) || 256))
+    )
+  )
+  ipcMain.handle(IPC.terrainExport, async (e, body: unknown, what: unknown) => {
+    // Exports go wherever the author chooses, for reference; they are never part of the world.
+    const r = world.terrainRaster(String(body), 2048, 1024)
+    if ('error' in r) return null
+    const win = winOf(e)
+    const heightMap = what === 'height'
+    const opts = {
+      title: 'Export map',
+      defaultPath: `${String(body)}-${heightMap ? 'height' : 'colour'}.png`,
+      filters: [{ name: 'PNG', extensions: ['png'] }]
+    }
+    const res = win ? await dialog.showSaveDialog(win, opts) : await dialog.showSaveDialog(opts)
+    if (res.canceled || !res.filePath) return null
+    const bgra = Buffer.alloc(r.width * r.height * 4)
+    for (let k = 0; k < r.width * r.height; k++) {
+      if (heightMap) {
+        const v = Math.round(((r.heights[k] - r.stats.lowest) / Math.max(1e-9, r.stats.highest - r.stats.lowest)) * 255)
+        bgra[k * 4] = bgra[k * 4 + 1] = bgra[k * 4 + 2] = v
+      } else {
+        bgra[k * 4] = r.rgba[k * 4 + 2]
+        bgra[k * 4 + 1] = r.rgba[k * 4 + 1]
+        bgra[k * 4 + 2] = r.rgba[k * 4]
+      }
+      bgra[k * 4 + 3] = 255
+    }
+    await fs.writeFile(res.filePath, nativeImage.createFromBitmap(bgra, { width: r.width, height: r.height }).toPNG())
+    return res.filePath
+  })
   ipcMain.handle(IPC.approachInfo, (_e, q: unknown) => world.approachInfo(asApproach(q)))
   ipcMain.handle(IPC.approachMap, (_e, q: unknown, extent: unknown, n: unknown) =>
     world.approachMap(asApproach(q), Number(extent) || 1, Math.max(5, Math.min(121, Math.trunc(Number(n)) || 41)))

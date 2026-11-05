@@ -14,6 +14,7 @@ export * from './routes'
 export * from './sky'
 export * from './history'
 export * from './solarSystem'
+export * from './terrain'
 export * from './compare'
 export { templateFiles } from './template'
 export {

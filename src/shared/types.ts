@@ -163,6 +163,7 @@ export interface WorldSnapshot {
   viewpoints: EntityDto[]
   /** settings/history.json, if the world has it. */
   historySettings: Record<string, unknown> | null
+  terrains: EntityDto[]
   issueCounts: { error: number; warning: number; info: number }
 }
 
@@ -227,6 +228,7 @@ export type EditableKind =
   | 'route'
   | 'viewpoint'
   | 'historySettings'
+  | 'terrain'
 
 // ---- Phase 3: stars, systems, bodies ----
 
@@ -557,4 +559,15 @@ export interface NewsDto {
   from: string
   t0: number
   arrivals: { system: string; t: number; via: 'here' | 'radio' | 'ships'; path: string[] }[]
+}
+
+// ---- Phase 8: terrain ----
+
+export interface TerrainRasterDto {
+  width: number
+  height: number
+  /** km above sea level, rows from the north pole, longitude −180° to 180°. */
+  heights: Float32Array
+  rgba: Uint8ClampedArray
+  stats: { ocean: number; highest: number; lowest: number; meanTemp: number | null; minTemp: number | null; maxTemp: number | null }
 }

@@ -611,6 +611,26 @@ try {
   const s7 = (await page.locator('.checks-summary').textContent()) ?? ''
   check(s7 === 'No problems found.' || /(^|\D)0 errors/.test(s7), `the accepted history has no errors (${s7})`)
 
+  // 17. Phase 8: terrain for Earth, re-rolled, locked and saved as text.
+  await tool('Terrain')
+  await page.locator('[data-terrain-body="earth"]').click()
+  await page.locator('#makeTerrain').click()
+  await page.waitForSelector('#terrainStats', { timeout: 30_000 })
+  check(/under water/.test((await page.locator('#terrainStats').textContent()) ?? ''), 'a new terrain draws its map and globe')
+  await page.locator('#terrainReroll').click()
+  await page.waitForFunction(() => /Roll 1 of terrain@1/.test(document.querySelector('.terrain')?.textContent ?? ''))
+  await page.locator('#terrainLock').check()
+  await page.waitForFunction(() => document.querySelector('#terrainReroll')?.disabled === true)
+  check(true, 'it re-rolls, and locking stops re-rolling')
+  await page.screenshot({ path: path.join(shots, '17-terrain.png') })
+  await page.locator('.status-save').click()
+  await page.waitForFunction(() => document.querySelector('.status-saved') !== null)
+  const terrainFile = JSON.parse(await fs.readFile(path.join(worldDir, 'terrains/earth.json'), 'utf8'))
+  check(
+    terrainFile.roll === 1 && terrainFile.lock?.gen === 'terrain@1' && terrainFile.body === 'earth',
+    'saving writes the terrain as text, locked to terrain@1'
+  )
+
   // 10. The update status reports a dev build.
   const status = await page.evaluate(() => window.malevo.updates.status())
   check(status.state === 'unavailable', 'an unpackaged build reports updates as unavailable')
