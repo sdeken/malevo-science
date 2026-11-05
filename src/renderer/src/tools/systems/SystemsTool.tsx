@@ -214,6 +214,45 @@ function SystemDetail({
         )
       )}
 
+      <details className="overrides" id="systemTraffic">
+        <summary>Port and traffic</summary>
+        <div className="field-row">
+          <label className="field">
+            Ships dock at
+            <select
+              value={String(system.value.port ?? '')}
+              onChange={(e) => save({ port: e.target.value || undefined })}
+              aria-label="Port body"
+              id="systemPort"
+            >
+              <option value="">A habitable distance (1 AU × √L)</option>
+              {system.bodies.map((b) => (
+                <option key={b.id} value={b.id}>
+                  {'  '.repeat(b.depth)}
+                  {b.name}
+                </option>
+              ))}
+            </select>
+          </label>
+          <NumberField
+            label="Declared net, ships/day"
+            value={system.value.declaredNet_perDay as number | undefined}
+            optional
+            hint="Positive for a sink (a graveyard), negative for a source (a shipyard)."
+            onCommit={(v) => save({ declaredNet_perDay: v })}
+          />
+        </div>
+        {snapshot.nodes[`system:${system.id}`] && (
+          <p className="muted small">
+            Crawl between the dock and the collapse edge ({sig((snapshot.nodes[`system:${system.id}`].crawlDistance ?? NaN) / AU, 3)} AU):{' '}
+            {duration(snapshot.nodes[`system:${system.id}`].crawlOut)} out, {duration(snapshot.nodes[`system:${system.id}`].crawlIn)} in.{' '}
+            <button className="link" onClick={() => navigate('routes', `system:${system.id}`)}>
+              Routes and traffic
+            </button>
+          </p>
+        )}
+      </details>
+
       {displayCal && <HistoryEditor system={system} snapshot={snapshot} now={now} displayCal={displayCal} />}
 
       <div className="orbit-layout">

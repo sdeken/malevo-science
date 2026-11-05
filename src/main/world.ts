@@ -15,6 +15,7 @@ import path from 'node:path'
 import {
   calendarTicks,
   compareStrings,
+  allowedImbalance,
   formatInstant,
   parseInstant,
   starDistance,
@@ -30,6 +31,16 @@ import {
   cultureSettingsKind,
   polityKind,
   relationKind,
+  nebulaKind,
+  routeKind,
+  stationKind,
+  allRoutes,
+  balanceTolerance,
+  nodePath,
+  planRoute,
+  routeWorld,
+  suggestBalancing,
+  trafficReport,
   systemHistory,
   whenResolver,
   calendarKind,
@@ -81,6 +92,11 @@ import type {
   FolderInfo,
   ParsedDate,
   PlanetProposal,
+  BalanceSuggestionDto,
+  RouteInfoDto,
+  RouteNodeDto,
+  RoutePlanDto,
+  TrafficDto,
   StarField,
   StarInfoDto,
   StarSearchHit,
@@ -101,7 +117,10 @@ const KIND_DEFS: Record<EditableKind, KindDef> = {
   culture: cultureKind as KindDef,
   polity: polityKind as KindDef,
   relation: relationKind as KindDef,
-  cultureSettings: cultureSettingsKind as KindDef
+  cultureSettings: cultureSettingsKind as KindDef,
+  station: stationKind as KindDef,
+  nebula: nebulaKind as KindDef,
+  route: routeKind as KindDef
 }
 
 export class WorldSession extends EventEmitter {
@@ -211,6 +230,7 @@ export class WorldSession extends EventEmitter {
       .sort((a, b) => compareStrings(a.id, b.id))
       .map((e) => systemDto(systemInfo(world, this.env, e.id)!, e.path, resolver))
     const physicsFile = world.entities.get(physicsKind.kind)?.value as PhysicsSettings | undefined
+    const { routes, nodes, traffic } = routesDto(world, this.env, physicsFile)
     const issues = runChecks(world, this.env)
     const count = (s: string): number => issues.filter((i) => i.severity === s).length
     return {
@@ -226,6 +246,11 @@ export class WorldSession extends EventEmitter {
       polities: entityDtos(world, polityKind.kind),
       relations: entityDtos(world, relationKind.kind),
       cultureSettings: (world.entities.get(cultureSettingsKind.kind)?.value as CultureSettings | undefined) ?? null,
+      stations: entityDtos(world, stationKind.kind),
+      nebulae: entityDtos(world, nebulaKind.kind),
+      routes,
+      nodes,
+      traffic,
       physics: physicsFile
         ? {
             legLimit_ly: physicsFile.foam.legLimit_ly,
@@ -372,6 +397,18 @@ export class WorldSession extends EventEmitter {
     this.editor!.edit(changes)
     this.changed()
     return proposal.bodies.map((b) => b.id)
+  }
+
+  // ---- routes ----
+
+  planRoute(from: string, to: string): RoutePlanDto | null {
+    const plan = planRoute(this.world(), this.env, from, to)
+    return plan ? { waypoints: plan.waypoints as Record<string, string>[], duration: plan.duration, ly: plan.ly } : null
+  }
+
+  balance(onlyRoutes?: readonly string[]): BalanceSuggestionDto | null {
+    const p = suggestBalancing(this.world(), this.env, onlyRoutes)
+    return p ? { suggestions: p.suggestions, cost: p.cost, remaining: p.remaining } : null
   }
 
   // ---- editing (unsaved until save) ----
@@ -655,4 +692,52 @@ function systemDto(sys: SystemInfo, path: string, resolver: WhenResolver): Syste
     bodies: sys.bodies.map(bodyDto),
     history: systemHistory(sys.file as SystemFile, resolver)
   }
+}
+
+function routesDto(
+  world: WorldData,
+  env: WorldEnv,
+  physics: PhysicsSettings | undefined
+): { routes: RouteInfoDto[]; nodes: Record<string, RouteNodeDto>; traffic: TrafficDto | null } {
+  const rw = routeWorld(world, env)
+  const nodes: Record<string, RouteNodeDto> = {}
+  const add = (id: string | null): void => {
+    if (!id || nodes[id]) return
+    const n = rw.node(id)
+    nodes[id] = { ...n, pos: n.pos ? [n.pos[0], n.pos[1], n.pos[2]] : null, path: nodePath(id) }
+  }
+  for (const e of entitiesOf(world, systemKind)) add(`system:${e.id}`)
+  for (const e of entitiesOf(world, stationKind)) add(`station:${e.id}`)
+  const routes: RouteInfoDto[] = allRoutes(world, env).map((r) => {
+    r.nodes.forEach(add)
+    for (const s of r.services) s.stops.forEach(add)
+    return {
+      id: r.id,
+      path: `${routeKind.folder}/${r.id}.json`,
+      value: r.file as unknown as Record<string, unknown>,
+      name: r.file.name,
+      color: r.file.color ?? null,
+      nodes: r.nodes,
+      legs: r.legs,
+      services: r.services.map((s) => ({ ...s, note: s.note ?? null })),
+      length: r.length
+    }
+  })
+  const t = physics ? trafficReport(world, env) : null
+  const tol = physics ? balanceTolerance(physics) : null
+  const traffic: TrafficDto | null =
+    t && tol
+      ? {
+          nodes: t.nodes.map((b) => {
+            add(b.node)
+            const allowed = allowedImbalance(b, tol)
+            return { ...b, allowed, unbalanced: Math.abs(b.imbalance) > allowed }
+          }),
+          declaredTotal: t.declaredTotal,
+          fleet: t.fleet,
+          unknownDurations: t.unknownDurations,
+          inTransit: t.inTransit
+        }
+      : null
+  return { routes, nodes, traffic }
 }

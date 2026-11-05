@@ -3,11 +3,12 @@
  * none of them writes. Findings are advice: a half-finished world is normal,
  * so nothing here blocks saving.
  */
-import { compareStrings, formatInstant, parseInstant, type Calendar, type CalendarSet } from '@malevo/core'
+import { compareStrings, formatInstant, parseGeneratedId, parseInstant, type Calendar, type CalendarSet } from '@malevo/core'
 import { staleLocks } from './deps'
 import { cultureSettings, relationId, systemHistory } from './cultures'
 import { resolveEvents, whenResolver, worldCalendars, type WorldEnv } from './events'
-import { systemInfo } from './systems'
+import { systemInfo, worldStars } from './systems'
+import { allRoutes, nodePath, routeWorld, trafficReport, waypointNode } from './routes'
 import { templateFiles } from './template'
 import {
   calendarKind,
@@ -383,6 +384,79 @@ export const culturesCheck: Check = {
   }
 }
 
+export const routesCheck: Check = {
+  id: 'routes',
+  title: 'Routes are flyable and traffic balances at every node',
+  run(world, env) {
+    const out: Issue[] = []
+    const rw = routeWorld(world, env)
+    const stars = worldStars(world, env)
+    const limit = rw.physics?.foam.legLimit_ly
+    const nebulaName = new Map(rw.nebulae.map((n) => [n.id, n.name]))
+    // Where to report a node that has no file of its own: the first route through it.
+    const routeOf = new Map<string, string>()
+    for (const r of allRoutes(world, env)) {
+      const path = `routes/${r.id}.json`
+      const issue = (severity: Issue['severity'], code: string, message: string, field?: string): void => {
+        out.push({ severity, check: 'routes', code, message, path, field })
+      }
+      r.file.waypoints.forEach((w, i) => {
+        const node = waypointNode(w)
+        if (!node) {
+          issue('error', 'bad-waypoint', `Waypoint ${i + 1} must name exactly one system, station or star.`, `waypoints[${i}]`)
+          return
+        }
+        if (!routeOf.has(node)) routeOf.set(node, path)
+        if (w.star && !rw.node(node).pos && (parseGeneratedId(w.star) || stars.catalogAvailable))
+          issue('error', 'missing-star', `Waypoint ${i + 1}: star "${w.star}" does not exist.`, `waypoints[${i}].star`)
+        if (i > 0 && node === waypointNode(r.file.waypoints[i - 1]))
+          issue('error', 'repeated-waypoint', `Waypoints ${i} and ${i + 1} are the same place.`, `waypoints[${i}]`)
+      })
+      for (const l of r.legs) {
+        const field = `waypoints[${l.index + 1}]`
+        if (l.tooLong)
+          issue(
+            'error',
+            'leg-too-long',
+            `The leg from waypoint ${l.index + 1} to ${l.index + 2} is ${l.ly!.toFixed(2)} ly, beyond the leg limit of ${limit} ly.`,
+            field
+          )
+        for (const n of l.nebulae)
+          issue(
+            'error',
+            'crosses-nebula',
+            `The leg from waypoint ${l.index + 1} to ${l.index + 2} crosses ${nebulaName.get(n) ?? n}.`,
+            field
+          )
+      }
+      for (const s of r.services) if (s.error) issue('error', 'bad-service', `Service ${s.index + 1}: ${s.error}`, `services[${s.index}]`)
+    }
+    const report = trafficReport(world, env)
+    if (report) {
+      const fmt = (n: number): string => (Math.abs(n) >= 10 ? n.toFixed(1) : n.toPrecision(3).replace(/\.?0+$/, ''))
+      for (const b of report.unbalanced) {
+        const [, name] = b.node.split(/:(.*)/)
+        const declared = b.declared ? ` (declared: ${fmt(b.declared)})` : ''
+        out.push({
+          severity: 'warning',
+          check: 'routes',
+          code: 'unbalanced',
+          message: `${name}: ${fmt(b.arrivals)} ships/day arrive and ${fmt(b.departures)} leave, a net ${b.net > 0 ? 'gain' : 'loss'} of ${fmt(Math.abs(b.net))}${declared}. Add return traffic, or declare the imbalance (declaredNet_perDay).`,
+          path: nodePath(b.node) ?? routeOf.get(b.node)
+        })
+      }
+      if (Math.abs(report.declaredTotal) > 1e-6)
+        out.push({
+          severity: 'warning',
+          check: 'routes',
+          code: 'declared-total',
+          message: `Declared imbalances add up to ${fmt(report.declaredTotal)} ships/day, not 0. Every ship that arrives somewhere left somewhere else, so sinks must be matched by sources.`
+        })
+    }
+    return out
+  }
+}
+
 export const BUILTIN_CHECKS: readonly Check[] = [
   filesCheck,
   referencesCheck,
@@ -391,6 +465,7 @@ export const BUILTIN_CHECKS: readonly Check[] = [
   eventsCheck,
   systemsCheck,
   culturesCheck,
+  routesCheck,
   templateCheck,
   formatCheck
 ]

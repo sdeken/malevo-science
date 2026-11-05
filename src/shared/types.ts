@@ -151,6 +151,13 @@ export interface WorldSnapshot {
   relations: EntityDto[]
   /** settings/cultures.json, if the world has it. */
   cultureSettings: CultureSettingsDto | null
+  stations: EntityDto[]
+  nebulae: EntityDto[]
+  routes: RouteInfoDto[]
+  /** Every node any route touches, plus every station and system, by node id. */
+  nodes: Record<string, RouteNodeDto>
+  /** Null without physics settings. */
+  traffic: TrafficDto | null
   issueCounts: { error: number; warning: number; info: number }
 }
 
@@ -200,7 +207,19 @@ export interface CompareReport {
   }[]
 }
 
-export type EditableKind = 'event' | 'calendar' | 'physics' | 'system' | 'body' | 'culture' | 'polity' | 'relation' | 'cultureSettings'
+export type EditableKind =
+  | 'event'
+  | 'calendar'
+  | 'physics'
+  | 'system'
+  | 'body'
+  | 'culture'
+  | 'polity'
+  | 'relation'
+  | 'cultureSettings'
+  | 'station'
+  | 'nebula'
+  | 'route'
 
 // ---- Phase 3: stars, systems, bodies ----
 
@@ -330,4 +349,96 @@ export interface EntityDto {
 export interface CultureSettingsDto {
   traits: { id: string; label: string; low?: string; high?: string; weight: number }[]
   affinity: { opennessTrait?: string; closedFloor: number }
+}
+
+// ---- Phase 5: routes and traffic ----
+
+/** A route node: "system:<id>", "station:<id>" or "star:<id>". */
+export interface RouteNodeDto {
+  id: string
+  kind: 'system' | 'station' | 'star'
+  name: string
+  /** Light-years; null when it cannot be found. */
+  pos: [number, number, number] | null
+  system: string | null
+  /** Torch times between the dock and the collapse edge, s. */
+  crawlOut: number | null
+  crawlIn: number | null
+  crawlDistance: number | null
+  declared: number
+  /** The file it lives in, if any. */
+  path: string | null
+}
+
+export interface RouteLegDto {
+  index: number
+  from: string
+  to: string
+  ly: number | null
+  /** Time in the foam, s. */
+  foam: number | null
+  tooLong: boolean
+  nebulae: string[]
+}
+
+export interface RouteServiceDto {
+  index: number
+  from: number
+  to: number
+  perDay: number
+  note: string | null
+  stops: string[]
+  error: string | null
+  /** Door to door, s. */
+  duration: number | null
+  fleet: number | null
+}
+
+export interface RouteInfoDto {
+  id: string
+  path: string
+  value: Record<string, unknown>
+  name: string
+  color: string | null
+  /** Node id per waypoint. */
+  nodes: (string | null)[]
+  legs: RouteLegDto[]
+  services: RouteServiceDto[]
+  length: number | null
+}
+
+export interface NodeBalanceDto {
+  node: string
+  arrivals: number
+  departures: number
+  net: number
+  declared: number
+  imbalance: number
+  through: number
+  /** The imbalance it may carry without a warning. */
+  allowed: number
+  unbalanced: boolean
+}
+
+export interface TrafficDto {
+  nodes: NodeBalanceDto[]
+  declaredTotal: number
+  fleet: number
+  unknownDurations: number
+  /** Ships under way per directed leg, keyed "from→to". */
+  inTransit: Record<string, number>
+}
+
+export interface RoutePlanDto {
+  waypoints: Record<string, string>[]
+  duration: number
+  ly: number
+}
+
+export interface BalanceSuggestionDto {
+  suggestions: { route: string; from: number; to: number; perDay: number }[]
+  /** Ship-days per day the additions cost. */
+  cost: number
+  /** Imbalance no route can take away, by node. */
+  remaining: Record<string, number>
 }

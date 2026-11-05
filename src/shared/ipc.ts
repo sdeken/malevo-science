@@ -37,6 +37,8 @@ export const IPC = {
   starsSearch: 'stars:search',
   systemsRoll: 'systems:roll',
   systemsKeep: 'systems:keep',
+  routesPlan: 'routes:plan',
+  routesBalance: 'routes:balance',
 
   calTicks: 'cal:ticks',
   calFormat: 'cal:format',

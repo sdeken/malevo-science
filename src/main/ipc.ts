@@ -43,7 +43,10 @@ const EDITABLE: readonly EditableKind[] = [
   'culture',
   'polity',
   'relation',
-  'cultureSettings'
+  'cultureSettings',
+  'station',
+  'nebula',
+  'route'
 ]
 const asKind = (k: unknown): EditableKind => {
   if (!EDITABLE.includes(k as EditableKind)) throw new Error(`"${String(k)}" cannot be edited.`)
@@ -146,6 +149,8 @@ export function registerIpc(deps: IpcDeps): void {
   ipcMain.handle(IPC.starsSearch, (_e, text: unknown) => world.searchStars(String(text)))
   ipcMain.handle(IPC.systemsRoll, (_e, id: unknown, roll: unknown) => world.roll(String(id), Number(roll)))
   ipcMain.handle(IPC.systemsKeep, (_e, id: unknown, roll: unknown) => world.keep(String(id), Number(roll)))
+  ipcMain.handle(IPC.routesPlan, (_e, from: unknown, to: unknown) => world.planRoute(String(from), String(to)))
+  ipcMain.handle(IPC.routesBalance, (_e, only: unknown) => world.balance(Array.isArray(only) ? only.map(String) : undefined))
 
   ipcMain.handle(IPC.calTicks, (_e, cal: unknown, t0: unknown, t1: unknown, target: unknown) =>
     world.ticks(String(cal), Number(t0), Number(t1), Number(target))

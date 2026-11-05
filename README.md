@@ -8,7 +8,10 @@ cities. Every tool works from one shared model, so details stay consistent from 
 The app contains no setting and knows nothing about git. It reads and writes plain world folders
 of JSON. The author decides what is canon and commits it by hand to a repository of their own.
 
-**Status:** Phases 0–4 are built. Phase 4 added cultures with world-defined traits, polities,
+**Status:** Phases 0–5 are built. Phase 5 added galactic routes: legs under the leg limit and
+around nebulae, a route planner over the star atlas, stations, one-way services with their trip
+times and fleets, and each node's traffic balance with a helper that proposes return traffic.
+Phase 4 added cultures with world-defined traits, polities,
 affinities that change at timeline events, and each system's history of control and population.
 Phase 3 added the star atlas (the real HYG stars plus
 generated faint ones, in 3D), star systems built on them with planets you can roll and keep, and

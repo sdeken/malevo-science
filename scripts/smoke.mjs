@@ -460,6 +460,59 @@ try {
   const s4 = (await page.locator('.checks-summary').textContent()) ?? ''
   check(s4 === 'No problems found.' || /0 errors, 0 warnings/.test(s4), `cultures, polities and history check clean (${s4})`)
 
+  // 14. Phase 5: a planned route, one-way traffic, the balance it upsets, and the helper's fix.
+  await tool('Routes')
+  await page.locator('[data-tab="routes"]').click()
+  await page.locator('#addEntity').click()
+  await page.waitForSelector('#newRoute')
+  await page.locator('#routeFrom').selectOption('system:proxima-centauri')
+  await page.locator('#newRoute .node-picker').nth(1).locator('input.search').fill('Altair')
+  await page.locator('#newRoute [data-hit="hip.97649"]').click()
+  await page.locator('#planRoute').click()
+  await page.waitForSelector('[data-route]', { timeout: 30_000 })
+  const legs = await page.locator('#waypoints [data-waypoint]').count()
+  const legText = (await page.locator('#waypoints').textContent()) ?? ''
+  check(legs >= 3 && !/too long|crosses/.test(legText), `the planner chains Proxima to Altair in legs under the limit (${legs} waypoints)`)
+  await page.locator('#addServiceForward').click()
+  await page.waitForSelector('[data-service="0"]')
+  // Above the 1 ship/day tolerance floor, so the imbalance counts.
+  await page.locator('[data-service="0"] input[type="number"]').fill('5')
+  await page.locator('[data-service="0"] input[type="number"]').press('Enter')
+  await page.waitForFunction(() => window.malevo.world.snapshot().then((s) => s.routes[0]?.services[0]?.perDay === 5))
+  check(
+    /\d/.test((await page.locator('[data-service="0"]').textContent()) ?? ''),
+    'a one-way service shows its door-to-door time and fleet'
+  )
+  await page.screenshot({ path: path.join(shots, '12-route.png') })
+  await page.locator('[data-tab="balance"]').click()
+  await page.waitForSelector('[data-node="system:proxima-centauri"]')
+  check(
+    /off by/.test((await page.locator('[data-node="system:proxima-centauri"]').textContent()) ?? ''),
+    'one-way traffic leaves its ends unbalanced'
+  )
+  await page.locator('#suggestBalance').click()
+  await page.waitForSelector('#acceptAll')
+  await page.locator('#acceptAll').click()
+  await page.waitForFunction(() => !/off by/.test(document.querySelector('#balanceTable')?.textContent ?? 'off by'))
+  check(true, 'the balancing helper’s return traffic balances every node')
+  await page.screenshot({ path: path.join(shots, '13-balance.png') })
+  await page.locator('.status-save').click()
+  await page.waitForFunction(() => document.querySelector('.status-saved') !== null)
+  const routeFiles = await fs.readdir(path.join(worldDir, 'routes'))
+  const routeFile = JSON.parse(await fs.readFile(path.join(worldDir, 'routes', routeFiles[0]), 'utf8'))
+  check(
+    routeFiles.length === 1 &&
+      routeFile.waypoints[0].system === 'proxima-centauri' &&
+      routeFile.waypoints.at(-1).star === 'hip.97649' &&
+      routeFile.services.length === 2,
+    'saving writes the route with its waypoints and both services'
+  )
+  await tool('Checks')
+  await page.locator('.checks-bar button').click()
+  await page.waitForFunction(() => /No problems found|notes/.test(document.querySelector('.checks-summary')?.textContent ?? ''))
+  const s5 = (await page.locator('.checks-summary').textContent()) ?? ''
+  check(s5 === 'No problems found.' || /0 errors, 0 warnings/.test(s5), `routes and traffic check clean (${s5})`)
+
   // 10. The update status reports a dev build.
   const status = await page.evaluate(() => window.malevo.updates.status())
   check(status.state === 'unavailable', 'an unpackaged build reports updates as unavailable')

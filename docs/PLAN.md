@@ -671,7 +671,11 @@ control and culture mix.
 
 - Culture and polity editors, the affinity model, and control and culture mix over time.
 
-### Phase 5: Galactic routes and traffic
+### Phase 5: Galactic routes and traffic — built
+
+Built; see [DEVELOPMENT.md](DEVELOPMENT.md). Itineraries are a route's services: one-way runs
+between two of its waypoints, stopping at every waypoint between. Seasonal profiles and the demand
+generator (§6.4) are not built yet.
 
 - Legs, routes, itineraries and directed flows.
 - The balance report and balancing helper, and the Little's-law numbers.

@@ -5,7 +5,8 @@ import type { StarField, StarInfoDto, StarSearchHit } from '../../../../shared/t
 import { duration, sig } from '../../components/fields'
 import { slugId, useWorldPref } from '../../state'
 import type { ToolDefinition, ToolProps } from '../registry'
-import { StarMap, type MapSystem } from './StarMap'
+import { StarMap, type MapNebula, type MapRoute, type MapSystem } from './StarMap'
+import { mapNebulae, mapRoutes, mapStations } from '../routes/mapData'
 
 const SOL = 'hyg.0'
 
@@ -86,13 +87,16 @@ function StarsView({ world, snapshot, now, focus: navFocus, navigate }: ToolProp
     () =>
       systems
         .filter((s) => s.star)
-        .map((s) => {
+        .map((s): MapSystem => {
           const polity = historyAt(s.history, now)?.polity
           const color = polity ? String(snapshot.polities.find((p) => p.id === polity)?.value?.color ?? '') : ''
           return { id: s.id, name: s.name, pos: s.star!.pos, color: color || undefined }
-        }),
-    [systems, now, snapshot.polities]
+        })
+        .concat(mapStations(snapshot)),
+    [systems, now, snapshot]
   )
+  const routes: MapRoute[] = useMemo(() => mapRoutes(snapshot), [snapshot])
+  const nebulae: MapNebula[] = useMemo(() => mapNebulae(snapshot), [snapshot])
   const onStar = (id: string): string[] => systems.filter((s) => s.starId === id).map((s) => s.id)
   const dist = (a: StarInfoDto | null, b: StarInfoDto | null): number | null =>
     a && b ? Math.hypot(a.pos[0] - b.pos[0], a.pos[1] - b.pos[1], a.pos[2] - b.pos[2]) : null
@@ -258,7 +262,16 @@ function StarsView({ world, snapshot, now, focus: navFocus, navigate }: ToolProp
         )}
       </nav>
       <div className="split-detail map-pane">
-        <StarMap field={field} focus={center} systems={mapSystems} selected={selected} onPick={setSelected} reach={legLimit} />
+        <StarMap
+          field={field}
+          focus={center}
+          systems={mapSystems}
+          selected={selected}
+          onPick={setSelected}
+          reach={legLimit}
+          routes={routes}
+          nebulae={nebulae}
+        />
         <p className="map-hint muted small">
           Drag to turn, wheel to zoom, right-drag to pan, click a star to pick it. The blue sphere is one leg.
         </p>

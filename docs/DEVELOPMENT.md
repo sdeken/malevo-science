@@ -30,7 +30,7 @@ npm run dev          # the app with hot reload
   the file system.
 - **`src/renderer`** is the tool host: the welcome screen, sidebar, current-date bar and status
   bar. Tools live in `src/renderer/src/tools/<id>/` and are listed in
-  `src/renderer/src/tools/index.ts`. The tools are Timeline, Stars, Systems, Cultures, Calendars,
+  `src/renderer/src/tools/index.ts`. The tools are Timeline, Stars, Systems, Routes, Cultures, Calendars,
   Fork & compare, Checks and World.
 - **The world session lives in main** (`src/main/world.ts`): the open world, its unsaved changes
   (a `WorldEditor`), and every calendar operation. The renderer gets snapshots pushed to it, and
@@ -39,7 +39,8 @@ npm run dev          # the app with hot reload
   install an update.
 - **`packages/core`** (`@malevo/core`) is the pure shared library: units, keyed random streams,
   vectors and frames, universal time, calendars, orbits, the foam collapse rule, torch travel,
-  vehicle kinematics and traffic flows. It has no I/O, no DOM and no setting data. Every function
+  vehicle kinematics, traffic flows and galactic routing (A* under the leg limit, around nebulae).
+  It has no I/O, no DOM and no setting data. Every function
   takes the world's settings as arguments.
 - **`packages/model`** (`@malevo/model`) is the world-folder format. It holds the schemas, the
   canonical JSON writer, the loader, references, the dependency graph and the checks. Its pure entry
@@ -223,6 +224,39 @@ module.exports = {
   (culture shares). Each holds from its `from` date until the next entry.
   - Those dates are written like event dates: a date in any calendar, or anchored to an event.
   - The star map colours each system by the polity holding it at the current date.
+
+### Routes and traffic
+
+- **Nodes** are systems, stations and bare stars. Inside the app they are written
+  `system:<id>`, `station:<id>` and `star:<id>`. A star that carries a system counts as that
+  system.
+- **A station** is `stations/<id>.json`: name, `pos_ly` (galactic light-years from Sol) and an
+  optional `declaredNet_perDay`.
+- **A nebula** is `nebulae/<id>.json`: name, `center_ly`, `radii_ly` (an axis-aligned ellipsoid)
+  and an optional colour. No leg may cross one.
+- **A route** is `routes/<id>.json`:
+  - name and optional colour;
+  - `waypoints`, each naming exactly one `system`, `station` or `star`;
+  - `services`, each a one-way run `from` one waypoint index `to` another at `perDay` ships per
+    standard day, stopping at every waypoint between. A → B and B → A are separate services, and
+    either may be missing.
+- **Systems** can name a `port` body (where ships dock) and a `declaredNet_perDay`.
+- **Trip times** (`packages/model/src/routes.ts`) are worked out, never stored:
+  - At a system, ships crawl by torch between the dock and the edge of the star's collapse zone.
+    The dock is the port body's distance from the star, or 1 AU × √L if no port is set. They
+    burn all the way out, and flip and burn on the way in, at the cruise acceleration.
+  - Stations and bare stars have no crawl.
+  - Foam legs take distance ÷ top speed.
+  - Every stop between the ends adds a crawl in, the stopover, and a crawl out.
+- **Little's law:** a service ties up perDay × door-to-door time ships; a leg has perDay × leg time
+  under way.
+- **Balance:** every node's arrivals, departures, through traffic and net are compared with its
+  declared imbalance, within the world's tolerance. The declared imbalances should add up to zero.
+- **The balancing helper** finds the least extra traffic, in ship-days, that balances every node,
+  using existing route legs in either direction. Consecutive legs are joined into through
+  services. It only proposes; the author adds what they want.
+- **The route planner** runs A* over the stars and stations in a sphere around both ends. Each
+  stop costs its crawl and the stopover.
 
 ### Editing, saving, undo
 

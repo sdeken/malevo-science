@@ -318,6 +318,10 @@ export const systemSchema = obj({
       radius_rsun: opt(num({ above: 0, sig: 6 }))
     })
   ),
+  /** The body ships dock at; absent means a habitable distance from the star (1 AU × √luminosity). */
+  port: opt(ref('body')),
+  /** Declared net imbalance of ship traffic, ships/day: positive for a sink (a graveyard), negative for a source (a shipyard). */
+  declaredNet_perDay: opt(num({ sig: 6 })),
   tags: opt(arr(str({ min: 1, max: 40 }))),
   /** Who held it and who lived there, over time: each entry applies from its date until the next. */
   history: opt(
@@ -469,6 +473,68 @@ export type RelationFile = Infer<typeof relationSchema>
 
 export const relationKind: KindDef<RelationFile> = { kind: 'relation', label: 'relation', folder: 'relations', schema: relationSchema }
 
+// ---- routes, stations and nebulae ----
+
+const POINT_LY = arr(num({ sig: 9 }), { min: 3, max: 3 })
+
+/** A node in deep space (or anywhere else a system is not): a depot, a relay, a waystation. */
+export const stationSchema = obj({
+  name: name(),
+  /** Position, light-years, in the star atlas's frame. */
+  pos_ly: POINT_LY,
+  /** As for systems: positive for a sink, negative for a source. */
+  declaredNet_perDay: opt(num({ sig: 6 })),
+  tags: opt(arr(str({ min: 1, max: 40 })))
+})
+export type StationFile = Infer<typeof stationSchema>
+
+export const stationKind: KindDef<StationFile> = { kind: 'station', label: 'station', folder: 'stations', schema: stationSchema }
+
+/** A region the foam cannot cross: an axis-aligned ellipsoid. */
+export const nebulaSchema = obj({
+  name: name(),
+  center_ly: POINT_LY,
+  radii_ly: arr(num({ above: 0, sig: 9 }), { min: 3, max: 3 }),
+  color: opt(COLOR),
+  tags: opt(arr(str({ min: 1, max: 40 })))
+})
+export type NebulaFile = Infer<typeof nebulaSchema>
+
+export const nebulaKind: KindDef<NebulaFile> = { kind: 'nebula', label: 'nebula', folder: 'nebulae', schema: nebulaSchema }
+
+/** A stop on a route: exactly one of a system, a station, or a bare star (somewhere to drop out of the foam). */
+export const waypointSchema = obj({
+  system: opt(ref('system')),
+  station: opt(ref('station')),
+  star: opt(str({ pattern: STAR_ID, patternHint: 'is not a star id (hip.N, hyg.N or a generated g.… id)' }))
+})
+export type Waypoint = Infer<typeof waypointSchema>
+
+/**
+ * A named chain of legs, and the traffic it carries. Each service runs one
+ * way, from one waypoint to another (by index), stopping at every waypoint
+ * between; A → B and B → A are separate services with their own numbers.
+ */
+export const routeSchema = obj({
+  name: name(),
+  color: opt(COLOR),
+  waypoints: arr(waypointSchema, { min: 2 }),
+  services: opt(
+    arr(
+      obj({
+        from: num({ integer: true, min: 0 }),
+        to: num({ integer: true, min: 0 }),
+        perDay: num({ min: 0, sig: 6 }),
+        note: opt(str({ max: 200 }))
+      })
+    )
+  ),
+  tags: opt(arr(str({ min: 1, max: 40 })))
+})
+export type RouteFile = Infer<typeof routeSchema>
+
+export const routeKind: KindDef<RouteFile> = { kind: 'route', label: 'route', folder: 'routes', schema: routeSchema }
+
 export const KINDS: readonly KindDef[] = [
   physicsKind as KindDef,
   starfieldKind as KindDef,
@@ -479,5 +545,8 @@ export const KINDS: readonly KindDef[] = [
   cultureSettingsKind as KindDef,
   cultureKind as KindDef,
   polityKind as KindDef,
-  relationKind as KindDef
+  relationKind as KindDef,
+  stationKind as KindDef,
+  nebulaKind as KindDef,
+  routeKind as KindDef
 ]

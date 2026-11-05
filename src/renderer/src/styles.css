@@ -1306,3 +1306,54 @@ table.matrix td.is-current {
 button.link.danger {
   color: var(--danger);
 }
+
+/* ---- Routes ---- */
+
+.route-map {
+  height: 380px;
+  margin-top: 16px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+}
+
+td.row-actions {
+  white-space: nowrap;
+}
+
+td.row-actions button {
+  padding: 2px 7px;
+  margin-right: 2px;
+}
+
+table.units td .field {
+  margin: 0;
+}
+
+table.units.balance tr.is-current td {
+  background: var(--bg-sunken);
+}
+
+.node-picker {
+  min-width: 260px;
+}
+
+.node-picker .hits {
+  max-height: 220px;
+  overflow: auto;
+}
+
+.balance-proposal ul {
+  padding-left: 18px;
+}
+
+.split-list .seg.tabs {
+  flex-wrap: wrap;
+}
+
+table.units.services input:not([type='checkbox']):not([type='radio']) {
+  width: 80px;
+}
+
+table.units.services select {
+  max-width: 170px;
+}

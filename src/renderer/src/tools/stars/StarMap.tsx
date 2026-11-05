@@ -12,6 +12,22 @@ export interface MapSystem {
   color?: string
 }
 
+export interface MapRoute {
+  id: string
+  color: string
+  /** Waypoint positions, ly. */
+  points: [number, number, number][]
+  /** Drawn brighter (the route being edited). */
+  current?: boolean
+}
+
+export interface MapNebula {
+  id: string
+  center: [number, number, number]
+  radii: [number, number, number]
+  color: string
+}
+
 interface Props {
   field: StarField | null
   focus: [number, number, number]
@@ -20,6 +36,8 @@ interface Props {
   onPick(index: number | null): void
   /** Draw a sphere of this radius (ly) around the focus: the leg limit. */
   reach: number | null
+  routes?: MapRoute[]
+  nebulae?: MapNebula[]
 }
 
 const VERTEX = `
@@ -47,7 +65,7 @@ void main() {
  * galactic pole). Drag to orbit, wheel to zoom, right-drag to pan; click a
  * star to pick it. Systems are ringed and labelled. Renders on demand only.
  */
-export function StarMap({ field, focus, systems, selected, onPick, reach }: Props): React.JSX.Element {
+export function StarMap({ field, focus, systems, selected, onPick, reach, routes, nebulae }: Props): React.JSX.Element {
   const host = useRef<HTMLDivElement>(null)
   const labels = useRef<HTMLDivElement>(null)
   const ctx = useRef<{
@@ -267,12 +285,30 @@ export function StarMap({ field, focus, systems, selected, onPick, reach }: Prop
       sphere.position.set(...focus)
       c.marks.add(sphere)
     }
+    for (const r of routes ?? []) {
+      if (r.points.length < 2) continue
+      const line = new THREE.Line(
+        new THREE.BufferGeometry().setFromPoints(r.points.map((p) => new THREE.Vector3(...p))),
+        new THREE.LineBasicMaterial({ color: new THREE.Color(r.color), transparent: true, opacity: r.current ? 1 : 0.55 })
+      )
+      c.marks.add(line)
+      if (r.current) c.marks.add(ring(r.points.flat() as unknown as [number, number, number], new THREE.Color(r.color).getHex(), 8))
+    }
+    for (const n of nebulae ?? []) {
+      const shell = new THREE.Mesh(
+        new THREE.SphereGeometry(1, 24, 12),
+        new THREE.MeshBasicMaterial({ color: new THREE.Color(n.color), wireframe: true, transparent: true, opacity: 0.18 })
+      )
+      shell.scale.set(...n.radii)
+      shell.position.set(...n.center)
+      c.marks.add(shell)
+    }
     const grid = new THREE.PolarGridHelper(50, 8, 5, 64, 0x223044, 0x223044)
     grid.rotation.x = Math.PI / 2
     grid.position.set(focus[0], focus[1], 0)
     c.marks.add(grid)
     c.render()
-  }, [systems, selected, field, focus, reach])
+  }, [systems, selected, field, focus, reach, routes, nebulae])
 
   return (
     <div className="star-map" ref={host}>

@@ -8,6 +8,8 @@ import type {
   FolderInfo,
   ParsedDate,
   PlanetProposal,
+  BalanceSuggestionDto,
+  RoutePlanDto,
   Settings,
   StarField,
   StarInfoDto,
@@ -84,6 +86,12 @@ const api = {
     roll: (id: string, roll: number): Promise<PlanetProposal> => ipcRenderer.invoke(IPC.systemsRoll, id, roll),
     /** Keep a roll as locked bodies, replacing an earlier kept roll. Unsaved, undoable. */
     keep: (id: string, roll: number): Promise<string[]> => ipcRenderer.invoke(IPC.systemsKeep, id, roll)
+  },
+  routes: {
+    /** The quickest chain of legs between two nodes through the atlas (nothing is written). */
+    plan: (from: string, to: string): Promise<RoutePlanDto | null> => ipcRenderer.invoke(IPC.routesPlan, from, to),
+    /** Flows that would balance the network, as services on existing routes (nothing is written). */
+    balance: (onlyRoutes?: string[]): Promise<BalanceSuggestionDto | null> => ipcRenderer.invoke(IPC.routesBalance, onlyRoutes)
   },
   calendar: {
     ticks: (cal: string, t0: number, t1: number, target: number): Promise<TickInfo[]> =>
