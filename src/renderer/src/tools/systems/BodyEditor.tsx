@@ -30,8 +30,9 @@ type Value = Record<string, unknown> & {
   }
   mass_mearth: number
   radius_km: number
-  rotation: { period_h?: number; locked?: boolean; tilt_deg: number }
+  rotation: { period_h?: number; locked?: boolean; tilt_deg: number; equinox_deg?: number; meridian_deg?: number }
   albedo?: number
+  atmosphere?: { pressure_atm: number; scaleHeight_km?: number }
   lock?: { gen: string }
 }
 
@@ -194,6 +195,48 @@ export function BodyEditor({ body, system, calendars, displayCal, version, onDel
           onCommit={(t) => t !== undefined && setRotation({ tilt_deg: Math.max(0, Math.min(180, t)) })}
         />
       </div>
+      <details className="overrides">
+        <summary>Orientation and air (for the sky view)</summary>
+        <div className="field-row">
+          <NumberField
+            label="Spring equinox at orbital longitude, °"
+            value={v.rotation.equinox_deg}
+            optional
+            placeholder="0"
+            hint="From the orbit's ascending node."
+            onCommit={(x) => setRotation({ equinox_deg: x === undefined ? undefined : ((x % 360) + 360) % 360 })}
+          />
+          {!v.rotation.locked && (
+            <NumberField
+              label="Prime meridian at time 0, °"
+              value={v.rotation.meridian_deg}
+              optional
+              placeholder="0"
+              hint="Turns the clock: where longitude 0 faces."
+              onCommit={(x) => setRotation({ meridian_deg: x === undefined ? undefined : ((x % 360) + 360) % 360 })}
+            />
+          )}
+        </div>
+        <div className="field-row">
+          <NumberField
+            label="Surface pressure, atm"
+            value={v.atmosphere?.pressure_atm}
+            optional
+            placeholder="no air"
+            onCommit={(p) => save({ atmosphere: p === undefined ? undefined : { ...v.atmosphere, pressure_atm: Math.max(0, p) } })}
+            id="bodyPressure"
+          />
+          {v.atmosphere && (
+            <NumberField
+              label="Scale height, km"
+              value={v.atmosphere.scaleHeight_km}
+              optional
+              placeholder="8 km ÷ gravity"
+              onCommit={(h) => save({ atmosphere: { ...v.atmosphere!, scaleHeight_km: h !== undefined && h > 0 ? h : undefined } })}
+            />
+          )}
+        </div>
+      </details>
 
       <h3>What follows</h3>
       <dl className="facts compact two-col">

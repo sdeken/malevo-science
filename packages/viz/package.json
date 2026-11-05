@@ -1,0 +1,10 @@
+{
+  "name": "@malevo/viz",
+  "version": "0.0.0",
+  "description": "Shared renderers over @malevo/core: the sky view",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  }
+}

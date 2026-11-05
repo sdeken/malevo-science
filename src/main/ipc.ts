@@ -1,7 +1,7 @@
 import { app, dialog, ipcMain, shell, BrowserWindow } from 'electron'
 import { WORLD_FORMAT } from '@malevo/model'
 import { IPC } from '../shared/ipc'
-import type { AppInfo, EditableKind, Settings, WorldResult } from '../shared/types'
+import type { AppInfo, ApproachQueryDto, EditableKind, Settings, ViewpointDto, WorldResult } from '../shared/types'
 import type { SettingsStore } from './settings'
 import type { Updater } from './updates'
 import type { WorldSession } from './world'
@@ -46,11 +46,34 @@ const EDITABLE: readonly EditableKind[] = [
   'cultureSettings',
   'station',
   'nebula',
-  'route'
+  'route',
+  'viewpoint'
 ]
 const asKind = (k: unknown): EditableKind => {
   if (!EDITABLE.includes(k as EditableKind)) throw new Error(`"${String(k)}" cannot be edited.`)
   return k as EditableKind
+}
+
+function asViewpoint(v: unknown): ViewpointDto {
+  const o = (v ?? {}) as Record<string, unknown>
+  return {
+    body: String(o.body ?? ''),
+    lat_deg: Number(o.lat_deg) || 0,
+    lon_deg: Number(o.lon_deg) || 0,
+    elevation_m: o.elevation_m === undefined ? undefined : Number(o.elevation_m) || 0
+  }
+}
+
+function asApproach(v: unknown): ApproachQueryDto {
+  const o = (v ?? {}) as Record<string, unknown>
+  const off = Array.isArray(o.offset) && o.offset.length === 2 ? (o.offset.map((x) => Number(x) || 0) as [number, number]) : undefined
+  return {
+    system: String(o.system ?? ''),
+    from: String(o.from ?? ''),
+    t: Number(o.t) || 0,
+    offset: off,
+    margin: Number(o.margin) || undefined
+  }
 }
 
 /** Registers every request handler. Arguments from the renderer are untrusted and are coerced here. */
@@ -150,6 +173,18 @@ export function registerIpc(deps: IpcDeps): void {
   ipcMain.handle(IPC.systemsRoll, (_e, id: unknown, roll: unknown) => world.roll(String(id), Number(roll)))
   ipcMain.handle(IPC.systemsKeep, (_e, id: unknown, roll: unknown) => world.keep(String(id), Number(roll)))
   ipcMain.handle(IPC.routesPlan, (_e, from: unknown, to: unknown) => world.planRoute(String(from), String(to)))
+  ipcMain.handle(IPC.skyStars, (_e, system: unknown) => world.skyStars(String(system)))
+  ipcMain.handle(IPC.skyScene, (_e, vp: unknown, t: unknown) => world.skyScene(asViewpoint(vp), Number(t)))
+  ipcMain.handle(IPC.skyNoon, (_e, body: unknown, lon: unknown, t: unknown) =>
+    world.skyNoon(String(body), Number(lon) || 0, Number(t) || 0)
+  )
+  ipcMain.handle(IPC.approachInfo, (_e, q: unknown) => world.approachInfo(asApproach(q)))
+  ipcMain.handle(IPC.approachMap, (_e, q: unknown, extent: unknown, n: unknown) =>
+    world.approachMap(asApproach(q), Number(extent) || 1, Math.max(5, Math.min(121, Math.trunc(Number(n)) || 41)))
+  )
+  ipcMain.handle(IPC.approachSeries, (_e, q: unknown, t0: unknown, t1: unknown, n: unknown) =>
+    world.approachSeries(asApproach(q), Number(t0), Number(t1), Math.max(2, Math.min(1000, Math.trunc(Number(n)) || 120)))
+  )
   ipcMain.handle(IPC.routesBalance, (_e, only: unknown) => world.balance(Array.isArray(only) ? only.map(String) : undefined))
 
   ipcMain.handle(IPC.calTicks, (_e, cal: unknown, t0: unknown, t1: unknown, target: unknown) =>

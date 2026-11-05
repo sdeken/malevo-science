@@ -680,7 +680,13 @@ generator (§6.4) are not built yet.
 - Legs, routes, itineraries and directed flows.
 - The balance report and balancing helper, and the Little's-law numbers.
 
-### Phase 6: Sky view and approach planner
+### Phase 6: Sky view and approach planner — built
+
+Built; see [DEVELOPMENT.md](DEVELOPMENT.md). The P2 exit test is `packages/model/tests/sky.test.ts`.
+The sky is drawn on the CPU from `@malevo/core`'s sky model rather than torchlight's shader, so
+it is the same code the tests check. Not ported: the city skyline and its vehicles (they belong to
+the city planner), parked hulls, insertion burns, and the lee-planner's search for the best aim
+and controlled cut (the Approach tool maps every aim instead).
 
 - The `sky` module, with the prototype torchlight's atmosphere and brightness physics moved into
   `@malevo/viz`. It draws real stars from the atlas, bodies from the system and torches from the

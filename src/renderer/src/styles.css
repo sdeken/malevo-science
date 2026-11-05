@@ -1357,3 +1357,91 @@ table.units.services input:not([type='checkbox']):not([type='radio']) {
 table.units.services select {
   max-width: 170px;
 }
+
+/* ---- Sky ---- */
+
+.sky-side {
+  width: 340px;
+}
+
+.sky-pane {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.sky-canvas {
+  position: relative;
+  flex: 1;
+  min-height: 300px;
+  overflow: hidden;
+  background: #05070c;
+}
+
+.sky-canvas canvas {
+  display: block;
+  cursor: grab;
+  touch-action: none;
+}
+
+.sky-when {
+  font-variant-numeric: tabular-nums;
+  margin: 0 0 6px;
+}
+
+.seg.time-steps button {
+  padding: 3px 6px;
+  font-size: 12px;
+}
+
+.field-row.tight {
+  gap: 8px;
+}
+
+.field-row.tight input {
+  width: 90px;
+}
+
+/* ---- Approach ---- */
+
+.approach-panels {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 28px;
+  margin-top: 12px;
+}
+
+.approach-chart {
+  background: var(--bg-sunken);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  cursor: crosshair;
+}
+
+.approach-chart .series-crawl {
+  fill: none;
+  stroke: #2f9b87;
+  stroke-width: 2;
+}
+
+.approach-chart .series-base {
+  fill: none;
+  stroke: var(--muted);
+  stroke-width: 1.2;
+  stroke-dasharray: 4 3;
+}
+
+.approach-chart .series-now {
+  stroke: #d9604f;
+  stroke-width: 1.5;
+}
+
+.approach-chart .lee-window {
+  fill: rgba(47, 155, 135, 0.15);
+}
+
+.approach-chart .axis {
+  font-size: 11px;
+  fill: var(--muted);
+}

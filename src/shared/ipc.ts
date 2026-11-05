@@ -39,6 +39,12 @@ export const IPC = {
   systemsKeep: 'systems:keep',
   routesPlan: 'routes:plan',
   routesBalance: 'routes:balance',
+  skyStars: 'sky:stars',
+  skyScene: 'sky:scene',
+  skyNoon: 'sky:noon',
+  approachInfo: 'approach:info',
+  approachMap: 'approach:map',
+  approachSeries: 'approach:series',
 
   calTicks: 'cal:ticks',
   calFormat: 'cal:format',

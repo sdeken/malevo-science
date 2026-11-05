@@ -10,7 +10,10 @@
     "exhaustSpeed_c": 0.05,
     "propellantFraction": 0.5,
     "cruiseAccel_g": 1,
-    "governorCutoff_km": 20000
+    "governorCutoff_km": 20000,
+    "shipMass_t": 10000,
+    "visibleFraction": 0.03,
+    "frontFactor": 0.3
   },
   "travel": {
     "stopover_d": 1

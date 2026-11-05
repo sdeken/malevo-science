@@ -9,6 +9,13 @@ import type {
   ParsedDate,
   PlanetProposal,
   BalanceSuggestionDto,
+  SkyStarsDto,
+  SkySceneDto,
+  ViewpointDto,
+  ApproachQueryDto,
+  ApproachInfoDto,
+  ApproachMapDto,
+  ApproachSeriesDto,
   RoutePlanDto,
   Settings,
   StarField,
@@ -86,6 +93,21 @@ const api = {
     roll: (id: string, roll: number): Promise<PlanetProposal> => ipcRenderer.invoke(IPC.systemsRoll, id, roll),
     /** Keep a roll as locked bodies, replacing an earlier kept roll. Unsaved, undoable. */
     keep: (id: string, roll: number): Promise<string[]> => ipcRenderer.invoke(IPC.systemsKeep, id, roll)
+  },
+  sky: {
+    /** Stars as seen from a system (directions in the system frame). */
+    stars: (system: string): Promise<SkyStarsDto | null> => ipcRenderer.invoke(IPC.skyStars, system),
+    /** The sun, bodies and torches from a point on a body at an instant. */
+    scene: (vp: ViewpointDto, t: number): Promise<SkySceneDto | { error: string }> => ipcRenderer.invoke(IPC.skyScene, vp, t)
+  },
+  /** The prime meridian that makes it local noon at a longitude at an instant (for rotation.meridian_deg). */
+  skyNoon: (body: string, lon: number, t: number): Promise<number | null> => ipcRenderer.invoke(IPC.skyNoon, body, lon, t),
+  approach: {
+    info: (q: ApproachQueryDto): Promise<ApproachInfoDto | { error: string }> => ipcRenderer.invoke(IPC.approachInfo, q),
+    map: (q: ApproachQueryDto, extent: number, n: number): Promise<ApproachMapDto | { error: string }> =>
+      ipcRenderer.invoke(IPC.approachMap, q, extent, n),
+    series: (q: ApproachQueryDto, t0: number, t1: number, n: number): Promise<ApproachSeriesDto | { error: string }> =>
+      ipcRenderer.invoke(IPC.approachSeries, q, t0, t1, n)
   },
   routes: {
     /** The quickest chain of legs between two nodes through the atlas (nothing is written). */

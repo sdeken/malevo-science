@@ -30,7 +30,7 @@ npm run dev          # the app with hot reload
   the file system.
 - **`src/renderer`** is the tool host: the welcome screen, sidebar, current-date bar and status
   bar. Tools live in `src/renderer/src/tools/<id>/` and are listed in
-  `src/renderer/src/tools/index.ts`. The tools are Timeline, Stars, Systems, Routes, Cultures, Calendars,
+  `src/renderer/src/tools/index.ts`. The tools are Timeline, Stars, Systems, Routes, Sky, Approach, Cultures, Calendars,
   Fork & compare, Checks and World.
 - **The world session lives in main** (`src/main/world.ts`): the open world, its unsaved changes
   (a `WorldEditor`), and every calendar operation. The renderer gets snapshots pushed to it, and
@@ -47,6 +47,8 @@ npm run dev          # the app with hot reload
   is safe for the renderer. File access lives in `@malevo/model/node`, which is the only code that
   reads or writes a world folder. `packages/model/template/` holds the files every new world
   starts with.
+- **`packages/viz`** (`@malevo/viz`) holds shared renderers that draw from `@malevo/core`: so far
+  the sky view. It uses the DOM, so it is type-checked with the renderer, not with Node.
 - **`packages/gen`** (`@malevo/gen`) holds the versioned generators and, in `golden/`, their golden
   fixtures.
 - **`packages/cli`** (`@malevo/cli`) is the `malevo` command. `npm run build` bundles it into
@@ -257,6 +259,54 @@ module.exports = {
   services. It only proposes; the author adds what they want.
 - **The route planner** runs A* over the stars and stations in a sphere around both ends. Each
   stop costs its crawl and the stopover.
+
+### Sky and approach
+
+- **Frames:**
+  - A system's orbits are measured from its reference plane. By default that is the galactic
+    plane; a system's `frame` (`poleL_deg`, `poleB_deg`) tilts it. Star positions and route
+    directions come from the atlas in galactic coordinates and are turned into that frame, so the
+    stars, the bodies and the torches share one sky.
+  - A body's north pole is tilted from its orbit's normal by `rotation.tilt_deg`. It leans so its
+    northern spring equinox comes at orbital longitude `rotation.equinox_deg`, measured from the
+    ascending node (default 0).
+  - Its prime meridian is at `rotation.meridian_deg` (default 0) at universal time 0 and turns
+    with the rotation period. A locked body keeps longitude 0 toward what it orbits.
+  - The Sky tool's **Make it noon here now** sets `meridian_deg` so the world's clock reads local
+    noon at the chosen longitude.
+- **Air:** a body's `atmosphere` (`pressure_atm`, optional `scaleHeight_km`) is Earth's scaled by
+  its column of air (pressure over gravity), scale height, radius and starlight. Without one the
+  sky stays black by day.
+- **The sky model** (`packages/core/src/atmosphere.ts`) is ported from the prototype torchlight:
+  - single scattering, plus the fitted multiple-scattering twilight term;
+  - the natural night sky, the Milky Way along the real galactic plane, and moonlight;
+  - extinction, refraction, and the limiting magnitude against the local sky (naked eye,
+    binoculars or telescope, by zoom).
+
+  One departure: ozone is scaled to Earth's real column, about a third of the prototype's, which
+  turned twilight purple.
+- **Stars** are the catalogue's (plus nearby generated ones) as seen from the system's own star.
+- **Bodies** are drawn as discs with their phase when they are big enough.
+- **Torches** (`packages/model/src/sky.ts`) are the route network's own numbers (principle P2):
+  - Every service through the system sends ships in at its rate. Each spends the node's crawl time
+    on a straight line from the collapse edge (toward the route's neighbour) to the port, so
+    λ × crawl time are under way.
+  - Ships enter in a steady stream, offset per service, so the number up at any instant is the
+    whole number either side of the average.
+  - Brightness: the jet's power (ship mass, cruise acceleration and exhaust speed) times the
+    visible fraction, full from behind the plume and dimmer (the front factor) from ahead.
+  - Within the governor's cutoff of the port, torches are off.
+  - The physics settings gain the optional `torch.shipMass_t`, `visibleFraction` and
+    `frontFactor`.
+- **Viewpoints** are `viewpoints/<id>.json`: a body, a latitude, an east longitude and an
+  optional elevation.
+- **The approach** (`packages/core/src/approach.ts`, from the prototype lee-planner):
+  - A ship comes in on a straight line from the other star, aimed at the port, drops where the
+    foam first collapses under every body's tide, then flips and burns to the port.
+  - The Approach tool shows the drop, the crawl, and what the bodies' lee saves against the star
+    alone.
+  - It also shows the best and worst crawl within a navigator's margin, a map of crawl time over
+    aim offsets ("looking down the lane"), and a sweep over the years with the lee windows shaded.
 
 ### Editing, saving, undo
 

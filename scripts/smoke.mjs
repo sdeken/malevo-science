@@ -513,6 +513,31 @@ try {
   const s5 = (await page.locator('.checks-summary').textContent()) ?? ''
   check(s5 === 'No problems found.' || /0 errors, 0 warnings/.test(s5), `routes and traffic check clean (${s5})`)
 
+  // 15. Phase 6: the sky from a kept planet, with the route's torches; an approach into the system.
+  await tool('Sky')
+  await page.waitForSelector('#skyFacts', { timeout: 30_000 })
+  check(true, 'the Sky tool works out the sky from a planet')
+  await page.waitForSelector('[data-sky-route]', { timeout: 15_000 })
+  const skyRows = await page.locator('[data-sky-route]').allTextContents()
+  const counts = skyRows.map((r) => {
+    const m = r.match(/(\d+)\s*\(avg ([\d.,]+)\)/)
+    return m ? [Number(m[1]), Number(m[2].replace(/,/g, ''))] : null
+  })
+  check(
+    counts.length >= 2 && counts.every((c) => c && (c[0] === Math.floor(c[1]) || c[0] === Math.ceil(c[1]) || Math.abs(c[0] - c[1]) <= 1)),
+    `the sky shows each route's torches, ships per day × crawl time (${JSON.stringify(counts)})`
+  )
+  await page.screenshot({ path: path.join(shots, '14-sky.png') })
+  await tool('Approach')
+  await page.waitForSelector('#approachFacts', { timeout: 30_000 })
+  check(
+    /AU from the star/.test((await page.locator('#approachFacts').textContent()) ?? ''),
+    'the approach finds where ships drop out of the foam'
+  )
+  await page.waitForSelector('#approachChart', { timeout: 60_000 })
+  check(true, 'and sweeps the crawl over the years')
+  await page.screenshot({ path: path.join(shots, '15-approach.png') })
+
   // 10. The update status reports a dev build.
   const status = await page.evaluate(() => window.malevo.updates.status())
   check(status.state === 'unavailable', 'an unpackaged build reports updates as unavailable')

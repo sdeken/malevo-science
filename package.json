@@ -38,6 +38,7 @@
     "@malevo/core": "*",
     "@malevo/gen": "*",
     "@malevo/model": "*",
+    "@malevo/viz": "*",
     "@types/node": "^22.0.0",
     "@types/react": "^19.0.0",
     "@types/react-dom": "^19.0.0",

@@ -22,5 +22,6 @@
     "tests/**/*",
     "packages/*/src/**/*",
     "packages/*/tests/**/*"
-  ]
+  ],
+  "exclude": ["packages/viz/**"]
 }

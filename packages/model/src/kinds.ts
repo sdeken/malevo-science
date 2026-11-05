@@ -7,7 +7,7 @@
  * Every field name carries its unit (`_s`, `_au`, `_c`, ...). The converters
  * at the bottom turn file values into the SI values @malevo/core works in.
  */
-import { AU, C, DAY, G0, KM, LY, type CalendarDef, type FoamSettings, type ScriptCalendarImpl } from '@malevo/core'
+import { AU, C, DAY, G0, KM, LY, type CalendarDef, type FoamSettings, type ScriptCalendarImpl, type TorchLight } from '@malevo/core'
 import { arr, bool, dict, num, obj, oneOf, opt, ref, str, tagged, type Infer, type Schema } from './schema'
 
 export interface KindDef<T = unknown> {
@@ -71,7 +71,13 @@ export const physicsSchema = obj({
     exhaustSpeed_c: num({ above: 0, max: 1, sig: 9 }),
     propellantFraction: num({ above: 0, max: 0.999, sig: 9 }),
     cruiseAccel_g: num({ above: 0, sig: 9 }),
-    governorCutoff_km: num({ min: 0, sig: 9 })
+    governorCutoff_km: num({ min: 0, sig: 9 }),
+    /** A typical ship's mass, tonnes (for how bright its torch is). Default 10,000. */
+    shipMass_t: opt(num({ above: 0, sig: 9 })),
+    /** Fraction of the jet's power radiated as visible light. Default 0.03. */
+    visibleFraction: opt(num({ above: 0, max: 1, sig: 9 })),
+    /** A torch seen from ahead (exhaust pointing away), relative to from behind. Default 0.3. */
+    frontFactor: opt(num({ min: 0, max: 1, sig: 9 }))
   }),
   travel: obj({
     stopover_d: num({ min: 0, sig: 9 })
@@ -111,6 +117,17 @@ export function torchSettings(p: PhysicsSettings): {
     propellantFraction: p.torch.propellantFraction,
     cruiseAccel: p.torch.cruiseAccel_g * G0,
     governorCutoff: p.torch.governorCutoff_km * KM
+  }
+}
+
+/** How bright a typical ship's torch is (core TorchLight), with the defaults for settings a world leaves out. */
+export function torchLightSettings(p: PhysicsSettings): TorchLight {
+  return {
+    mass: (p.torch.shipMass_t ?? 10_000) * 1000,
+    accel: p.torch.cruiseAccel_g * G0,
+    exhaustSpeed: p.torch.exhaustSpeed_c * C,
+    visibleFraction: p.torch.visibleFraction ?? 0.03,
+    frontFactor: p.torch.frontFactor ?? 0.3
   }
 }
 
@@ -318,6 +335,13 @@ export const systemSchema = obj({
       radius_rsun: opt(num({ above: 0, sig: 6 }))
     })
   ),
+  /**
+   * Which way the system's reference plane (the plane its orbits' inclinations
+   * are measured from) faces: its north pole in galactic longitude and
+   * latitude. Absent: the galactic plane itself. The x axis is the plane's
+   * ascending node on the galactic plane.
+   */
+  frame: opt(obj({ poleL_deg: num({ min: 0, max: 360, sig: 7 }), poleB_deg: num({ min: -90, max: 90, sig: 7 }) })),
   /** The body ships dock at; absent means a habitable distance from the star (1 AU × √luminosity). */
   port: opt(ref('body')),
   /** Declared net imbalance of ship traffic, ships/day: positive for a sink (a graveyard), negative for a source (a shipyard). */
@@ -372,10 +396,22 @@ export const bodySchema = obj({
     /** Always shows one face to what it orbits. */
     locked: opt(bool()),
     /** Axial tilt to its orbit, degrees. */
-    tilt_deg: num({ min: 0, max: 180, sig: 5 })
+    tilt_deg: num({ min: 0, max: 180, sig: 5 }),
+    /** Orbital longitude, from the orbit's ascending node, of its northern spring equinox. Default 0. */
+    equinox_deg: opt(num({ min: 0, max: 360, sig: 7 })),
+    /** Where its prime meridian points at universal time 0, degrees from the equinox direction. Default 0. Ignored when locked. */
+    meridian_deg: opt(num({ min: 0, max: 360, sig: 7 }))
   }),
   /** Bond albedo; a typical value for the class is assumed when absent. */
   albedo: opt(num({ min: 0, max: 1, sig: 4 })),
+  /** Air, if it has any: what the sky view scatters light in. */
+  atmosphere: opt(
+    obj({
+      pressure_atm: num({ min: 0, sig: 6 }),
+      /** Absent: Earth's 8 km scaled by gravity. */
+      scaleHeight_km: opt(num({ above: 0, sig: 6 }))
+    })
+  ),
   lock: opt(lockSchema)
 })
 export type BodyFile = Infer<typeof bodySchema>
@@ -535,6 +571,27 @@ export type RouteFile = Infer<typeof routeSchema>
 
 export const routeKind: KindDef<RouteFile> = { kind: 'route', label: 'route', folder: 'routes', schema: routeSchema }
 
+// ---- viewpoints ----
+
+/** A place on a body to look at the sky from. */
+export const viewpointSchema = obj({
+  name: name(),
+  body: ref('body'),
+  lat_deg: num({ min: -90, max: 90, sig: 7 }),
+  /** East longitude. */
+  lon_deg: num({ min: -180, max: 360, sig: 7 }),
+  elevation_m: opt(num({ sig: 6 })),
+  note: opt(str({ max: 200 }))
+})
+export type ViewpointFile = Infer<typeof viewpointSchema>
+
+export const viewpointKind: KindDef<ViewpointFile> = {
+  kind: 'viewpoint',
+  label: 'viewpoint',
+  folder: 'viewpoints',
+  schema: viewpointSchema
+}
+
 export const KINDS: readonly KindDef[] = [
   physicsKind as KindDef,
   starfieldKind as KindDef,
@@ -548,5 +605,6 @@ export const KINDS: readonly KindDef[] = [
   relationKind as KindDef,
   stationKind as KindDef,
   nebulaKind as KindDef,
-  routeKind as KindDef
+  routeKind as KindDef,
+  viewpointKind as KindDef
 ]

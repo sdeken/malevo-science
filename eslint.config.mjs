@@ -30,7 +30,7 @@ export default tseslint.config(
   {
     // The stability contract (docs/PLAN.md §3.2): the model and every
     // generator draw randomness only from keyed, seeded streams.
-    files: ['packages/core/**', 'packages/model/**', 'packages/gen/**'],
+    files: ['packages/core/**', 'packages/model/**', 'packages/gen/**', 'packages/viz/**'],
     rules: {
       'no-restricted-properties': [
         'error',

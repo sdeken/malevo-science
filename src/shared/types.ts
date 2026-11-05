@@ -158,6 +158,7 @@ export interface WorldSnapshot {
   nodes: Record<string, RouteNodeDto>
   /** Null without physics settings. */
   traffic: TrafficDto | null
+  viewpoints: EntityDto[]
   issueCounts: { error: number; warning: number; info: number }
 }
 
@@ -220,6 +221,7 @@ export type EditableKind =
   | 'station'
   | 'nebula'
   | 'route'
+  | 'viewpoint'
 
 // ---- Phase 3: stars, systems, bodies ----
 
@@ -441,4 +443,81 @@ export interface BalanceSuggestionDto {
   cost: number
   /** Imbalance no route can take away, by node. */
   remaining: Record<string, number>
+}
+
+// ---- Phase 6: sky and approach ----
+
+export type V3 = [number, number, number]
+
+export interface SkyStarsDto {
+  ids: string[]
+  /** Unit directions in the system frame, x y z per star. */
+  dir: Float32Array
+  mag: Float32Array
+  ci: Float32Array
+  names: Record<number, string>
+}
+
+export interface ViewpointDto {
+  body: string
+  lat_deg: number
+  lon_deg: number
+  elevation_m?: number
+}
+
+export interface SkySceneDto {
+  system: string
+  body: string
+  t: number
+  frame: { up: V3; north: V3; east: V3 }
+  sun: { dir: V3; mag: number; radius: number }
+  bodies: { id: string; name: string; dir: V3; distance: number; mag: number; radius: number; phase: number; lit: V3 }[]
+  torches: {
+    route: string
+    service: number
+    neighbour: string
+    kind: 'in' | 'out'
+    dir: V3
+    distance: number
+    mag: number
+    tau: number
+    dark: boolean
+  }[]
+  routes: { route: string; neighbour: string; kind: 'in' | 'out'; perDay: number; crawl: number; expected: number; shown: number }[]
+  atmosphere: { radius: number; column: number; scaleHeight: number; light: number } | null
+  galPole: V3
+  galCentre: V3
+}
+
+export interface ApproachQueryDto {
+  system: string
+  from: string
+  t: number
+  /** Aim offset in the aim plane, m. */
+  offset?: [number, number]
+  margin?: number
+}
+
+export interface ApproachInfoDto {
+  back: V3
+  port: V3
+  drop: V3 | null
+  dropRadius: number | null
+  crawlDistance: number | null
+  crawl: number | null
+  starOnly: { dropRadius: number | null; crawl: number | null }
+  leeGain: number | null
+  margin: { best: number | null; worst: number | null } | null
+}
+
+export interface ApproachMapDto {
+  crawl: (number | null)[]
+  extent: number
+  n: number
+}
+
+export interface ApproachSeriesDto {
+  t: number[]
+  crawl: (number | null)[]
+  starOnly: (number | null)[]
 }

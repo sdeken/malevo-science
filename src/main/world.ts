@@ -41,6 +41,13 @@ import {
   routeWorld,
   suggestBalancing,
   trafficReport,
+  viewpointKind,
+  skyStars,
+  skyScene,
+  approachInfo,
+  approachMap,
+  approachSeries,
+  meridianForNoon,
   systemHistory,
   whenResolver,
   calendarKind,
@@ -97,6 +104,13 @@ import type {
   RouteNodeDto,
   RoutePlanDto,
   TrafficDto,
+  ApproachInfoDto,
+  ApproachMapDto,
+  ApproachQueryDto,
+  ApproachSeriesDto,
+  SkySceneDto,
+  SkyStarsDto,
+  ViewpointDto,
   StarField,
   StarInfoDto,
   StarSearchHit,
@@ -120,7 +134,8 @@ const KIND_DEFS: Record<EditableKind, KindDef> = {
   cultureSettings: cultureSettingsKind as KindDef,
   station: stationKind as KindDef,
   nebula: nebulaKind as KindDef,
-  route: routeKind as KindDef
+  route: routeKind as KindDef,
+  viewpoint: viewpointKind as KindDef
 }
 
 export class WorldSession extends EventEmitter {
@@ -251,6 +266,7 @@ export class WorldSession extends EventEmitter {
       routes,
       nodes,
       traffic,
+      viewpoints: entityDtos(world, viewpointKind.kind),
       physics: physicsFile
         ? {
             legLimit_ly: physicsFile.foam.legLimit_ly,
@@ -409,6 +425,32 @@ export class WorldSession extends EventEmitter {
   balance(onlyRoutes?: readonly string[]): BalanceSuggestionDto | null {
     const p = suggestBalancing(this.world(), this.env, onlyRoutes)
     return p ? { suggestions: p.suggestions, cost: p.cost, remaining: p.remaining } : null
+  }
+
+  // ---- sky and approach ----
+
+  skyStars(systemId: string): SkyStarsDto | null {
+    return skyStars(this.world(), this.env, systemId)
+  }
+
+  skyScene(vp: ViewpointDto, t: number): SkySceneDto | { error: string } {
+    return skyScene(this.world(), this.env, vp, t) as SkySceneDto | { error: string }
+  }
+
+  skyNoon(body: string, lon: number, t: number): number | null {
+    return meridianForNoon(this.world(), this.env, body, lon, t)
+  }
+
+  approachInfo(q: ApproachQueryDto): ApproachInfoDto | { error: string } {
+    return approachInfo(this.world(), this.env, q) as ApproachInfoDto | { error: string }
+  }
+
+  approachMap(q: ApproachQueryDto, extent: number, n: number): ApproachMapDto | { error: string } {
+    return approachMap(this.world(), this.env, q, extent, n)
+  }
+
+  approachSeries(q: ApproachQueryDto, t0: number, t1: number, n: number): ApproachSeriesDto | { error: string } {
+    return approachSeries(this.world(), this.env, q, t0, t1, n)
   }
 
   // ---- editing (unsaved until save) ----
