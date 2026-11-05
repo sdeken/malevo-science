@@ -12,6 +12,8 @@ import {
   solarSystemFor,
   systemFrame,
   systemInfo,
+  allRoutes,
+  approachInfo,
   bodyPosition,
   templateFiles,
   type WorldEnv,
@@ -154,5 +156,38 @@ describe('where the planets are at a date', () => {
     const turn = Math.acos((j0[0] * jq[0] + j0[1] * jq[1]) / (Math.hypot(j0[0], j0[1]) * Math.hypot(jq[0], jq[1]))) / DEG
     expect(turn).toBeGreaterThan(80)
     expect(turn).toBeLessThan(100)
+  })
+})
+
+describe('trip times follow the physics settings', () => {
+  const withPhysics = (patch: (p: Record<string, Record<string, unknown>>) => void) => {
+    const files = [...templateFiles(), ...solFiles()]
+    const phys = files.find((f) => f.path === 'settings/physics.json')!
+    const p = JSON.parse(phys.text ?? '{}')
+    patch(p)
+    const rest = files.filter((f) => f !== phys)
+    return readWorld([
+      { path: 'world.json', text: '{"format": 1, "name": "S", "seed": 1}' },
+      ...rest,
+      { path: 'settings/physics.json', text: JSON.stringify(p) },
+      { path: 'routes/r.json', text: JSON.stringify({ name: 'R', waypoints: [{ system: 'sol' }, { star: 'hip.70890' }] }) }
+    ])
+  }
+  const foamTime = (w: ReturnType<typeof world>): number => allRoutes(w, env)[0].legs[0].foam!
+  const crawl = (w: ReturnType<typeof world>): number => {
+    const r = approachInfo(w, env, { system: 'sol', from: [1, 0, 0], t: 0 })
+    if ('error' in r) throw new Error(r.error)
+    return r.crawl!
+  }
+
+  it('foam time scales with the top speed, the crawl with the acceleration, and the tanks cap it', () => {
+    const base = withPhysics(() => {})
+    const fast = withPhysics((p) => (p.foam.topSpeed_c = (p.foam.topSpeed_c as number) * 2))
+    expect(foamTime(fast) / foamTime(base)).toBeCloseTo(0.5, 6)
+    const hard = withPhysics((p) => (p.torch.cruiseAccel_g = (p.torch.cruiseAccel_g as number) * 4))
+    expect(crawl(hard) / crawl(base)).toBeCloseTo(0.5, 3)
+    // Tanks too small for the flip-and-burn speed: the crawl coasts in the middle and takes longer.
+    const dry = withPhysics((p) => (p.torch.exhaustSpeed_c = 0.0001))
+    expect(crawl(dry)).toBeGreaterThan(crawl(base) * 1.5)
   })
 })

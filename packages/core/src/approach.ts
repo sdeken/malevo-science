@@ -6,7 +6,7 @@
  * cancelling the star's (its "lee"), moves the drop and so the crawl.
  */
 import { firstCollapseAlong, type FoamSettings, type MassPoint } from './foam'
-import { flipAndBurnTime } from './torch'
+import { flipAndBurnTime, torchTrip } from './torch'
 import { distance, type Vec3 } from './vec'
 
 export interface ApproachLine {
@@ -37,13 +37,16 @@ export function approachAlong(
   port: Vec3,
   accel: number,
   reach: number,
-  steps = 600
+  steps = 600,
+  /** The tanks, when they may cap the crawl's speed (flip and burn, arriving at rest). */
+  tanks?: { exhaustSpeed: number; propellantFraction: number }
 ): ApproachResult {
   const s = firstCollapseAlong(line.aim, line.back, bodies, foam, reach, -reach, (2 * reach) / steps)
   if (s === null) return { drop: null, crawlDistance: null, crawl: null }
   const drop: Vec3 = [line.aim[0] + s * line.back[0], line.aim[1] + s * line.back[1], line.aim[2] + s * line.back[2]]
   const d = distance(drop, port)
-  return { drop, crawlDistance: d, crawl: flipAndBurnTime(d, accel) }
+  const crawl = tanks ? torchTrip(d, { accel, ...tanks, stop: true }).time : flipAndBurnTime(d, accel)
+  return { drop, crawlDistance: d, crawl }
 }
 
 /** Two unit vectors spanning the plane perpendicular to `back`: the aim plane's axes. */

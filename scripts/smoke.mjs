@@ -113,6 +113,8 @@ try {
   )
   await page.locator('.tool-link', { hasText: 'World' }).click()
   check((await page.locator('.world-seed').textContent()) === String(manifest.seed), 'the World tool shows the seed from the file')
+  await page.waitForSelector('#physicsEditor')
+  check((await page.locator('#physTopSpeed').inputValue()) !== '', 'and the physics settings, to edit in place')
   check(!JSON.stringify(await fs.readdir(userData)).includes('world.json'), 'nothing world-related is written to userData but settings')
   const stat = await fs.stat(path.join(worldDir, 'world.json'))
   const physicsStat = await fs.stat(path.join(worldDir, 'settings', 'physics.json'))

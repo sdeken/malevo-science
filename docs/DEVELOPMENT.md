@@ -202,6 +202,26 @@ module.exports = {
   day and the year of the planet it belongs to. A planet locked to its star has no solar day to
   follow.
 
+### Physics settings
+
+- **The World tool edits `settings/physics.json` in place:**
+  - **Foam:** top speed, leg limit, gravity limit, collapse radius and load rule.
+  - **Torches:** cruise acceleration, exhaust speed, propellant share and governor cutoff.
+  - **Travel and traffic:** stopover, balance tolerance and balance floor.
+
+  Edits are unsaved and undoable like any other, and every tool follows them at once.
+- **Every trip time comes from these settings.** Foam time is distance over the top speed. Burns
+  and crawls run at the cruise acceleration, and the tanks (exhaust speed and propellant share)
+  cap a crawl's speed when they are too small for flip-and-burn.
+- **The load rule** is how tides from several bodies combine into the foam's load:
+  - `max-eigen` counts the strongest stretch in any one direction;
+  - `rss` counts the tide's overall size, every direction together.
+
+  The two agree exactly around a single body, and along the line through a star and a giant,
+  where both tides stretch the same way. They differ only where tides pull across each other,
+  on a giant's flanks. There `rss` reaches a little further: at most about 6% of the giant's
+  bubble (0.248 against 0.264 AU for a Jupiter just outside Sol's edge).
+
 ### The collapse surface
 
 - **Where the foam collapses** is the surface where the load from every body's tide reaches 1

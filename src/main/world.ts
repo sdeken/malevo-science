@@ -297,6 +297,7 @@ export class WorldSession extends EventEmitter {
       traffic,
       viewpoints: entityDtos(world, viewpointKind.kind),
       historySettings: (world.entities.get(historySettingsKind.kind)?.value as Record<string, unknown> | undefined) ?? null,
+      physicsSettings: (world.entities.get(physicsKind.kind)?.value as Record<string, unknown> | undefined) ?? null,
       terrains: entityDtos(world, terrainKind.kind),
       cities: cityInfos(world, this.env)
         .sort((a, b) => compareStrings(a.id, b.id))

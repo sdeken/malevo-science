@@ -1869,3 +1869,15 @@ fieldset.plain {
 .leg-st-decel {
   background: #3c7d6a;
 }
+
+.physics-editor {
+  margin-top: 18px;
+  max-width: 900px;
+}
+
+.load-rule label.check {
+  display: flex;
+  gap: 8px;
+  align-items: flex-start;
+  margin: 4px 0;
+}

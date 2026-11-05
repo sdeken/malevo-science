@@ -163,6 +163,8 @@ export interface WorldSnapshot {
   viewpoints: EntityDto[]
   /** settings/history.json, if the world has it. */
   historySettings: Record<string, unknown> | null
+  /** settings/physics.json as written, if the world has it (for editing). */
+  physicsSettings: Record<string, unknown> | null
   terrains: EntityDto[]
   cities: CityInfoDto[]
   cityPlans: EntityDto[]

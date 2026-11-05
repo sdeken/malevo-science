@@ -453,7 +453,9 @@ function approachSetup(world: WorldData, env: WorldEnv, q: Pick<ApproachQuery, '
     back = galacticToSystem(systemFrame(sys.file), [g[0] / d, g[1] / d, g[2] / d])
   } else back = normalize(q.from)
   const foam = foamSettings(physics)
-  const accel = torchSettings(physics).cruiseAccel
+  const torch = torchSettings(physics)
+  const accel = torch.cruiseAccel
+  const tanks = { exhaustSpeed: torch.exhaustSpeed, propellantFraction: torch.propellantFraction }
   const reach = 2.5 * sys.collapse
   const starPoint: MassPoint[] = [{ pos: [0, 0, 0], mass: sys.star.physics.mass * M_SUN }]
   const port = (t: number): Vec3 | null => portAt(sys, t, back)
@@ -461,7 +463,7 @@ function approachSetup(world: WorldData, env: WorldEnv, q: Pick<ApproachQuery, '
     const p = port(t)
     if (!p) return { drop: null, crawlDistance: null, crawl: null, dropRadius: null }
     const l = line ?? offsetLine({ aim: p, back }, offset[0], offset[1])
-    const r = approachAlong(l, starOnly ? starPoint : massPoints(sys, t), foam, p, accel, reach)
+    const r = approachAlong(l, starOnly ? starPoint : massPoints(sys, t), foam, p, accel, reach, undefined, tanks)
     return { ...r, dropRadius: r.drop ? Math.hypot(...r.drop) : null }
   }
   return {
