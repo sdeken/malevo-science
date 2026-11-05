@@ -86,6 +86,7 @@ import {
   type CultureSettings,
   type KindDef,
   type SystemFile,
+  type BodyFile,
   type WhenResolver,
   type PhysicsSettings,
   type SystemInfo,
@@ -436,7 +437,32 @@ export class WorldSession extends EventEmitter {
       roll: Math.max(0, Math.trunc(roll))
     }
     const out = runGenerator(planets, input, world.manifest!.seed)
-    return { roll: input.roll, bodies: out.bodies.map((b) => ({ id: b.id, value: b.value as unknown as Record<string, unknown> })) }
+    // Bodies the system keeps whatever the roll (anything not from planets@): a rolled planet whose orbit crosses
+    // one of theirs is left out, as the crossing-orbits check would flag it.
+    const AU_KM = 1.495978707e8
+    const band = (o: { a_au?: number; a_km?: number; e: number }): [number, number] | null => {
+      const a = o.a_au ?? (o.a_km !== undefined ? o.a_km / AU_KM : null)
+      return a === null ? null : [a * (1 - o.e), a * (1 + o.e)]
+    }
+    const fixed: { name: string; band: [number, number] }[] = []
+    for (const e of world.entities.values()) {
+      if (e.kind.kind !== bodyKind.kind || e.value === undefined) continue
+      const v = e.value as BodyFile
+      if (v.system !== sys.id || v.parent || v.lock?.gen?.startsWith('planets@') || v.class === 'belt' || v.class === 'dwarf') continue
+      const bd = band(v.orbit)
+      if (bd) fixed.push({ name: v.name, band: bd })
+    }
+    const clashes: { id: string; with: string }[] = []
+    for (const b of out.bodies) {
+      const bd = band(b.value.orbit)
+      const hit = bd && fixed.find((f) => Math.max(f.band[0], bd[0]) <= Math.min(f.band[1], bd[1]))
+      if (hit) clashes.push({ id: b.id, with: hit.name })
+    }
+    return {
+      roll: input.roll,
+      bodies: out.bodies.map((b) => ({ id: b.id, value: b.value as unknown as Record<string, unknown> })),
+      clashes
+    }
   }
 
   /** Keep a roll: write its bodies, replacing bodies kept from an earlier roll of planets@1. One undoable, unsaved step. */
@@ -444,6 +470,8 @@ export class WorldSession extends EventEmitter {
     const world = this.world()
     const proposal = this.roll(systemId, roll)
     const changes: FileChange[] = []
+    const left = new Set(proposal.clashes.map((c) => c.id))
+    proposal.bodies = proposal.bodies.filter((b) => !left.has(b.id))
     const newIds = new Set(proposal.bodies.map((b) => b.id))
     for (const e of world.entities.values()) {
       if (e.kind.kind !== bodyKind.kind || e.value === undefined) continue

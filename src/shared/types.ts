@@ -349,6 +349,8 @@ export interface StarSearchHit {
 export interface PlanetProposal {
   roll: number
   bodies: { id: string; value: Record<string, unknown> }[]
+  /** Rolled planets left out when kept: their orbits cross a body the system already has (its known planets). */
+  clashes: { id: string; with: string }[]
 }
 
 // ---- Phase 4: cultures, polities, relations ----

@@ -1,5 +1,5 @@
 import { useLayoutEffect, useMemo, useRef, useState } from 'react'
-import { AU, M_SUN, collapseRegions, collapseSlice, stateAt, type MassPoint, type OrbitalElements, type Vec3 } from '@malevo/core'
+import { AU, M_SUN, collapseOutlines, stateAt, type MassPoint, type OrbitalElements, type Vec3 } from '@malevo/core'
 import type { ElementsInfo, PhysicsSummary, SystemInfoDto } from '../../../../shared/types'
 import { sig, starColour } from '../../components/fields'
 
@@ -89,10 +89,12 @@ export function OrbitView({ system, foam, now, selected, onSelect, center, bodie
       if (p) masses.push({ pos: p, mass: els.get(id)!.mass })
     }
     const settings = { collapseRadius: foam.collapseRadius_au * AU, rule: foam.loadRule }
-    return collapseRegions(masses, settings, { minRadius: outer / 400, steps: 160 }).map((r) => ({
-      star: r.body === 0,
-      center: r.center,
-      points: collapseSlice(r, settings, masses, [1, 0, 0], [0, 1, 0], 120)
+    return collapseOutlines(masses, settings, [0, 0, 0], [1, 0, 0], [0, 1, 0], { minRadius: outer / 400, grid: 160 }).map((o) => ({
+      star: o.body === 0,
+      center: o.center,
+      // The outer boundary, then any holes.
+      loops: o.loops,
+      points: o.loops[0]
     }))
   }, [foam, system, now, outer])
   const hostPos = useMemo((): Vec3 => {
@@ -235,26 +237,44 @@ export function OrbitView({ system, foam, now, selected, onSelect, center, bodie
           ))}
         {collapse.map((c, k) => {
           // On the log scale, a region away from the view's centre would be squashed toward its orbit (distances
-          // out from the centre shrink, distances along the orbit do not). Draw it in its true shape instead, at the
-          // scale along the orbit where its centre sits.
+          // out from the centre shrink, distances along the orbit do not). A small one is drawn in its true shape
+          // instead, at the scale along the orbit where its centre sits. A big one (a third of its distance or more)
+          // is mapped like everything else, so a gap or a join with the star's region reads as it is; between, a blend.
           const cx = c.center[0] - hostPos[0]
           const cy = c.center[1] - hostPos[1]
           const rc = Math.hypot(cx, cy)
-          const local = scale === 'log' && rc > 1e-9 * outer
+          const size = Math.max(...c.points.map((p) => Math.hypot(p[0] - c.center[0], p[1] - c.center[1])))
+          const w = scale === 'log' && rc > 1e-9 * outer ? Math.max(0, Math.min(1, (0.35 - size / rc) / 0.25)) : 0
           const [mx, my] = at(cx, cy)
-          const kl = local ? map(rc) / rc : 0
-          const pts = c.points.map((p) =>
-            local
-              ? ([mx + (p[0] - c.center[0]) * kl, my - (p[1] - c.center[1]) * kl] as [number, number])
-              : at(p[0] - hostPos[0], p[1] - hostPos[1])
-          )
+          const kl = rc > 0 ? map(rc) / rc : 0
+          const place = (p: Vec3): [number, number] => {
+            const g = at(p[0] - hostPos[0], p[1] - hostPos[1])
+            if (w === 0) return g
+            const t: [number, number] = [mx + (p[0] - c.center[0]) * kl, my - (p[1] - c.center[1]) * kl]
+            return [t[0] * w + g[0] * (1 - w), t[1] * w + g[1] * (1 - w)]
+          }
+          const pts = c.points.map(place)
           if (pts.length < 3) return null
+          const d = c.loops
+            .map(
+              (l) =>
+                'M ' +
+                l
+                  .map((p) =>
+                    place(p)
+                      .map((x) => x.toFixed(1))
+                      .join(',')
+                  )
+                  .join(' L ') +
+                ' Z'
+            )
+            .join(' ')
           const top = pts.reduce((a, b) => (b[1] < a[1] ? b : a))
           return (
             <g key={`c-${k}`} className="ov-collapse" pointerEvents="none">
-              <polygon points={pts.map((p) => `${p[0].toFixed(1)},${p[1].toFixed(1)}`).join(' ')}>
+              <path d={d} fillRule="evenodd">
                 <title>The foam collapses inside this line (every body's tide, at the current date)</title>
-              </polygon>
+              </path>
               {c.star && center === null && system.collapse && (
                 <text x={top[0]} y={top[1] - 4}>
                   collapse {sig(system.collapse / AU, 3)} AU

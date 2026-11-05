@@ -377,8 +377,8 @@ try {
   await rollOnce()
   await rollOnce()
   check((await rollNo()) === 2, 'rolling again gives a different system')
-  // The world's seed is new every run, and now and then a small red dwarf rolls no planets: roll on until one has some.
-  for (let k = 0; k < 20 && (await page.locator('.roll-panel tbody tr').count()) === 0; k++) await rollOnce()
+  // The world's seed is new every run, and now and then a roll has no planets that fit beside the known ones: roll on.
+  for (let k = 0; k < 20 && (await page.locator('.roll-panel tbody tr:not(.muted)').count()) === 0; k++) await rollOnce()
   await page.locator('#keepRoll').click()
   await page.waitForSelector('[data-body-row^="proxima-centauri-"]', { timeout: 15_000 })
   const kept = await page.locator('[data-body-row^="proxima-centauri-"]').count()
@@ -429,7 +429,7 @@ try {
   const summary = (await page.locator('.checks-summary').textContent()) ?? ''
   check(
     summary === 'No problems found.' || / 0 errors, 0 warnings/.test(` ${summary}`),
-    `the world with its new system checks clean (${summary})`
+    `the world with its new system checks clean (${summary}${/ 0 errors, 0 warnings/.test(` ${summary}`) || summary === 'No problems found.' ? '' : `: ${await page.locator('.issue-list').textContent()}`})`
   )
 
   // 13. Phase 4: cultures, a relation that departs from their traits, a polity, and a system's history.

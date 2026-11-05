@@ -1,5 +1,16 @@
 import { describe, expect, it } from 'vitest'
-import { AU, M_JUPITER, M_SUN, collapseMesh, collapseRadius, collapseRegions, collapseSlice, foamLoad, type MassPoint } from '@malevo/core'
+import {
+  AU,
+  M_JUPITER,
+  M_SUN,
+  collapseMesh,
+  collapseOutlines,
+  collapseRadius,
+  collapseRegions,
+  collapseSlice,
+  foamLoad,
+  type MassPoint
+} from '@malevo/core'
 
 const s = { collapseRadius: 2.7 * AU, rule: 'max-eigen' as const }
 const star: MassPoint = { pos: [0, 0, 0], mass: M_SUN }
@@ -40,5 +51,41 @@ describe('the collapse surface', () => {
     // The star's region bulges out past the giant on that side.
     expect(merged[0].radial([1, 0, 0]) / AU).toBeGreaterThan(2.85)
     expect(merged[0].radial([-1, 0, 0]) / AU).toBeCloseTo(2.7, 1)
+  })
+})
+
+describe('collapse outlines in the system plane', () => {
+  const O: [number, number, number] = [0, 0, 0]
+  const outlines = (bodies: MassPoint[]) => collapseOutlines(bodies, s, O, X, Y, { grid: 160 })
+  const xs = (loop: readonly (readonly number[])[]) => loop.map((p) => p[0] / AU)
+
+  it('is the collapse circle for a lone star', () => {
+    const [o] = outlines([star])
+    expect(o.loops).toHaveLength(1)
+    for (const p of o.loops[0]) expect(Math.hypot(p[0], p[1]) / AU).toBeCloseTo(2.7, 1)
+  })
+
+  it('keeps a massive planet past the star’s bubble apart until the load between them reaches 1', () => {
+    // At 5.4 AU, 0.05 M☉: its own bubble is about 1 AU, with a gap of about 1.7 AU to the star's.
+    const apart = outlines([star, { pos: [5.4 * AU, 0, 0], mass: 0.05 * M_SUN }])
+    expect(apart.map((o) => o.body)).toEqual([0, 1])
+    expect(Math.max(...xs(apart[0].loops[0]))).toBeLessThan(3)
+    expect(Math.min(...xs(apart[1].loops[0]))).toBeGreaterThan(4)
+    for (const p of apart[1].loops[0]) expect(foamLoad(p, [star, { pos: [5.4 * AU, 0, 0], mass: 0.05 * M_SUN }], s)).toBeCloseTo(1, 1)
+  })
+
+  it('joins them through a smooth neck once it does, not a straight spike', () => {
+    const planet: MassPoint = { pos: [5.4 * AU, 0, 0], mass: 0.6 * M_SUN }
+    // The load on the line between them reaches 1 everywhere: one area.
+    const joined = outlines([star, planet])
+    expect(joined).toHaveLength(1)
+    const loop = joined[0].loops[0]
+    // The neck: its narrowest half-width between the two is positive and wider than a grid cell, and the outline
+    // narrows to it gradually (no jump of more than a few cells from one x to the next).
+    const halfWidthAt = (x: number) => Math.max(...loop.filter((p) => Math.abs(p[0] / AU - x) < 0.08).map((p) => Math.abs(p[1] / AU)), 0)
+    const widths = [1.5, 2, 2.5, 3, 3.5, 4].map(halfWidthAt)
+    expect(Math.min(...widths)).toBeGreaterThan(0.2)
+    for (let k = 1; k < widths.length; k++) expect(Math.abs(widths[k] - widths[k - 1])).toBeLessThan(0.6)
+    for (const p of loop) expect(foamLoad(p, [star, planet], s)).toBeCloseTo(1, 1)
   })
 })

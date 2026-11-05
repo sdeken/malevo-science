@@ -1104,7 +1104,8 @@ details.overrides summary {
 }
 
 .ov-collapse circle,
-.ov-collapse polygon {
+.ov-collapse polygon,
+.ov-collapse path {
   fill: none;
   stroke: var(--now);
   stroke-dasharray: 5 4;

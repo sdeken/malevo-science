@@ -331,8 +331,13 @@ function SystemDetail({
                 <tbody>
                   {proposal.bodies.map((b) => {
                     const o = b.value.orbit as { a_au: number }
+                    const clash = proposal.clashes?.find((c) => c.id === b.id)
                     return (
-                      <tr key={b.id}>
+                      <tr
+                        key={b.id}
+                        className={clash ? 'muted' : undefined}
+                        title={clash ? `Left out when kept: its orbit crosses ${clash.with}'s` : undefined}
+                      >
                         <td>{String(b.value.name)}</td>
                         <td>{String(b.value.class)}</td>
                         <td>{sig(o.a_au, 3)} AU</td>
@@ -343,6 +348,12 @@ function SystemDetail({
                 </tbody>
               </table>
               {proposal.bodies.length === 0 && <p className="muted">This roll has no planets.</p>}
+              {proposal.clashes?.length > 0 && (
+                <p className="muted small">
+                  Greyed planets cross the orbits of bodies already here ({[...new Set(proposal.clashes.map((c) => c.with))].join(', ')})
+                  and are left out when kept.
+                </p>
+              )}
               <div className="inspector-actions">
                 <button onClick={() => void roll(proposal.roll + 1)} id="rollAgain">
                   Roll again

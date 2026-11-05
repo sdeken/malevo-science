@@ -154,7 +154,9 @@ export function foamTime(distance: number, s: Pick<FoamSettings, 'topSpeed' | 'g
  * enough lies inside the star's region, which then bulges to take it in.
  * The surface is found along rays from the centre, so a region is assumed to
  * be star-shaped about it: each ray's crossing is the outermost one (a lee's
- * dent shows; a hole deep inside does not).
+ * dent shows; a hole deep inside does not). That fails for bubbles side by
+ * side: a ray from the star through a separate bubble reaches its far side.
+ * For the true outline in a plane, use `collapseOutlines`.
  */
 export interface CollapseRegion {
   /** Index of the body at its heart. */
@@ -278,4 +280,203 @@ export function collapseSlice(
     out.push([foot[0] + d[0] * t, foot[1] + d[1] * t, foot[2] + d[2] * t])
   }
   return out
+}
+
+/** One connected collapse area in a plane: its outer boundary and any holes in it (lees). */
+export interface CollapseOutline {
+  /** Index of the most massive body inside it. */
+  body: number
+  /** The body's foot in the plane. */
+  center: Vec3
+  /** Closed loops in the plane: the outer boundary first, then holes. */
+  loops: Vec3[][]
+}
+
+/**
+ * Where the foam collapses in a plane through `origin` spanned by unit
+ * vectors `u` and `v`: the contour where the load is 1, traced as it is.
+ *
+ * This is the exact slice of the 3D collapse surface, whatever its shape: two
+ * bubbles stay apart until the load between them reaches 1, then join through
+ * a smooth neck; a lee shows as a dent or a hole. For each body big enough
+ * to matter (own collapse radius at least `minRadius`), biggest first, the
+ * load is sampled on a grid around it (wide enough to take in any body whose
+ * collapse could touch it) and contoured by marching squares on the log of
+ * the load. A body inside an area already traced has none of its own.
+ */
+export function collapseOutlines(
+  bodies: readonly MassPoint[],
+  s: Pick<FoamSettings, 'collapseRadius' | 'rule'>,
+  origin: Vec3,
+  u: Vec3,
+  v: Vec3,
+  opts: { minRadius?: number; grid?: number } = {}
+): CollapseOutline[] {
+  const n = Math.max(16, Math.round(opts.grid ?? 160))
+  const nrm: Vec3 = [u[1] * v[2] - u[2] * v[1], u[2] * v[0] - u[0] * v[2], u[0] * v[1] - u[1] * v[0]]
+  const to2 = (p: Vec3): [number, number] => {
+    const d = [p[0] - origin[0], p[1] - origin[1], p[2] - origin[2]]
+    return [d[0] * u[0] + d[1] * u[1] + d[2] * u[2], d[0] * v[0] + d[1] * v[1] + d[2] * v[2]]
+  }
+  const to3 = (x: number, y: number): Vec3 => [
+    origin[0] + x * u[0] + y * v[0],
+    origin[1] + x * u[1] + y * v[1],
+    origin[2] + x * u[2] + y * v[2]
+  ]
+  const own = bodies.map((b) => collapseRadius(b.mass, s))
+  const order = bodies.map((_, i) => i).sort((a, b) => bodies[b].mass - bodies[a].mass || a - b)
+  const out: CollapseOutline[] = []
+  const flat = bodies.map((b) => to2(b.pos))
+  // Where the foam collapses, within a sum-of-loads bound: |T₁ + T₂| ≤ |T₁| + |T₂|, so a point in collapse has
+  // some body's own load ≥ 1/N there; 1.6 × own radius covers any pair (2^(1/3) ≈ 1.26) with room to spare.
+  for (const i of order) {
+    if (own[i] < (opts.minRadius ?? 0)) continue
+    const [cx, cy] = flat[i]
+    const off = (bodies[i].pos[0] - origin[0]) * nrm[0] + (bodies[i].pos[1] - origin[1]) * nrm[1] + (bodies[i].pos[2] - origin[2]) * nrm[2]
+    if (Math.abs(off) >= 1.6 * own[i]) continue
+    if (out.some((o) => pointInLoop([cx, cy], o.loops[0].map(to2)) && !o.loops.slice(1).some((h) => pointInLoop([cx, cy], h.map(to2)))))
+      continue
+    let reach = 1.6 * own[i]
+    for (let changed = true; changed;) {
+      changed = false
+      bodies.forEach((_, j) => {
+        if (j === i) return
+        const d = Math.hypot(flat[j][0] - cx, flat[j][1] - cy)
+        const far = d + 1.6 * own[j]
+        if (d - 1.6 * own[j] < reach && far > reach) {
+          reach = far
+          changed = true
+        }
+      })
+    }
+    // log load on an (n+1)² grid over the square of half-width `reach` about the body.
+    const h = (2 * reach) / n
+    const f = new Float64Array((n + 1) * (n + 1))
+    for (let a = 0; a <= n; a++)
+      for (let b = 0; b <= n; b++) {
+        const L = foamLoad(to3(cx - reach + b * h, cy - reach + a * h), bodies, s)
+        // On a body itself the load is unbounded (NaN from 0/0): inside.
+        f[a * (n + 1) + b] = Number.isNaN(L) || L === Infinity ? 700 : L > 0 ? Math.log(L) : -700
+      }
+    const loops = marchingSquares(f, n, cx - reach, cy - reach, h)
+    const outer = loops.filter((l) => pointInLoop([cx, cy], l)).sort((p, q) => Math.abs(loopArea(p)) - Math.abs(loopArea(q)))[0]
+    if (!outer) continue
+    const holes = loops.filter((l) => l !== outer && !pointInLoop([cx, cy], l) && pointInLoop(l[0], outer))
+    out.push({ body: i, center: to3(cx, cy), loops: [outer, ...holes].map((l) => l.map(([x, y]) => to3(x, y))) })
+  }
+  return out
+}
+
+function pointInLoop(p: readonly [number, number] | readonly number[], loop: readonly (readonly number[])[]): boolean {
+  let inside = false
+  for (let k = 0, j = loop.length - 1; k < loop.length; j = k++) {
+    const [xi, yi] = loop[k]
+    const [xj, yj] = loop[j]
+    if (yi > p[1] !== yj > p[1] && p[0] < ((xj - xi) * (p[1] - yi)) / (yj - yi) + xi) inside = !inside
+  }
+  return inside
+}
+
+function loopArea(loop: readonly (readonly number[])[]): number {
+  let a = 0
+  for (let k = 0, j = loop.length - 1; k < loop.length; j = k++) a += loop[j][0] * loop[k][1] - loop[k][0] * loop[j][1]
+  return a / 2
+}
+
+/**
+ * The closed contours where `f` (on an (n+1)² grid, row a at y0 + a·h, column
+ * b at x0 + b·h) crosses 0, with crossings placed by linear interpolation.
+ * Lines that run off the grid are returned open (read as closed by a straight edge).
+ */
+function marchingSquares(f: Float64Array, n: number, x0: number, y0: number, h: number): [number, number][][] {
+  const W = n + 1
+  const val = (a: number, b: number): number => f[a * W + b]
+  // A crossing point on an edge, keyed so neighbouring cells share it: horizontal edges "h:a:b", vertical "v:a:b".
+  const pts = new Map<string, [number, number]>()
+  const point = (key: string, a0: number, b0: number, a1: number, b1: number): string => {
+    if (!pts.has(key)) {
+      const p = val(a0, b0)
+      const q = val(a1, b1)
+      const t = p === q ? 0.5 : Math.max(0, Math.min(1, p / (p - q)))
+      pts.set(key, [x0 + (b0 + (b1 - b0) * t) * h, y0 + (a0 + (a1 - a0) * t) * h])
+    }
+    return key
+  }
+  const next = new Map<string, string[]>()
+  const link = (p: string, q: string): void => {
+    next.set(p, [...(next.get(p) ?? []), q])
+    next.set(q, [...(next.get(q) ?? []), p])
+  }
+  for (let a = 0; a < n; a++)
+    for (let b = 0; b < n; b++) {
+      // Corners: 0 (a,b), 1 (a,b+1), 2 (a+1,b+1), 3 (a+1,b); inside where f ≥ 0.
+      const c = [val(a, b) >= 0, val(a, b + 1) >= 0, val(a + 1, b + 1) >= 0, val(a + 1, b) >= 0]
+      const idx = (c[0] ? 1 : 0) | (c[1] ? 2 : 0) | (c[2] ? 4 : 0) | (c[3] ? 8 : 0)
+      if (idx === 0 || idx === 15) continue
+      const e = [
+        () => point(`h:${a}:${b}`, a, b, a, b + 1),
+        () => point(`v:${a}:${b + 1}`, a, b + 1, a + 1, b + 1),
+        () => point(`h:${a + 1}:${b}`, a + 1, b, a + 1, b + 1),
+        () => point(`v:${a}:${b}`, a, b, a + 1, b)
+      ]
+      const centre = (val(a, b) + val(a, b + 1) + val(a + 1, b + 1) + val(a + 1, b)) / 4 >= 0
+      const pairs: [number, number][] =
+        idx === 5
+          ? centre
+            ? [
+                [0, 1],
+                [2, 3]
+              ]
+            : [
+                [0, 3],
+                [1, 2]
+              ]
+          : idx === 10
+            ? centre
+              ? [
+                  [0, 3],
+                  [1, 2]
+                ]
+              : [
+                  [0, 1],
+                  [2, 3]
+                ]
+            : [CASES[idx]]
+      for (const [p, q] of pairs) link(e[p](), e[q]())
+    }
+  // Chain the segments into loops (or open lines at the grid's edge).
+  const used = new Set<string>()
+  const lines: [number, number][][] = []
+  const walk = (start: string): string[] => {
+    const line = [start]
+    used.add(start)
+    for (let cur = start; ;) {
+      const nx = (next.get(cur) ?? []).find((k) => !used.has(k))
+      if (nx === undefined) break
+      used.add(nx)
+      line.push(nx)
+      cur = nx
+    }
+    return line
+  }
+  // Open lines first (ends have one neighbour), then closed loops.
+  for (const k of next.keys()) if (!used.has(k) && next.get(k)!.length === 1) lines.push(walk(k).map((x) => pts.get(x)!))
+  for (const k of next.keys()) if (!used.has(k)) lines.push(walk(k).map((x) => pts.get(x)!))
+  return lines.filter((l) => l.length >= 3)
+}
+
+/** Marching-squares edge pairs for the single-segment cases (edges 0 top, 1 right, 2 bottom, 3 left). */
+const CASES: Record<number, [number, number]> = {
+  1: [3, 0],
+  2: [0, 1],
+  3: [3, 1],
+  4: [1, 2],
+  6: [0, 2],
+  7: [3, 2],
+  8: [2, 3],
+  9: [0, 2],
+  11: [1, 2],
+  12: [1, 3],
+  13: [0, 1],
+  14: [3, 0]
 }
