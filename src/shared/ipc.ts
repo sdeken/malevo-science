@@ -43,6 +43,9 @@ export const IPC = {
   skyScene: 'sky:scene',
   skyNoon: 'sky:noon',
   approachInfo: 'approach:info',
+  historyPropose: 'history:propose',
+  historyAccept: 'history:accept',
+  historyNews: 'history:news',
   approachMap: 'approach:map',
   approachSeries: 'approach:series',
 

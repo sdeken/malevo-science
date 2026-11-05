@@ -1445,3 +1445,67 @@ table.units.services select {
   font-size: 11px;
   fill: var(--muted);
 }
+
+/* ---- History ---- */
+
+.history-head {
+  display: flex;
+  align-items: center;
+  gap: 24px;
+}
+
+.history-head .seg.tabs {
+  margin: 0;
+}
+
+.history-run {
+  display: flex;
+  gap: 24px;
+  align-items: flex-start;
+}
+
+.history-left {
+  flex: 1;
+  min-width: 380px;
+  max-width: 560px;
+}
+
+.history-map {
+  flex: 1;
+  height: 520px;
+  min-width: 320px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  position: sticky;
+  top: 0;
+}
+
+.proposal-group {
+  border-top: 1px solid var(--border);
+  padding: 6px 0;
+}
+
+.proposal-head {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+}
+
+.proposal-list {
+  list-style: none;
+  padding: 0 0 0 22px;
+  margin: 4px 0;
+  max-height: 260px;
+  overflow: auto;
+}
+
+.proposal-list li {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  font-size: 13px;
+}
+
+.history-conflicts ul {
+  padding-left: 18px;
+}

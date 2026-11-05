@@ -48,6 +48,11 @@ import {
   approachMap,
   approachSeries,
   meridianForNoon,
+  historySettingsKind,
+  proposeHistory,
+  newsArrival,
+  KINDS,
+  type HistoryProposal,
   systemHistory,
   whenResolver,
   calendarKind,
@@ -111,6 +116,8 @@ import type {
   SkySceneDto,
   SkyStarsDto,
   ViewpointDto,
+  HistoryProposalDto,
+  NewsDto,
   StarField,
   StarInfoDto,
   StarSearchHit,
@@ -135,7 +142,8 @@ const KIND_DEFS: Record<EditableKind, KindDef> = {
   station: stationKind as KindDef,
   nebula: nebulaKind as KindDef,
   route: routeKind as KindDef,
-  viewpoint: viewpointKind as KindDef
+  viewpoint: viewpointKind as KindDef,
+  historySettings: historySettingsKind as KindDef
 }
 
 export class WorldSession extends EventEmitter {
@@ -267,6 +275,7 @@ export class WorldSession extends EventEmitter {
       nodes,
       traffic,
       viewpoints: entityDtos(world, viewpointKind.kind),
+      historySettings: (world.entities.get(historySettingsKind.kind)?.value as Record<string, unknown> | undefined) ?? null,
       physics: physicsFile
         ? {
             legLimit_ly: physicsFile.foam.legLimit_ly,
@@ -439,6 +448,41 @@ export class WorldSession extends EventEmitter {
 
   skyNoon(body: string, lon: number, t: number): number | null {
     return meridianForNoon(this.world(), this.env, body, lon, t)
+  }
+
+  // ---- history ----
+
+  private lastProposal: { version: number; proposal: HistoryProposal } | null = null
+
+  historyPropose(seed?: number): HistoryProposalDto | { error: string } {
+    const p = proposeHistory(this.world(), this.env, seed)
+    if ('error' in p) return p
+    this.lastProposal = { version: this.version, proposal: p }
+    return p
+  }
+
+  /** Accept pieces of the last proposal: one undoable, unsaved step. */
+  historyAccept(keys: readonly string[]): number {
+    const last = this.lastProposal
+    if (!last) throw new WorldError('io', 'Run the history first.')
+    if (last.version !== this.version) throw new WorldError('io', 'The world has changed since the run. Run it again before accepting.')
+    const want = new Set(keys)
+    const changes: FileChange[] = []
+    for (const f of last.proposal.files) {
+      if (!want.has(f.key)) continue
+      const kind = KINDS.find((k) => k.kind === f.kind)
+      if (kind) changes.push({ path: f.path, text: entityText(kind, f.value) })
+    }
+    if (!changes.length) return 0
+    this.editor!.edit(changes)
+    this.changed()
+    // Accepted pieces are now fixed points; the rest of the proposal is out of date.
+    this.lastProposal = null
+    return changes.length
+  }
+
+  historyNews(eventId: string): NewsDto | { error: string } {
+    return newsArrival(this.world(), this.env, eventId)
   }
 
   approachInfo(q: ApproachQueryDto): ApproachInfoDto | { error: string } {

@@ -538,6 +538,69 @@ try {
   check(true, 'and sweeps the crawl over the years')
   await page.screenshot({ path: path.join(shots, '15-approach.png') })
 
+  // 16. Phase 7: set up the history generator, run it, accept the run, and trace news through it.
+  await page.evaluate(async () => {
+    const yr = 31_557_600
+    for (const [id, name, y] of [
+      ['slow-ships', 'Slow ships', 300],
+      ['foam-drive', 'The foam drive', 650],
+      ['run-end', 'End of the run', 800],
+      ['big-news', 'Big news', 760]
+    ])
+      await window.malevo.world.setEntity('event', id, { name, type: 'event', when: { at: { t_s: y * yr } } })
+  })
+  await tool('History')
+  await page.waitForSelector('#historySetup')
+  await page.locator('#histOrigin').selectOption('proxima-centauri')
+  await page.locator('#histCulture').selectOption('new-culture')
+  await page.locator('#histSlow').selectOption('slow-ships')
+  await page.locator('#histFoam').selectOption('foam-drive')
+  await page.locator('#histEnd').selectOption('run-end')
+  await page.locator('#historyCreate').click()
+  await page.waitForSelector('#historyRun')
+  // Keep the smoke run small.
+  await page.evaluate(async () => {
+    const s = (await window.malevo.world.snapshot()).historySettings
+    await window.malevo.world.setEntity('historySettings', 'historySettings', { ...s, growth: { systems: 30, maxRadius_ly: 45 } })
+  })
+  await page.locator('#historyRun').click()
+  await page.waitForSelector('#historySummary', { timeout: 60_000 })
+  const summary7 = (await page.locator('#historySummary').textContent()) ?? ''
+  const proposedSystems = Number(summary7.match(/(\d+) systems/)?.[1] ?? 0)
+  check(proposedSystems >= 15, `a run proposes a settlement history (${summary7.trim()})`)
+  await page.screenshot({ path: path.join(shots, '16-history.png') })
+  await page.locator('#historyAccept').click()
+  await page.waitForFunction(() => /Accepted \d+ file/.test(document.querySelector('.history-run')?.textContent ?? ''))
+  await page.locator('.status-save').click()
+  await page.waitForFunction(() => document.querySelector('.status-saved') !== null)
+  const sysFiles = await fs.readdir(path.join(worldDir, 'systems'))
+  const locked = (
+    await Promise.all(sysFiles.map(async (f) => JSON.parse(await fs.readFile(path.join(worldDir, 'systems', f), 'utf8')).lock?.gen))
+  ).filter((g) => g === 'history@1').length
+  check(locked >= 15, `accepting writes the systems, locked to history@1 (${locked})`)
+  await page.evaluate(async () => {
+    const yr = 31_557_600
+    await window.malevo.world.setEntity('event', 'big-news', {
+      name: 'Big news',
+      type: 'event',
+      when: { at: { t_s: 760 * yr } },
+      where: 'proxima-centauri'
+    })
+  })
+  await page.locator('[data-tab="news"]').click()
+  await page.locator('#newsEvent').selectOption('big-news')
+  await page.waitForSelector('#newsTable [data-news]')
+  check(
+    (await page.locator('#newsTable [data-news="ships"]').count()) > 0,
+    'news of an event reaches other systems by ship, ahead of radio'
+  )
+  await page.evaluate(() => window.malevo.world.discard())
+  await tool('Checks')
+  await page.locator('.checks-bar button').click()
+  await page.waitForFunction(() => /No problems found|notes|errors?/.test(document.querySelector('.checks-summary')?.textContent ?? ''))
+  const s7 = (await page.locator('.checks-summary').textContent()) ?? ''
+  check(s7 === 'No problems found.' || /(^|\D)0 errors/.test(s7), `the accepted history has no errors (${s7})`)
+
   // 10. The update status reports a dev build.
   const status = await page.evaluate(() => window.malevo.updates.status())
   check(status.state === 'unavailable', 'an unpackaged build reports updates as unavailable')

@@ -30,7 +30,7 @@ npm run dev          # the app with hot reload
   the file system.
 - **`src/renderer`** is the tool host: the welcome screen, sidebar, current-date bar and status
   bar. Tools live in `src/renderer/src/tools/<id>/` and are listed in
-  `src/renderer/src/tools/index.ts`. The tools are Timeline, Stars, Systems, Routes, Sky, Approach, Cultures, Calendars,
+  `src/renderer/src/tools/index.ts`. The tools are Timeline, Stars, Systems, Routes, Sky, Approach, Cultures, History, Calendars,
   Fork & compare, Checks and World.
 - **The world session lives in main** (`src/main/world.ts`): the open world, its unsaved changes
   (a `WorldEditor`), and every calendar operation. The renderer gets snapshots pushed to it, and
@@ -307,6 +307,53 @@ module.exports = {
     alone.
   - It also shows the best and worst crawl within a navigator's margin, a map of crawl time over
     aim offsets ("looking down the lane"), and a sweep over the years with the lee windows shaded.
+
+### The history generator
+
+- **`settings/history.json`** (created by the History tool) says what to play out:
+  - the origin system and its culture;
+  - the events that bring slow ships and the foam drive, and the event that ends the run;
+  - slow ships' reach and how many colonies they found;
+  - how many systems by the end, and how far out;
+  - culture rates: enclaves, branching, blending;
+  - the belief cultures that found enclaves (each from an event);
+  - the polities: when they form, each one's target share of the systems, and how fast it pulls
+    its systems toward one culture.
+- **`history@1`** (`packages/gen/src/history.ts`) has the prototype `settle.js` mechanics with
+  nothing particular to one story:
+  - slow-ship colonies near the origin, each starting a regional culture;
+  - after the foam drive, colonies up to two legs out, with outposts at the stops between;
+  - enclaves and branching cultures, and blending along lanes;
+  - polity borders by weighted distance from each capital, balanced to the shares.
+
+  Stars off the main sequence are never settled. A history is path-dependent, so the run draws
+  from one stream. Names come from per-star streams.
+- **Gated by the timeline:**
+  - Nothing is settled before the slow-ship event.
+  - Before the foam drive, nothing is settled beyond slow ships' reach.
+  - No route opens before the foam drive.
+
+  The `history` check reports authored systems and routes that break this.
+- **Fixed facts:** every existing system is a fixed point.
+  - With a dated history, it is settled at its first entry, with that entry's cultures and its
+    latest polity.
+  - Without one, it is a place the run should reach.
+  - A polity's capital is kept.
+  - What the run cannot honour is listed under "What it could not honour".
+- **Proposals:**
+  - A run proposes new systems (with histories: founded, when the polities formed, at the end)
+    and new regional cultures.
+  - It proposes routes, with `opened` dates. Slow-ship links that fit the leg limit open when the
+    foam drive does.
+  - It proposes events, with `where`, and capitals for polities that have none.
+  - Accepted pieces are written as one undoable, unsaved step, locked to `history@1` (provenance
+    only: no inputs, so they never go stale). On the next run they are fixed points.
+  - To compare runs, fork the world and accept in the fork.
+- **News** (`newsArrival`): when each system heard of an event that has a `where`.
+  - It goes by radio at the speed of light, or by ship over the routes open at the time (once the
+    foam drive exists), whichever is first.
+  - Each ship leg takes its door-to-door trip time plus half the gap between sailings on its
+    services.
 
 ### Editing, saving, undo
 

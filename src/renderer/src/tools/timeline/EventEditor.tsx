@@ -6,6 +6,7 @@ interface Props {
   event: EventInfo
   events: EventInfo[]
   calendars: CalendarInfo[]
+  systems: { id: string; name: string }[]
   displayCal: string
   now: number
   setNow(t: number): void
@@ -14,7 +15,7 @@ interface Props {
 }
 
 /** Edit one event. Every change is an unsaved, undoable edit; nothing is written until Save. */
-export function EventEditor({ event, events, calendars, displayCal, now, setNow, version, onDeleted }: Props): React.JSX.Element {
+export function EventEditor({ event, events, calendars, systems, displayCal, now, setNow, version, onDeleted }: Props): React.JSX.Element {
   const value = event.value
   const [name, setName] = useState(value?.name ?? '')
   const [tags, setTags] = useState((value?.tags ?? []).join(', '))
@@ -36,6 +37,7 @@ export function EventEditor({ event, events, calendars, displayCal, now, setNow,
     const next: EventValue = { ...value, ...patch }
     if (!next.tags?.length) delete next.tags
     if (!next.until) delete next.until
+    if (!next.where) delete next.where
     void window.malevo.world.setEntity('event', event.id, next)
   }
   const anchors = events.filter((e) => e.id !== event.id)
@@ -147,6 +149,19 @@ export function EventEditor({ event, events, calendars, displayCal, now, setNow,
           Add an end
         </button>
       )}
+
+      <label className="field">
+        Where
+        <select value={value.where ?? ''} onChange={(e) => save({ where: e.target.value || undefined })} id="eventWhere">
+          <option value="">(nowhere in particular)</option>
+          {systems.map((s) => (
+            <option key={s.id} value={s.id}>
+              {s.name}
+            </option>
+          ))}
+        </select>
+        <span className="muted small">The system news of it spreads from (the History tool shows who heard when).</span>
+      </label>
 
       <div className="inspector-actions">
         {event.start && <button onClick={() => setNow(event.start!.t)}>Go to its date</button>}

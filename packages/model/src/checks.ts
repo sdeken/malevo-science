@@ -9,6 +9,7 @@ import { cultureSettings, relationId, systemHistory } from './cultures'
 import { resolveEvents, whenResolver, worldCalendars, type WorldEnv } from './events'
 import { systemInfo, worldStars } from './systems'
 import { allRoutes, nodePath, routeWorld, trafficReport, waypointNode } from './routes'
+import { historySettings } from './history'
 import { templateFiles } from './template'
 import {
   calendarKind,
@@ -457,6 +458,64 @@ export const routesCheck: Check = {
   }
 }
 
+/** With history settings, the timeline gates capabilities: nothing settled or flown before it could be (docs/PLAN.md §7.3). */
+export const historyCheck: Check = {
+  id: 'history',
+  title: 'Nothing is settled or flown before the technology for it exists',
+  run(world, env) {
+    const s = historySettings(world)
+    if (!s) return []
+    const out: Issue[] = []
+    const resolver = whenResolver(world, worldCalendars(world, env))
+    const events = resolver.events()
+    const t = (id: string): number | null => events.get(id)?.start?.t ?? null
+    const slow = t(s.slowShips)
+    const foam = t(s.foamDrive)
+    const rw = routeWorld(world, env)
+    const origin = rw.node(`system:${s.origin}`).pos
+    for (const e of entitiesOf(world, systemKind)) {
+      if (e.id === s.origin) continue
+      const first = systemHistory(e.value, resolver).find((h) => h.t !== null)
+      if (!first) continue
+      const p = rw.node(`system:${e.id}`).pos
+      const far = p && origin ? Math.hypot(p[0] - origin[0], p[1] - origin[1], p[2] - origin[2]) : null
+      if (slow !== null && first.t! < slow)
+        out.push({
+          severity: 'warning',
+          check: 'history',
+          code: 'settled-too-early',
+          message: 'It is settled before the slow-ship event, before any ship could reach it.',
+          path: e.path,
+          field: 'history'
+        })
+      else if (foam !== null && first.t! < foam && far !== null && far > s.slow.reach_ly)
+        out.push({
+          severity: 'warning',
+          check: 'history',
+          code: 'beyond-slow-ships',
+          message: `It is settled before the foam drive, but it is ${far.toFixed(1)} ly from the origin, beyond slow ships' ${s.slow.reach_ly} ly.`,
+          path: e.path,
+          field: 'history'
+        })
+    }
+    if (foam !== null)
+      for (const r of allRoutes(world, env)) {
+        if (!r.file.opened) continue
+        const opened = resolver.resolve(r.file.opened).time?.t
+        if (opened !== undefined && opened < foam)
+          out.push({
+            severity: 'warning',
+            check: 'history',
+            code: 'route-before-foam',
+            message: 'It opens before the foam drive exists.',
+            path: `routes/${r.id}.json`,
+            field: 'opened'
+          })
+      }
+    return out
+  }
+}
+
 export const BUILTIN_CHECKS: readonly Check[] = [
   filesCheck,
   referencesCheck,
@@ -466,6 +525,7 @@ export const BUILTIN_CHECKS: readonly Check[] = [
   systemsCheck,
   culturesCheck,
   routesCheck,
+  historyCheck,
   templateCheck,
   formatCheck
 ]

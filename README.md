@@ -8,7 +8,10 @@ cities. Every tool works from one shared model, so details stay consistent from 
 The app contains no setting and knows nothing about git. It reads and writes plain world folders
 of JSON. The author decides what is canon and commits it by hand to a repository of their own.
 
-**Status:** Phases 0–6 are built. Phase 6 added the sky view: stars, sun, moons and planets
+**Status:** Phases 0–7 are built. Phase 7 added the history generator. It plays settlement out
+on the stars, gated by the timeline's technology events, and proposes systems, cultures, routes
+and events for the author to accept. It also shows when news of an event reached each system.
+Phase 6 added the sky view: stars, sun, moons and planets
 from any point on any body at any date, through the body's air, with the torches the route
 network implies. It also added the approach planner, which shows where ships drop out of the foam
 and how a giant planet's lee shortens the crawl. Phase 5 added galactic routes: legs under the leg limit and

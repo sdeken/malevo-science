@@ -12,6 +12,7 @@ export * from './systems'
 export * from './cultures'
 export * from './routes'
 export * from './sky'
+export * from './history'
 export * from './compare'
 export { templateFiles } from './template'
 export {

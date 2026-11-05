@@ -697,7 +697,13 @@ and controlled cut (the Approach tool maps every aim instead).
 exactly the routes the route planner has and the torch counts it implies. Editing a flow changes
 the sky.
 
-### Phase 7: History generator
+### Phase 7: History generator — built
+
+Built; see [DEVELOPMENT.md](DEVELOPMENT.md). The prototype's mechanics are kept and everything
+particular to one story is taken out. Capability events, the origin, enclave cultures, polities
+and their target shares all come from `settings/history.json`. Not built yet: tech gating beyond
+the two drives, generated flows (they wait for the demand generator, §6.4), and information
+propagation beyond radio and ships.
 
 - Port `settle.js` onto the shared core. Add tech gating, respecting fixed facts, propose/accept
   diffs and information propagation.

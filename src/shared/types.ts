@@ -120,6 +120,8 @@ export interface EventValue {
   type: 'event' | 'period' | 'story'
   when: WhenValue
   until?: WhenValue
+  /** The system it happened in. */
+  where?: string
   tags?: string[]
 }
 
@@ -159,6 +161,8 @@ export interface WorldSnapshot {
   /** Null without physics settings. */
   traffic: TrafficDto | null
   viewpoints: EntityDto[]
+  /** settings/history.json, if the world has it. */
+  historySettings: Record<string, unknown> | null
   issueCounts: { error: number; warning: number; info: number }
 }
 
@@ -222,6 +226,7 @@ export type EditableKind =
   | 'nebula'
   | 'route'
   | 'viewpoint'
+  | 'historySettings'
 
 // ---- Phase 3: stars, systems, bodies ----
 
@@ -520,4 +525,35 @@ export interface ApproachSeriesDto {
   t: number[]
   crawl: (number | null)[]
   starOnly: (number | null)[]
+}
+
+// ---- Phase 7: history ----
+
+export interface ProposedFileDto {
+  key: string
+  kind: string
+  id: string
+  path: string
+  value: Record<string, unknown>
+  group: 'system' | 'culture' | 'route' | 'event' | 'polity'
+  label: string
+  change: boolean
+  year: number | null
+  stars: string[]
+}
+
+export interface HistoryProposalDto {
+  seed: number
+  files: ProposedFileDto[]
+  conflicts: string[]
+  shares: Record<string, { target: number; actual: number }>
+  counts: { systems: number; cultures: number; routes: number; events: number }
+  positions: Record<string, [number, number, number]>
+  origin: string
+}
+
+export interface NewsDto {
+  from: string
+  t0: number
+  arrivals: { system: string; t: number; via: 'here' | 'radio' | 'ships'; path: string[] }[]
 }

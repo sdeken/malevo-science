@@ -12,6 +12,7 @@
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
+import { syntheticInput, syntheticStars } from './synthetic'
 import { describe, expect, it } from 'vitest'
 import { canonicalJson, contentHash } from '@malevo/model'
 import { GENERATORS, findGenerator, generatorId, placeholderNames, runGenerator, type Generator } from '@malevo/gen'
@@ -50,6 +51,13 @@ const CASES: Record<string, { seed: number; input: unknown }[]> = {
   'planets@1': [1, 42, 4242].flatMap((seed) =>
     STARS.flatMap((star, k) => [0, 1, 2].map((roll) => ({ seed, input: { system: `sys-${k}`, systemName: `System ${k}`, star, roll } })))
   ),
+  'history@1': [1, 42].map((seed) => ({
+    seed,
+    input: syntheticInput(syntheticStars(500, 120, 9), {
+      growth: { total: 30, maxRadius: 60, outward: 7, legs: 2 },
+      years: { slow: 300, foam: 650, end: 900, polities: 850 }
+    })
+  })),
   'placeholder-names@1': [1, 42, 4242, 0xffffffff].flatMap((seed) =>
     [0, 1, 2, 3, 4, 5, 6, 7].map((palette) => ({ seed, input: { ids: ['a', 'b', 'c', 'sys-001', 'sys-002', 'x.y_z'], palette } }))
   )

@@ -6,6 +6,7 @@ import { defineTools } from './registry'
 import { routesTool } from './routes/RoutesTool'
 import { skyTool } from './sky/SkyTool'
 import { approachTool } from './approach/ApproachTool'
+import { historyTool } from './history/HistoryTool'
 import { starsTool } from './stars/StarsTool'
 import { systemsTool } from './systems/SystemsTool'
 import { timelineTool } from './timeline/TimelineTool'
@@ -20,6 +21,7 @@ export const TOOLS = defineTools([
   skyTool,
   approachTool,
   culturesTool,
+  historyTool,
   calendarsTool,
   compareTool,
   checksTool,

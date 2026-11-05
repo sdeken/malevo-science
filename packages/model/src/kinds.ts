@@ -282,7 +282,10 @@ export const eventSchema = obj({
   type: oneOf(['event', 'period', 'story']),
   when: whenSchema,
   until: opt(whenSchema),
-  tags: opt(arr(str({ min: 1, max: 40 })))
+  /** Where it happened: the system news of it spreads from. */
+  where: opt(ref('system')),
+  tags: opt(arr(str({ min: 1, max: 40 }))),
+  lock: opt(lockSchema)
 })
 export type EventFile = Infer<typeof eventSchema>
 
@@ -357,7 +360,8 @@ export const systemSchema = obj({
         note: opt(str({ max: 200 }))
       })
     )
-  )
+  ),
+  lock: opt(lockSchema)
 })
 export type SystemFile = Infer<typeof systemSchema>
 
@@ -468,7 +472,8 @@ export const cultureSchema = obj({
   palette: opt(num({ integer: true, min: 0, max: 7 })),
   /** The calendars it uses: each from an event (or always, for the first) until the next. */
   calendars: opt(arr(obj({ calendar: ref('calendar'), from: opt(ref('event')) }))),
-  tags: opt(arr(str({ min: 1, max: 40 })))
+  tags: opt(arr(str({ min: 1, max: 40 }))),
+  lock: opt(lockSchema)
 })
 export type CultureFile = Infer<typeof cultureSchema>
 
@@ -565,7 +570,11 @@ export const routeSchema = obj({
       })
     )
   ),
-  tags: opt(arr(str({ min: 1, max: 40 })))
+  /** When the route opened and closed, if it has not always been there. News and the history use it. */
+  opened: opt(whenSchema),
+  closed: opt(whenSchema),
+  tags: opt(arr(str({ min: 1, max: 40 }))),
+  lock: opt(lockSchema)
 })
 export type RouteFile = Infer<typeof routeSchema>
 
@@ -592,6 +601,72 @@ export const viewpointKind: KindDef<ViewpointFile> = {
   schema: viewpointSchema
 }
 
+// ---- the history generator's settings ----
+
+/** What history@1 plays out: where it starts, which events unlock what, and how it behaves. */
+export const historySettingsSchema = obj({
+  /** Seed for runs; absent means the world seed. */
+  seed: opt(num({ integer: true, min: 0, max: 0xffffffff })),
+  /** The system settlement spreads from, and its culture. */
+  origin: ref('system'),
+  originCulture: ref('culture'),
+  /** Capabilities, by the events that bring them (docs/PLAN.md §7.3: gated by the timeline). */
+  slowShips: ref('event'),
+  foamDrive: ref('event'),
+  /** When the run stops. */
+  end: ref('event'),
+  step_y: opt(num({ above: 0, sig: 6 })),
+  slow: obj({
+    /** How far slow ships reach from the origin. */
+    reach_ly: num({ above: 0, sig: 6 }),
+    colonies: num({ integer: true, min: 0 })
+  }),
+  growth: obj({
+    /** Systems settled by the end, counting the slow-ship colonies. */
+    systems: num({ integer: true, min: 1, max: 5000 }),
+    /** No settlement farther than this from the origin. */
+    maxRadius_ly: num({ above: 0, sig: 6 }),
+    /** How strongly settlement pushes outward: higher is gentler. Default 7. */
+    outward_ly: opt(num({ above: 0, sig: 6 })),
+    /** How many legs out a system founds new ones. Default 2. */
+    legs: opt(num({ integer: true, min: 1, max: 4 }))
+  }),
+  culture: obj({
+    /** Chance a new colony is an enclave of a belief culture. */
+    enclaveRate: num({ min: 0, max: 1, sig: 6 }),
+    /** Chance a colony far from its culture's home starts a new regional culture. */
+    splitRate: num({ min: 0, max: 1, sig: 6 }),
+    splitDistance_ly: num({ min: 0, sig: 6 }),
+    /** Share of the difference that blends along each lane each step. */
+    blendRate: num({ min: 0, max: 1, sig: 6 })
+  }),
+  /** Belief cultures that found enclaves, each from an event (or from the start). */
+  enclaves: opt(arr(obj({ culture: ref('culture'), from: opt(ref('event')) }))),
+  polities: opt(
+    obj({
+      /** When the polities form and borders are drawn. */
+      from: ref('event'),
+      list: arr(
+        obj({
+          polity: ref('polity'),
+          /** Target share of the systems, 0–1. Its capital is the polity's own, or chosen by the run. */
+          share: num({ min: 0, max: 1, sig: 6 }),
+          /** How fast it pulls its systems toward its capital's culture, per decade (0–1). */
+          unify: opt(num({ min: 0, max: 1, sig: 6 }))
+        })
+      )
+    })
+  )
+})
+export type HistorySettings = Infer<typeof historySettingsSchema>
+
+export const historySettingsKind: KindDef<HistorySettings> = {
+  kind: 'historySettings',
+  label: 'history settings',
+  file: 'settings/history.json',
+  schema: historySettingsSchema
+}
+
 export const KINDS: readonly KindDef[] = [
   physicsKind as KindDef,
   starfieldKind as KindDef,
@@ -606,5 +681,6 @@ export const KINDS: readonly KindDef[] = [
   stationKind as KindDef,
   nebulaKind as KindDef,
   routeKind as KindDef,
-  viewpointKind as KindDef
+  viewpointKind as KindDef,
+  historySettingsKind as KindDef
 ]

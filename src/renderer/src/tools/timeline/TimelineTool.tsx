@@ -126,6 +126,7 @@ function TimelineView({ world, snapshot, now, setNow, displayCal }: ToolProps): 
           event={current}
           events={events}
           calendars={snapshot.calendars}
+          systems={snapshot.systems.map((x) => ({ id: x.id, name: x.name }))}
           displayCal={displayCal}
           now={now}
           setNow={setNow}

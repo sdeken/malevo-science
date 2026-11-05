@@ -12,6 +12,8 @@ import type {
   SkyStarsDto,
   SkySceneDto,
   ViewpointDto,
+  HistoryProposalDto,
+  NewsDto,
   ApproachQueryDto,
   ApproachInfoDto,
   ApproachMapDto,
@@ -102,6 +104,14 @@ const api = {
   },
   /** The prime meridian that makes it local noon at a longitude at an instant (for rotation.meridian_deg). */
   skyNoon: (body: string, lon: number, t: number): Promise<number | null> => ipcRenderer.invoke(IPC.skyNoon, body, lon, t),
+  history: {
+    /** Run history@1 and return what it proposes (nothing is written). */
+    propose: (seed?: number): Promise<HistoryProposalDto | { error: string }> => ipcRenderer.invoke(IPC.historyPropose, seed),
+    /** Accept pieces of the last run, by entity key: one undoable, unsaved step. */
+    accept: (keys: string[]): Promise<number> => ipcRenderer.invoke(IPC.historyAccept, keys),
+    /** When each system learned of an event. */
+    news: (event: string): Promise<NewsDto | { error: string }> => ipcRenderer.invoke(IPC.historyNews, event)
+  },
   approach: {
     info: (q: ApproachQueryDto): Promise<ApproachInfoDto | { error: string }> => ipcRenderer.invoke(IPC.approachInfo, q),
     map: (q: ApproachQueryDto, extent: number, n: number): Promise<ApproachMapDto | { error: string }> =>

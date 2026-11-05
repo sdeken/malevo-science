@@ -47,7 +47,8 @@ const EDITABLE: readonly EditableKind[] = [
   'station',
   'nebula',
   'route',
-  'viewpoint'
+  'viewpoint',
+  'historySettings'
 ]
 const asKind = (k: unknown): EditableKind => {
   if (!EDITABLE.includes(k as EditableKind)) throw new Error(`"${String(k)}" cannot be edited.`)
@@ -178,6 +179,11 @@ export function registerIpc(deps: IpcDeps): void {
   ipcMain.handle(IPC.skyNoon, (_e, body: unknown, lon: unknown, t: unknown) =>
     world.skyNoon(String(body), Number(lon) || 0, Number(t) || 0)
   )
+  ipcMain.handle(IPC.historyPropose, (_e, seed: unknown) =>
+    world.historyPropose(seed === undefined || seed === null ? undefined : Number(seed) >>> 0)
+  )
+  ipcMain.handle(IPC.historyAccept, (_e, keys: unknown) => world.historyAccept(Array.isArray(keys) ? keys.map(String) : []))
+  ipcMain.handle(IPC.historyNews, (_e, event: unknown) => world.historyNews(String(event)))
   ipcMain.handle(IPC.approachInfo, (_e, q: unknown) => world.approachInfo(asApproach(q)))
   ipcMain.handle(IPC.approachMap, (_e, q: unknown, extent: unknown, n: unknown) =>
     world.approachMap(asApproach(q), Number(extent) || 1, Math.max(5, Math.min(121, Math.trunc(Number(n)) || 41)))
