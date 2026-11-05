@@ -1,0 +1,8 @@
+{
+  "traits": [
+    { "id": "openness", "label": "Openness", "low": "insular", "high": "open to everyone", "weight": 1 },
+    { "id": "trade", "label": "Trade", "low": "self-sufficient", "high": "lives by trade", "weight": 0.5 },
+    { "id": "expansion", "label": "Expansion", "low": "stays put", "high": "spreads outward", "weight": 0.5 }
+  ],
+  "affinity": { "opennessTrait": "openness", "closedFloor": 0.25 }
+}

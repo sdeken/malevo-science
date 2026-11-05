@@ -8,6 +8,8 @@ export interface MapSystem {
   id: string
   name: string
   pos: [number, number, number]
+  /** The colour of the polity holding it at the current date. */
+  color?: string
 }
 
 interface Props {
@@ -101,10 +103,11 @@ export function StarMap({ field, focus, systems, selected, onPick, reach }: Prop
       const { systems: sys, field: f, selected: sel } = latest.current
       const w = el.clientWidth
       const h = el.clientHeight
-      const items: { text: string; p: THREE.Vector3; cls: string }[] = sys.map((s) => ({
+      const items: { text: string; p: THREE.Vector3; cls: string; color?: string }[] = sys.map((s) => ({
         text: s.name,
         p: new THREE.Vector3(...s.pos),
-        cls: 'map-label system'
+        cls: 'map-label system',
+        color: s.color
       }))
       if (f && sel !== null)
         items.push({
@@ -130,6 +133,7 @@ export function StarMap({ field, focus, systems, selected, onPick, reach }: Prop
             const d = document.createElement('div')
             d.className = it.cls
             d.textContent = it.text
+            if (it.color) d.style.color = it.color
             d.style.transform = `translate(${((v.x + 1) / 2) * w + 8}px, ${((1 - v.y) / 2) * h - 8}px)`
             return d
           })
@@ -245,7 +249,7 @@ export function StarMap({ field, focus, systems, selected, onPick, reach }: Prop
       )
       return g
     }
-    for (const s of systems) c.marks.add(ring(s.pos, 0xe0a43c, 14))
+    for (const s of systems) c.marks.add(ring(s.pos, s.color ? new THREE.Color(s.color).getHex() : 0xe0a43c, 14))
     if (field && selected !== null) {
       const p: [number, number, number] = [field.pos[selected * 3], field.pos[selected * 3 + 1], field.pos[selected * 3 + 2]]
       c.marks.add(ring(p, 0xffffff, 18))

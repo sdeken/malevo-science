@@ -663,7 +663,11 @@ only Sol and twelve nebulae, and nebulae belong with routes (Phase 5).
 - The system and body editor, orbit view and derived physics.
 - Optional loading of a prototype atlas file into a scratch world as a starting sketch.
 
-### Phase 4: Cultures and polities
+### Phase 4: Cultures and polities — built
+
+Built; see [DEVELOPMENT.md](DEVELOPMENT.md). Culture traits are defined per world in
+`settings/cultures.json`. Relations change at timeline events, and systems hold their history of
+control and culture mix.
 
 - Culture and polity editors, the affinity model, and control and culture mix over time.
 

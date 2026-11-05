@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { placeholderNames, runGenerator } from '@malevo/gen'
+import { historyAt } from '@malevo/model'
 import type { StarField, StarInfoDto, StarSearchHit } from '../../../../shared/types'
 import { duration, sig } from '../../components/fields'
 import { slugId, useWorldPref } from '../../state'
@@ -8,7 +9,7 @@ import { StarMap, type MapSystem } from './StarMap'
 
 const SOL = 'hyg.0'
 
-function StarsView({ world, snapshot, focus: navFocus, navigate }: ToolProps): React.JSX.Element {
+function StarsView({ world, snapshot, now, focus: navFocus, navigate }: ToolProps): React.JSX.Element {
   const systems = snapshot.systems
   const [focusId, setFocusId] = useWorldPref<string>(world.root, 'starsFocus', systems[0]?.starId ?? SOL)
   const [radius, setRadius] = useWorldPref<number>(world.root, 'starsRadius', 20)
@@ -82,8 +83,15 @@ function StarsView({ world, snapshot, focus: navFocus, navigate }: ToolProps): R
   }, [query])
 
   const mapSystems: MapSystem[] = useMemo(
-    () => systems.filter((s) => s.star).map((s) => ({ id: s.id, name: s.name, pos: s.star!.pos })),
-    [systems]
+    () =>
+      systems
+        .filter((s) => s.star)
+        .map((s) => {
+          const polity = historyAt(s.history, now)?.polity
+          const color = polity ? String(snapshot.polities.find((p) => p.id === polity)?.value?.color ?? '') : ''
+          return { id: s.id, name: s.name, pos: s.star!.pos, color: color || undefined }
+        }),
+    [systems, now, snapshot.polities]
   )
   const onStar = (id: string): string[] => systems.filter((s) => s.starId === id).map((s) => s.id)
   const dist = (a: StarInfoDto | null, b: StarInfoDto | null): number | null =>

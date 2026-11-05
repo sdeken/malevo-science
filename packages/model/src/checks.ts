@@ -5,10 +5,22 @@
  */
 import { compareStrings, formatInstant, parseInstant, type Calendar, type CalendarSet } from '@malevo/core'
 import { staleLocks } from './deps'
-import { resolveEvents, worldCalendars, type WorldEnv } from './events'
+import { cultureSettings, relationId, systemHistory } from './cultures'
+import { resolveEvents, whenResolver, worldCalendars, type WorldEnv } from './events'
 import { systemInfo } from './systems'
 import { templateFiles } from './template'
-import { calendarKind, entityKey, eventKind, physicsKind, systemKind, type CalendarFile, type StoredInstant } from './kinds'
+import {
+  calendarKind,
+  cultureKind,
+  entityKey,
+  eventKind,
+  physicsKind,
+  polityKind,
+  relationKind,
+  systemKind,
+  type CalendarFile,
+  type StoredInstant
+} from './kinds'
 import { entitiesOf, type Issue, type WorldData } from './load'
 
 export interface Check {
@@ -302,6 +314,75 @@ export function enteredTextDrift(instant: StoredInstant, set: CalendarSet): stri
   return `Was entered as "${instant.text}" in calendar "${instant.cal}", but that calendar now writes the stored time as "${now}". The stored time has not moved.`
 }
 
+export const culturesCheck: Check = {
+  id: 'cultures',
+  title: 'Cultures use defined traits; relations, polities and system histories hang together',
+  run(world, env) {
+    const out: Issue[] = []
+    const add = (severity: Issue['severity'], code: string, message: string, path: string, field?: string): void => {
+      out.push({ severity, check: 'cultures', code, message, path, field })
+    }
+    const settings = cultureSettings(world)
+    const defined = new Set(settings?.traits.map((t) => t.id) ?? [])
+    for (const e of entitiesOf(world, cultureKind)) {
+      for (const k of Object.keys(e.value.traits)) {
+        if (settings && !defined.has(k))
+          add('warning', 'unknown-trait', `Trait "${k}" is not defined in settings/cultures.json, so it is ignored.`, e.path, `traits.${k}`)
+      }
+    }
+    const resolver = whenResolver(world, worldCalendars(world, env))
+    const events = resolver.events()
+    const eventTime = (id: string, from: 'start' | 'end'): number | null =>
+      (from === 'end' ? events.get(id)?.end?.t : events.get(id)?.start?.t) ?? null
+    for (const e of entitiesOf(world, relationKind)) {
+      const [a, b] = e.value.between
+      if (a === b) add('error', 'bad-relation', 'A relation is between two different cultures.', e.path, 'between')
+      else if (e.id !== relationId(a, b))
+        add('error', 'bad-relation', `The relation between "${a}" and "${b}" belongs in relations/${relationId(a, b)}.json.`, e.path)
+      for (const [i, c] of (e.value.changes ?? []).entries()) {
+        if (world.entities.has(`event/${c.event}`) && eventTime(c.event, c.from ?? 'start') === null) {
+          add(
+            'warning',
+            'change-unplaced',
+            `Its change at "${c.event}" is ignored: that event's ${c.from ?? 'start'} cannot be worked out.`,
+            e.path,
+            `changes[${i}]`
+          )
+        }
+      }
+    }
+    for (const e of entitiesOf(world, polityKind)) {
+      const f = e.value.founded ? eventTime(e.value.founded, 'start') : null
+      const d = e.value.dissolved ? eventTime(e.value.dissolved, 'start') : null
+      if (f !== null && d !== null && d < f) add('warning', 'polity-dates', 'It is dissolved before it is founded.', e.path, 'dissolved')
+    }
+    for (const e of entitiesOf(world, systemKind)) {
+      const history = systemHistory(e.value, resolver)
+      for (const h of history) {
+        const field = `history[${h.index}]`
+        for (const m of h.errors) add('error', 'history-date', `Its history entry's date cannot be worked out: ${m}`, e.path, field)
+        if (!h.polity && h.cultures.length === 0 && !e.value.history?.[h.index]?.cultures?.length) {
+          add('warning', 'empty-history', 'A history entry with neither a polity nor any cultures says nothing.', e.path, field)
+        } else if ((e.value.history?.[h.index]?.cultures?.length ?? 0) > 0 && h.cultures.length === 0) {
+          add('warning', 'empty-shares', 'Its culture shares add up to nothing.', e.path, field)
+        }
+      }
+      for (let i = 1; i < history.length; i++) {
+        if (history[i].t !== null && history[i].t === history[i - 1].t) {
+          add(
+            'warning',
+            'same-date',
+            'Two history entries start at the same moment; the later one in the file wins.',
+            e.path,
+            `history[${history[i].index}]`
+          )
+        }
+      }
+    }
+    return out
+  }
+}
+
 export const BUILTIN_CHECKS: readonly Check[] = [
   filesCheck,
   referencesCheck,
@@ -309,6 +390,7 @@ export const BUILTIN_CHECKS: readonly Check[] = [
   calendarsCheck,
   eventsCheck,
   systemsCheck,
+  culturesCheck,
   templateCheck,
   formatCheck
 ]

@@ -30,7 +30,7 @@ npm run dev          # the app with hot reload
   the file system.
 - **`src/renderer`** is the tool host: the welcome screen, sidebar, current-date bar and status
   bar. Tools live in `src/renderer/src/tools/<id>/` and are listed in
-  `src/renderer/src/tools/index.ts`. The tools are Timeline, Stars, Systems, Calendars,
+  `src/renderer/src/tools/index.ts`. The tools are Timeline, Stars, Systems, Cultures, Calendars,
   Fork & compare, Checks and World.
 - **The world session lives in main** (`src/main/world.ts`): the open world, its unsaved changes
   (a `WorldEditor`), and every calendar operation. The renderer gets snapshots pushed to it, and
@@ -198,6 +198,31 @@ module.exports = {
 - **A planet-local calendar** can `follow` a body. Its day and year are then that body's solar
   day and the year of the planet it belongs to. A planet locked to its star has no solar day to
   follow.
+
+### Cultures, polities and relations
+
+- **`settings/cultures.json`** defines the traits cultures are described by, as id, label,
+  meaning at 0 and 1, and weight. A new world starts with openness, trade and expansion; add or
+  reweight traits freely.
+- **A culture** is `cultures/<id>.json`:
+  - name and colour;
+  - `traits`, 0–1 each, with a missing trait counting as 0.5;
+  - `techLag_y`;
+  - a naming `palette` (0–7) for placeholder names;
+  - the `calendars` it uses, each from an event onward.
+- **A polity** is `polities/<id>.json`: name, colour, dominant `culture`, `capital`, and the
+  `founded` and `dissolved` events.
+- **Affinity** between two cultures runs from −1 to 1. It is computed from their traits (see
+  `packages/model/src/cultures.ts` for the formula). Two open, identical cultures come out at 1;
+  closed ones are cooler, down to `2 × closedFloor − 1`.
+- **A relation** is `relations/<a>--<b>.json`, with the ids sorted.
+  - It can replace the computed affinity, and can `change` it at timeline events, such as a war
+    or a treaty.
+  - The latest change at or before a date holds.
+- **A system's `history`** lists entries saying who holds it (a polity) and who lives there
+  (culture shares). Each holds from its `from` date until the next entry.
+  - Those dates are written like event dates: a date in any calendar, or anchored to an event.
+  - The star map colours each system by the polity holding it at the current date.
 
 ### Editing, saving, undo
 

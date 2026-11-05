@@ -2,7 +2,7 @@ import { promises as fs } from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
-import { WORLD_FORMAT, WorldError, newWorldManifest, parseWorldManifest, serializeWorldManifest } from '@malevo/model'
+import { WORLD_FORMAT, WorldError, newWorldManifest, parseWorldManifest, serializeWorldManifest, templateFiles } from '@malevo/model'
 import { createWorld, inspectFolder, openWorld } from '@malevo/model/node'
 
 describe('world.json', () => {
@@ -56,7 +56,13 @@ describe('world folders', () => {
     const world = await createWorld(dir, 'Scratch', 42)
     expect(world.manifest.seed).toBe(42)
     expect((await fs.readdir(dir)).sort()).toEqual(['calendars', 'settings', 'world.json'])
-    expect((await fs.readdir(path.join(dir, 'settings'))).sort()).toEqual(['physics.json', 'stars.json'])
+    expect((await fs.readdir(path.join(dir, 'settings'))).sort()).toEqual(
+      templateFiles()
+        .map((f) => f.path)
+        .filter((p) => p.startsWith('settings/'))
+        .map((p) => p.slice('settings/'.length))
+        .sort()
+    )
     expect(await fs.readdir(path.join(dir, 'calendars'))).toEqual(['gregorian.json'])
     expect((await openWorld(dir)).manifest.name).toBe('Scratch')
   })

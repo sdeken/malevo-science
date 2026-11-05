@@ -318,7 +318,18 @@ export const systemSchema = obj({
       radius_rsun: opt(num({ above: 0, sig: 6 }))
     })
   ),
-  tags: opt(arr(str({ min: 1, max: 40 })))
+  tags: opt(arr(str({ min: 1, max: 40 }))),
+  /** Who held it and who lived there, over time: each entry applies from its date until the next. */
+  history: opt(
+    arr(
+      obj({
+        from: whenSchema,
+        polity: opt(ref('polity')),
+        cultures: opt(arr(obj({ culture: ref('culture'), share: num({ min: 0, sig: 6 }) }))),
+        note: opt(str({ max: 200 }))
+      })
+    )
+  )
 })
 export type SystemFile = Infer<typeof systemSchema>
 
@@ -372,11 +383,101 @@ export const bodyKind: KindDef<BodyFile> = {
   schema: bodySchema
 }
 
+// ---- cultures, polities and their relations ----
+
+const COLOR = str({ pattern: /^#[0-9a-f]{6}$/, patternHint: 'is not a colour like "#4f8fe0"' })
+const TRAIT_ID = str({ pattern: /^[a-z][a-zA-Z0-9]*$/, patternHint: 'is not a trait id (letters and digits, starting lowercase)' })
+
+/** The traits cultures are described by, and how affinity is worked out from them. */
+export const cultureSettingsSchema = obj({
+  traits: arr(
+    obj({
+      id: TRAIT_ID,
+      label: str({ min: 1, max: 60 }),
+      /** What 0 and 1 mean, for the editor. */
+      low: opt(str({ max: 60 })),
+      high: opt(str({ max: 60 })),
+      /** How much a difference in this trait counts against affinity. 0 to ignore it. */
+      weight: num({ min: 0, sig: 6 })
+    })
+  ),
+  affinity: obj({
+    /** The trait that scales how much a culture warms to anyone at all. */
+    opennessTrait: opt(TRAIT_ID),
+    /** How warm two identical, fully closed cultures are, from 0 (as cold as can be) to 1 (no effect). */
+    closedFloor: num({ min: 0, max: 1, sig: 6 })
+  })
+})
+export type CultureSettings = Infer<typeof cultureSettingsSchema>
+
+export const cultureSettingsKind: KindDef<CultureSettings> = {
+  kind: 'cultureSettings',
+  label: 'culture settings',
+  file: 'settings/cultures.json',
+  schema: cultureSettingsSchema
+}
+
+export const cultureSchema = obj({
+  name: name(),
+  color: COLOR,
+  /** 0 to 1 for each trait in settings/cultures.json; a missing trait counts as 0.5. */
+  traits: dict(num({ min: 0, max: 1, sig: 4 }), { key: TRAIT_ID }),
+  /** How many years behind the frontier of technology it adopts things. */
+  techLag_y: opt(num({ min: 0, sig: 6 })),
+  /** Which sound palette its placeholder names come from (0–7). */
+  palette: opt(num({ integer: true, min: 0, max: 7 })),
+  /** The calendars it uses: each from an event (or always, for the first) until the next. */
+  calendars: opt(arr(obj({ calendar: ref('calendar'), from: opt(ref('event')) }))),
+  tags: opt(arr(str({ min: 1, max: 40 })))
+})
+export type CultureFile = Infer<typeof cultureSchema>
+
+export const cultureKind: KindDef<CultureFile> = { kind: 'culture', label: 'culture', folder: 'cultures', schema: cultureSchema }
+
+export const politySchema = obj({
+  name: name(),
+  color: COLOR,
+  /** Its dominant culture. */
+  culture: opt(ref('culture')),
+  capital: opt(ref('system')),
+  founded: opt(ref('event')),
+  dissolved: opt(ref('event')),
+  tags: opt(arr(str({ min: 1, max: 40 })))
+})
+export type PolityFile = Infer<typeof politySchema>
+
+export const polityKind: KindDef<PolityFile> = { kind: 'polity', label: 'polity', folder: 'polities', schema: politySchema }
+
+/** The relation between two cultures, filed as `relations/<a>--<b>.json` with the ids in sorted order. */
+export const relationSchema = obj({
+  between: arr(ref('culture'), { min: 2, max: 2 }),
+  /** Replaces the affinity worked out from their traits, from −1 (hostile) to 1 (close). */
+  affinity: opt(num({ min: -1, max: 1, sig: 4 })),
+  /** Changes at events (a war, a treaty): each holds from that event until the next change. */
+  changes: opt(
+    arr(
+      obj({
+        event: ref('event'),
+        from: opt(oneOf(['start', 'end'])),
+        affinity: num({ min: -1, max: 1, sig: 4 }),
+        note: opt(str({ max: 200 }))
+      })
+    )
+  )
+})
+export type RelationFile = Infer<typeof relationSchema>
+
+export const relationKind: KindDef<RelationFile> = { kind: 'relation', label: 'relation', folder: 'relations', schema: relationSchema }
+
 export const KINDS: readonly KindDef[] = [
   physicsKind as KindDef,
   starfieldKind as KindDef,
   calendarKind as KindDef,
   eventKind as KindDef,
   systemKind as KindDef,
-  bodyKind as KindDef
+  bodyKind as KindDef,
+  cultureSettingsKind as KindDef,
+  cultureKind as KindDef,
+  polityKind as KindDef,
+  relationKind as KindDef
 ]

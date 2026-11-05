@@ -3,7 +3,13 @@ import os from 'node:os'
 import path from 'node:path'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import { run } from '@malevo/cli'
+import { templateFiles } from '@malevo/model'
 import { createWorld } from '@malevo/model/node'
+
+/** The settings files a world gets from the template (the template grows phase by phase). */
+const SETTINGS_FILES = templateFiles()
+  .map((f) => f.path)
+  .filter((p) => p.startsWith('settings/'))
 
 let tmp: string
 const lines: string[] = []
@@ -66,7 +72,7 @@ describe('malevo template', () => {
     await createWorld(tmp, 'T', 1)
     await fs.rm(path.join(tmp, 'settings'), { recursive: true })
     expect(await run(['template', '.'], io())).toBe(0)
-    expect(lines).toEqual(['added settings/physics.json', 'added settings/stars.json'])
+    expect(lines).toEqual(SETTINGS_FILES.map((p) => `added ${p}`))
     lines.length = 0
     expect(await run(['template'], io())).toBe(0)
     expect(lines).toEqual(['The world already has every template file.'])

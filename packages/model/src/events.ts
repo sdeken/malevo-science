@@ -100,6 +100,18 @@ export interface ResolvedEvent {
 
 /** Resolve every event of a world. */
 export function resolveEvents(world: WorldData, cals: WorldCalendars): Map<string, ResolvedEvent> {
+  return whenResolver(world, cals).events()
+}
+
+export interface WhenResolver {
+  /** Every event, resolved. */
+  events(): Map<string, ResolvedEvent>
+  /** Any other date in the world (a system's history, a relation's change), by the same rules. */
+  resolve(when: When): { time: ResolvedTime | null; errors: string[] }
+}
+
+/** Resolves events and any other When against the world's events and calendars. Results are memoised. */
+export function whenResolver(world: WorldData, cals: WorldCalendars): WhenResolver {
   const events = new Map(entitiesOf(world, eventKind).map((e) => [e.id, e.value]))
   const out = new Map<string, ResolvedEvent>()
   const resolving = new Set<string>()
@@ -203,8 +215,17 @@ export function resolveEvents(world: WorldData, cals: WorldCalendars): Map<strin
     return { t, cal: cal?.id ?? null, precision: cal ? precision : null, circa, range }
   }
 
-  for (const id of [...events.keys()].sort(compareStrings)) resolve(id)
-  return out
+  return {
+    events() {
+      for (const id of [...events.keys()].sort(compareStrings)) resolve(id)
+      return out
+    },
+    resolve(when) {
+      const scratch: ResolvedEvent = { id: '', start: null, end: null, errors: [], warnings: [] }
+      const time = resolveWhen(when, 'from', scratch)
+      return { time, errors: scratch.errors.map((m) => m.replace(/^from: /, '')) }
+    }
+  }
 }
 
 /** [start of the `unit` containing t, start of the next one], in `cal`. */

@@ -11,6 +11,9 @@ built-in physics or calendars of its own (docs/PLAN.md, principle P0).
   to fill them in. Without a `seed`, the world's seed is used. Changing any of these changes, or
   removes, generated stars that systems may already sit on, and the checks will say so. These are
   the prototype star map's values.
+- `settings/cultures.json` lists the traits that describe cultures and how affinity is worked out
+  from them. Openness, trade and expansion are a starting set: add, rename or reweight traits for
+  the world.
 - `calendars/gregorian.json` is the only calendar a new world starts with (decision D3).
 
 `malevo template <world>` copies any of these files that a world is missing, without touching

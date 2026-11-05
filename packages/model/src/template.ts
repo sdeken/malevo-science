@@ -4,14 +4,16 @@
  */
 import gregorian from '../template/calendars/gregorian.json'
 import physics from '../template/settings/physics.json'
+import cultures from '../template/settings/cultures.json'
 import stars from '../template/settings/stars.json'
-import { calendarKind, entityPath, physicsKind, starfieldKind, type KindDef } from './kinds'
+import { calendarKind, cultureSettingsKind, entityPath, physicsKind, starfieldKind, type KindDef } from './kinds'
 import { serializeEntity } from './load'
 import { parseWith } from './schema'
 
 const TEMPLATE: { kind: KindDef; id: string; value: unknown }[] = [
   { kind: physicsKind as KindDef, id: 'physics', value: physics },
   { kind: starfieldKind as KindDef, id: 'starfield', value: stars },
+  { kind: cultureSettingsKind as KindDef, id: 'cultureSettings', value: cultures },
   { kind: calendarKind as KindDef, id: 'gregorian', value: gregorian }
 ]
 

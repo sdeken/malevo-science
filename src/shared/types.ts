@@ -146,6 +146,11 @@ export interface WorldSnapshot {
   events: EventInfo[]
   systems: SystemInfoDto[]
   physics: PhysicsSummary | null
+  cultures: EntityDto[]
+  polities: EntityDto[]
+  relations: EntityDto[]
+  /** settings/cultures.json, if the world has it. */
+  cultureSettings: CultureSettingsDto | null
   issueCounts: { error: number; warning: number; info: number }
 }
 
@@ -195,7 +200,7 @@ export interface CompareReport {
   }[]
 }
 
-export type EditableKind = 'event' | 'calendar' | 'physics' | 'system' | 'body'
+export type EditableKind = 'event' | 'calendar' | 'physics' | 'system' | 'body' | 'culture' | 'polity' | 'relation' | 'cultureSettings'
 
 // ---- Phase 3: stars, systems, bodies ----
 
@@ -269,6 +274,17 @@ export interface SystemInfoDto {
   /** Collapse radius around the star, m. */
   collapse: number | null
   bodies: BodyInfoDto[]
+  /** Who held it and who lived there, resolved and in time order. */
+  history: HistoryEntryDto[]
+}
+
+export interface HistoryEntryDto {
+  index: number
+  t: number | null
+  polity: string | null
+  cultures: { culture: string; share: number }[]
+  note: string | null
+  errors: string[]
 }
 
 export interface PhysicsSummary {
@@ -300,4 +316,18 @@ export interface StarSearchHit {
 export interface PlanetProposal {
   roll: number
   bodies: { id: string; value: Record<string, unknown> }[]
+}
+
+// ---- Phase 4: cultures, polities, relations ----
+
+/** An entity's id, file and value (null when the file does not parse). */
+export interface EntityDto {
+  id: string
+  path: string
+  value: Record<string, unknown> | null
+}
+
+export interface CultureSettingsDto {
+  traits: { id: string; label: string; low?: string; high?: string; weight: number }[]
+  affinity: { opennessTrait?: string; closedFloor: number }
 }

@@ -1187,3 +1187,122 @@ table.bodies tbody tr {
 table.daylight td {
   padding-right: 18px;
 }
+
+/* ---- Phase 4: cultures ---- */
+.seg.tabs {
+  margin-bottom: 12px;
+}
+
+.seg.tabs button {
+  flex: 1;
+}
+
+.swatch {
+  display: inline-block;
+  width: 10px;
+  height: 10px;
+  border-radius: 2px;
+  vertical-align: baseline;
+}
+
+.field.narrow {
+  flex: 0 0 80px;
+}
+
+.field input[type='color'] {
+  width: 64px;
+  height: 32px;
+  padding: 0;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: none;
+}
+
+.trait {
+  display: grid;
+  grid-template-columns: 110px 110px 1fr 120px 40px;
+  gap: 8px;
+  align-items: center;
+  margin-bottom: 6px;
+}
+
+.trait span:nth-child(2) {
+  text-align: right;
+}
+
+.relations-layout {
+  display: flex;
+  gap: 24px;
+  flex-wrap: wrap;
+  align-items: flex-start;
+}
+
+table.matrix {
+  border-collapse: collapse;
+  font-size: 13px;
+}
+
+table.matrix th {
+  font-weight: 500;
+  padding: 4px 8px;
+  text-align: left;
+  white-space: nowrap;
+}
+
+table.matrix td {
+  width: 56px;
+  height: 34px;
+  text-align: center;
+  cursor: pointer;
+  border: 1px solid var(--bg);
+  position: relative;
+}
+
+table.matrix td.diag {
+  background: var(--bg-sunken);
+  cursor: default;
+}
+
+table.matrix td.is-current {
+  outline: 2px solid var(--text);
+}
+
+.cell-mark {
+  position: absolute;
+  top: 1px;
+  right: 4px;
+  font-size: 10px;
+}
+
+.relations-graph {
+  background: var(--bg-sunken);
+  border-radius: var(--radius);
+}
+
+.graph-label {
+  fill: var(--text);
+  font-size: 11px;
+}
+
+.relation-editor {
+  margin-top: 16px;
+  padding-top: 8px;
+  border-top: 1px solid var(--border);
+}
+
+.history-editor {
+  margin: 8px 0 16px;
+  padding: 8px 0;
+  border-top: 1px solid var(--border);
+  border-bottom: 1px solid var(--border);
+}
+
+.history-entry {
+  border-left: 3px solid var(--border);
+  padding-left: 12px;
+  margin-bottom: 12px;
+}
+
+button.link.danger {
+  color: var(--danger);
+}

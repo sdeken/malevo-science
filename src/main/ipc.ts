@@ -34,7 +34,17 @@ export async function confirmLeave(world: WorldSession, win: BrowserWindow | nul
   return true
 }
 
-const EDITABLE: readonly EditableKind[] = ['event', 'calendar', 'physics', 'system', 'body']
+const EDITABLE: readonly EditableKind[] = [
+  'event',
+  'calendar',
+  'physics',
+  'system',
+  'body',
+  'culture',
+  'polity',
+  'relation',
+  'cultureSettings'
+]
 const asKind = (k: unknown): EditableKind => {
   if (!EDITABLE.includes(k as EditableKind)) throw new Error(`"${String(k)}" cannot be edited.`)
   return k as EditableKind

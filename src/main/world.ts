@@ -26,6 +26,12 @@ import { planets, runGenerator } from '@malevo/gen'
 import {
   WorldError,
   bodyKind,
+  cultureKind,
+  cultureSettingsKind,
+  polityKind,
+  relationKind,
+  systemHistory,
+  whenResolver,
   calendarKind,
   canonicalFixes,
   compareWorlds,
@@ -42,7 +48,10 @@ import {
   worldCalendars,
   worldStars,
   type BodyInfo,
+  type CultureSettings,
   type KindDef,
+  type SystemFile,
+  type WhenResolver,
   type PhysicsSettings,
   type SystemInfo,
   type WorldEnv,
@@ -63,6 +72,7 @@ import {
 } from '@malevo/model/node'
 import type {
   BodyInfoDto,
+  EntityDto,
   CalendarInfo,
   CheckReport,
   CompareReport,
@@ -87,7 +97,11 @@ const KIND_DEFS: Record<EditableKind, KindDef> = {
   calendar: calendarKind as KindDef,
   physics: physicsKind as KindDef,
   system: systemKind as KindDef,
-  body: bodyKind as KindDef
+  body: bodyKind as KindDef,
+  culture: cultureKind as KindDef,
+  polity: polityKind as KindDef,
+  relation: relationKind as KindDef,
+  cultureSettings: cultureSettingsKind as KindDef
 }
 
 export class WorldSession extends EventEmitter {
@@ -175,7 +189,8 @@ export class WorldSession extends EventEmitter {
           script: world.scripts.get(`${calendarKind.folder}/${e.id}.js`) ?? null
         }
       })
-    const resolved = resolveEvents(world, cals)
+    const resolver = whenResolver(world, cals)
+    const resolved = resolver.events()
     const events: EventInfo[] = [...world.entities.values()]
       .filter((e) => e.kind.kind === eventKind.kind)
       .sort((a, b) => compareStrings(a.id, b.id))
@@ -194,7 +209,7 @@ export class WorldSession extends EventEmitter {
     const systems: SystemInfoDto[] = [...world.entities.values()]
       .filter((e) => e.kind.kind === systemKind.kind && e.value !== undefined)
       .sort((a, b) => compareStrings(a.id, b.id))
-      .map((e) => systemDto(systemInfo(world, this.env, e.id)!, e.path))
+      .map((e) => systemDto(systemInfo(world, this.env, e.id)!, e.path, resolver))
     const physicsFile = world.entities.get(physicsKind.kind)?.value as PhysicsSettings | undefined
     const issues = runChecks(world, this.env)
     const count = (s: string): number => issues.filter((i) => i.severity === s).length
@@ -207,6 +222,10 @@ export class WorldSession extends EventEmitter {
       calendars,
       events,
       systems,
+      cultures: entityDtos(world, cultureKind.kind),
+      polities: entityDtos(world, polityKind.kind),
+      relations: entityDtos(world, relationKind.kind),
+      cultureSettings: (world.entities.get(cultureSettingsKind.kind)?.value as CultureSettings | undefined) ?? null,
       physics: physicsFile
         ? {
             legLimit_ly: physicsFile.foam.legLimit_ly,
@@ -615,7 +634,14 @@ function bodyDto(b: BodyInfo): BodyInfoDto {
   }
 }
 
-function systemDto(sys: SystemInfo, path: string): SystemInfoDto {
+function entityDtos(world: WorldData, kind: string): EntityDto[] {
+  return [...world.entities.values()]
+    .filter((e) => e.kind.kind === kind)
+    .sort((a, b) => compareStrings(a.id, b.id))
+    .map((e) => ({ id: e.id, path: e.path, value: (e.value as Record<string, unknown> | undefined) ?? null }))
+}
+
+function systemDto(sys: SystemInfo, path: string, resolver: WhenResolver): SystemInfoDto {
   return {
     id: sys.id,
     path,
@@ -626,6 +652,7 @@ function systemDto(sys: SystemInfo, path: string): SystemInfoDto {
     starError: sys.starError,
     habitableZone: sys.habitableZone ? [sys.habitableZone.inner, sys.habitableZone.outer] : null,
     collapse: sys.collapse,
-    bodies: sys.bodies.map(bodyDto)
+    bodies: sys.bodies.map(bodyDto),
+    history: systemHistory(sys.file as SystemFile, resolver)
   }
 }

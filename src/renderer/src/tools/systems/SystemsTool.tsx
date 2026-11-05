@@ -5,6 +5,7 @@ import { NumberField, TextField, duration, sig } from '../../components/fields'
 import { slugId, useWorldPref } from '../../state'
 import type { ToolDefinition, ToolProps } from '../registry'
 import { BodyEditor } from './BodyEditor'
+import { HistoryEditor } from './HistoryEditor'
 import { OrbitView, type Drawn } from './OrbitView'
 
 function SystemsView({ world, snapshot, now, displayCal, navigate, focus }: ToolProps): React.JSX.Element {
@@ -59,6 +60,7 @@ function SystemsView({ world, snapshot, now, displayCal, navigate, focus }: Tool
           displayCal={displayCal}
           calendars={snapshot.calendars}
           navigate={navigate}
+          snapshot={snapshot}
         />
       </div>
     </div>
@@ -71,8 +73,10 @@ function SystemDetail({
   now,
   displayCal,
   calendars,
-  navigate
+  navigate,
+  snapshot
 }: {
+  snapshot: ToolProps['snapshot']
   system: SystemInfoDto
   snapshotVersion: number
   now: number
@@ -209,6 +213,8 @@ function SystemDetail({
           </>
         )
       )}
+
+      {displayCal && <HistoryEditor system={system} snapshot={snapshot} now={now} displayCal={displayCal} />}
 
       <div className="orbit-layout">
         <div className="orbit-col">

@@ -83,7 +83,9 @@ try {
     }
     return out
   }
-  const EXPECTED_FILES = '["calendars/gregorian.json","settings/physics.json","settings/stars.json","world.json"]'
+  // A new world holds world.json and a copy of the template (packages/model/template, less its README).
+  const TEMPLATE_FILES = (await listAll(path.join(appRoot, 'packages/model/template'))).filter((p) => p !== 'README.md')
+  const EXPECTED_FILES = JSON.stringify([...TEMPLATE_FILES, 'world.json'].sort())
   const files = await listAll(worldDir)
   check(JSON.stringify(files) === EXPECTED_FILES, `the world folder holds world.json and the template, nothing else (${files.join(', ')})`)
   const text = await fs.readFile(path.join(worldDir, 'world.json'), 'utf8')
@@ -168,9 +170,10 @@ try {
   await page.waitForSelector('.checks-fix button.primary', { timeout: 10_000 })
   await page.locator('.checks-fix button.primary').click()
   await page.waitForSelector('.ok', { timeout: 10_000 })
+  const addedText = (await page.locator('.ok').textContent()) ?? ''
   check(
-    (await page.locator('.ok').textContent()) === 'Added settings/physics.json, settings/stars.json, calendars/gregorian.json.',
-    'the Checks tool adds the missing template files'
+    addedText.startsWith('Added ') && TEMPLATE_FILES.every((p) => addedText.includes(p)),
+    `the Checks tool adds the missing template files (${addedText})`
   )
   check((await page.locator('.checks-summary').textContent()) === 'No problems found.', 'after which the old world checks clean')
   await page.locator('.tool-link', { hasText: 'World' }).click()
@@ -403,6 +406,59 @@ try {
     summary === 'No problems found.' || / 0 errors, 0 warnings/.test(` ${summary}`),
     `the world with its new system checks clean (${summary})`
   )
+
+  // 13. Phase 4: cultures, a relation that departs from their traits, a polity, and a system's history.
+  await tool('Cultures')
+  await page.locator('[data-tab="cultures"]').click()
+  await page.locator('#addEntity').click()
+  await page.waitForSelector('[data-editing="new-culture"]')
+  await page.locator('#cultureName').fill('Plainsfolk')
+  await page.locator('#cultureName').press('Enter')
+  await page.locator('[data-editing="new-culture"] [data-trait="openness"]').fill('0.9')
+  await page.locator('#addEntity').click()
+  await page.waitForSelector('[data-editing="new-culture-2"]')
+  await page.locator('#cultureName').fill('Hillfolk')
+  await page.locator('#cultureName').press('Enter')
+  await page.locator('[data-editing="new-culture-2"] [data-trait="openness"]').fill('0.1')
+  await page.waitForFunction(() => document.querySelectorAll('[data-entity]').length === 2)
+  check(true, 'two cultures are made and given traits')
+  await page.locator('[data-tab="relations"]').click()
+  const cell = page.locator('[data-cell="new-culture--new-culture-2"]').first()
+  await cell.waitFor()
+  const derivedText = (await cell.textContent()) ?? ''
+  check(Number(derivedText) < 0.5, `insular and open cultures start cool to each other (${derivedText})`)
+  await cell.click()
+  await page.locator('#relationAffinity').fill('0.8')
+  await page.locator('#relationAffinity').press('Enter')
+  await page.waitForFunction(() => document.querySelector('[data-cell="new-culture--new-culture-2"]')?.textContent?.startsWith('0.8'))
+  check(true, 'a relation set by hand replaces the affinity from their traits')
+  await page.screenshot({ path: path.join(shots, '11-relations.png') })
+  await page.locator('[data-tab="polities"]').click()
+  await page.locator('#addEntity').click()
+  await page.waitForSelector('[data-editing="new-polity"]')
+  await page.locator('#polityName').fill('The League')
+  await page.locator('#polityName').press('Enter')
+  await tool('Systems')
+  await page.waitForSelector('#addHistory')
+  await page.locator('#addHistory').click()
+  await page.waitForSelector('[data-history="0"]')
+  await page.locator('[data-history="0"] select').filter({ hasText: '(no polity)' }).selectOption('new-polity')
+  await page.waitForFunction(() => /At the current date: The League/.test(document.querySelector('.history-editor')?.textContent ?? ''))
+  check(true, 'a history entry at the current date makes the polity hold the system now')
+  await page.locator('.status-save').click()
+  await page.waitForFunction(() => document.querySelector('.status-saved') !== null)
+  const relation = JSON.parse(await fs.readFile(path.join(worldDir, 'relations/new-culture--new-culture-2.json'), 'utf8'))
+  check(
+    relation.affinity === 0.8 && relation.between.join() === 'new-culture,new-culture-2',
+    'saving writes the relation under its sorted pair id'
+  )
+  const held = JSON.parse(await fs.readFile(path.join(worldDir, 'systems/proxima-centauri.json'), 'utf8'))
+  check(held.history?.[0]?.polity === 'new-polity', 'and the system’s history')
+  await tool('Checks')
+  await page.locator('.checks-bar button').click()
+  await page.waitForFunction(() => /No problems found|notes/.test(document.querySelector('.checks-summary')?.textContent ?? ''))
+  const s4 = (await page.locator('.checks-summary').textContent()) ?? ''
+  check(s4 === 'No problems found.' || /0 errors, 0 warnings/.test(s4), `cultures, polities and history check clean (${s4})`)
 
   // 10. The update status reports a dev build.
   const status = await page.evaluate(() => window.malevo.updates.status())
