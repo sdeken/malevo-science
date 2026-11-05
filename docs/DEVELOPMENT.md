@@ -215,7 +215,8 @@ module.exports = {
 
 ### Terrain
 
-- **A terrain** is `terrains/<id>.json`, one per body with a solid surface (rocky, ocean, dwarf).
+- **A terrain** is `terrains/<id>.json`, one per body: a surface for rocky, ocean and dwarf
+  bodies, cloud bands for giants.
   It holds:
   - `params` and `roll` for terrain@1;
   - optional `climate` inputs;
@@ -279,6 +280,45 @@ module.exports = {
   counts with a chart, and embeds the same sky as the Sky tool (`useSky` and `SkyCanvas`).
 - **The `cities` check** flags a city under the sea on its body's terrain, and notes cities on
   bodies with no surface.
+
+### City plans
+
+- **A city plan** is `cityplans/<id>.json`, one per city, in metres with x east, y north and z up.
+  It holds the plan's extent, default ground, and walking speed and detour, plus lists of objects,
+  each with an `id`, `name`, `note` and `hidden` flag:
+  - `ground`: polygons at a height (or on a sloping plane), with a surface;
+  - `water`: sea, river and basin polygons;
+  - `lines`: streets, avenues, highways, stairs, rail, field lines, funiculars, sea walls, piers.
+    A line can carry a `service` (headway, speed, acceleration, dwell, stops, cars, tracks,
+    phase and running hours);
+  - `regions`: districts filled by a preset (`buildings`, `cliff`, `yards`, `scatter`, `empty`)
+    from its JSON `params`;
+  - `buildings`: hand-placed landmarks;
+  - `points`: labels, stations, viewpoints and lighter fields.
+
+  It also has `orbit` (the lighter field, the flight time and the gap between launch windows)
+  and `port` (the stack tool's numbers).
+- **cityplan@1** (`packages/gen/src/cityplan.ts`) is a port of the prototype city generator. It
+  turns the plan into boxes (buildings, lamps, rails, cars parked in yards) and the vertical
+  faces where ground areas meet. Each object draws from its own stream, so editing one district
+  leaves the rest alone. `cityServices` builds each service's timetable: stops, departures and
+  arrivals both ways, accelerating and dwelling. A funicular's two cars run as a pair.
+- **Travel** (`cityTravel` in `packages/model/src/cityplan.ts`) is the earliest arrival over
+  walking and riding. Walking is straight-line distance times the detour. Rides wait for each
+  service's real next departure and keep to its running hours. "To orbit" walks or rides to the
+  lighter field, then adds half the window gap and the flight.
+- **The port** (`portCapacity`) gives freighters a day under four limits: the approach corridor
+  (1440 ÷ spacing), the stack (berths ÷ days in stack), the lighter fleet and the field's
+  movements. Each limit counts lighter trips per freighter. The binding one is the capacity. For
+  a system's main port it is set against the route network's own arrivals, and the `cityPlans`
+  check warns when arrivals exceed capacity.
+- **The City planner** draws the plan from above. You draw ground, water, lines and districts by
+  clicking corners and double-clicking to finish, place landmarks and points, and edit any object
+  in the side panel. A time-of-day slider (play to animate) moves the cars. Travel mode gives the
+  quickest trip between two clicks, or to orbit. **3D** shows the same scene lit by the sun at
+  that time, from the city's place on its body.
+- Loading a prototype city file directly is not built; the format is close enough to paste its
+  objects in by hand.
 
 ### The Solar System
 

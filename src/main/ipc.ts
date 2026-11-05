@@ -51,7 +51,8 @@ const EDITABLE: readonly EditableKind[] = [
   'viewpoint',
   'historySettings',
   'terrain',
-  'city'
+  'city',
+  'cityPlan'
 ]
 const asKind = (k: unknown): EditableKind => {
   if (!EDITABLE.includes(k as EditableKind)) throw new Error(`"${String(k)}" cannot be edited.`)
@@ -188,6 +189,12 @@ export function registerIpc(deps: IpcDeps): void {
   )
   ipcMain.handle(IPC.historyAccept, (_e, keys: unknown) => world.historyAccept(Array.isArray(keys) ? keys.map(String) : []))
   ipcMain.handle(IPC.historyNews, (_e, event: unknown) => world.historyNews(String(event)))
+  ipcMain.handle(IPC.planGeometry, (_e, id: unknown) => world.planGeometry(String(id)))
+  ipcMain.handle(IPC.planTravel, (_e, id: unknown, from: unknown, to: unknown, depart: unknown, hour: unknown) => {
+    const xy = (v: unknown): [number, number] => (Array.isArray(v) && v.length >= 2 ? [Number(v[0]) || 0, Number(v[1]) || 0] : [0, 0])
+    return world.planTravel(String(id), xy(from), to === 'orbit' ? 'orbit' : xy(to), Number(depart) || 0, Number(hour) || 3600)
+  })
+  ipcMain.handle(IPC.planPort, (_e, id: unknown) => world.planPort(String(id)))
   ipcMain.handle(IPC.cityConditions, (_e, id: unknown, t: unknown) => world.cityConditions(String(id), Number(t) || 0))
   ipcMain.handle(IPC.terrainRaster, (_e, body: unknown, w: unknown, h: unknown) =>
     world.terrainRaster(

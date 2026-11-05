@@ -8,7 +8,7 @@
  * at the bottom turn file values into the SI values @malevo/core works in.
  */
 import { AU, C, DAY, G0, KM, LY, type CalendarDef, type FoamSettings, type ScriptCalendarImpl, type TorchLight } from '@malevo/core'
-import { arr, bool, dict, num, obj, oneOf, opt, ref, str, tagged, type Infer, type Schema } from './schema'
+import { arr, bool, dict, json, num, obj, oneOf, opt, ref, str, tagged, type Infer, type Schema } from './schema'
 
 export interface KindDef<T = unknown> {
   kind: string
@@ -700,6 +700,150 @@ export type CityFile = Infer<typeof citySchema>
 
 export const cityKind: KindDef<CityFile> = { kind: 'city', label: 'city', folder: 'cities', schema: citySchema }
 
+// ---- city plans ----
+
+const XY = arr(num({ sig: 8 }), { min: 2, max: 2 })
+const XYZ = arr(num({ sig: 8 }), { min: 2, max: 3 })
+const POLY = arr(XY, { min: 3 })
+const PLAN_ID = str({ pattern: /^[a-z0-9][a-z0-9-]*$/, patternHint: 'is not an id (lowercase letters, digits and hyphens)' })
+const RGB01 = arr(num({ min: 0, max: 1, sig: 4 }), { min: 3, max: 3 })
+const common = { id: PLAN_ID, name: opt(str({ max: 200 })), note: opt(str({ max: 400 })), hidden: opt(bool()) }
+
+export const SURFACES = ['grass', 'mud', 'paved', 'sand', 'rock'] as const
+export const LINE_KINDS = [
+  'street',
+  'avenue',
+  'highway',
+  'stairs',
+  'lightrail',
+  'heavyrail',
+  'fieldline',
+  'funicular',
+  'siding',
+  'seawall',
+  'barrage',
+  'breakwater',
+  'pier'
+] as const
+export const REGION_PRESETS = ['buildings', 'cliff', 'yards', 'scatter', 'empty'] as const
+
+/**
+ * A city's plan: the prototype city format (bluff-planner) moved over as
+ * version 2. Anchored to a city, so its latitude, gravity and sun come from
+ * the model; metres, x east, y north, z up, from the city's own origin. Every
+ * speed and size is in this file and nowhere else.
+ */
+export const cityPlanSchema = obj({
+  city: ref('city'),
+  /** The area shown: [x0, y0, x1, y1], m. */
+  extent: arr(num({ sig: 8 }), { min: 4, max: 4 }),
+  /** Mixed into every object's random stream. */
+  seed: opt(num({ integer: true, min: 0, max: 0xffffffff })),
+  defaults: obj({ groundZ: num({ sig: 6 }), surface: oneOf(SURFACES) }),
+  walking: obj({
+    speed_ms: num({ above: 0, sig: 4 }),
+    /** How much longer real walks are than straight lines. */
+    detour: num({ min: 1, sig: 4 })
+  }),
+  ground: opt(
+    arr(
+      obj({
+        ...common,
+        poly: POLY,
+        z: opt(num({ sig: 6 })),
+        plane: opt(arr(arr(num({ sig: 8 }), { min: 3, max: 3 }), { min: 3, max: 3 })),
+        surface: opt(oneOf(SURFACES))
+      })
+    )
+  ),
+  water: opt(arr(obj({ ...common, poly: POLY, z: opt(num({ sig: 6 })), kind: opt(oneOf(['sea', 'river', 'basin'])) }))),
+  lines: opt(
+    arr(
+      obj({
+        ...common,
+        kind: oneOf(LINE_KINDS),
+        pts: arr(XYZ, { min: 2 }),
+        width: opt(num({ above: 0, sig: 5 })),
+        mount: opt(oneOf(['grade', 'elevated', 'face'])),
+        z: opt(num({ sig: 6 })),
+        h: opt(num({ sig: 5 })),
+        lamps: opt(bool()),
+        /** Cars on a timetable. */
+        service: opt(
+          obj({
+            headway_s: opt(num({ above: 0, sig: 6 })),
+            speed_ms: opt(num({ above: 0, sig: 5 })),
+            accel_ms2: opt(num({ above: 0, sig: 5 })),
+            dwell_s: opt(num({ min: 0, sig: 5 })),
+            /** Stops: points near the line, or distances along it (m). Both ends always stop. */
+            stops: opt(arr(json())),
+            stopEvery_m: opt(num({ above: 0, sig: 6 })),
+            cars: opt(num({ integer: true, min: 1 })),
+            carLength_m: opt(num({ above: 0, sig: 4 })),
+            tracks: opt(num({ integer: true, min: 1, max: 2 })),
+            phase_s: opt(num({ sig: 6 })),
+            /** Running hours, local: [from, to]. Absent: all day. */
+            hours: opt(arr(num({ min: 0, max: 24, sig: 4 }), { min: 2, max: 2 })),
+            colour: opt(RGB01)
+          })
+        )
+      })
+    )
+  ),
+  regions: opt(
+    arr(obj({ ...common, preset: oneOf(REGION_PRESETS), poly: POLY, params: opt(json()), seed: opt(num({ integer: true, min: 0 })) }))
+  ),
+  buildings: opt(
+    arr(
+      obj({
+        ...common,
+        center: XY,
+        size: XY,
+        angle: opt(num({ sig: 6 })),
+        z0: opt(num({ sig: 6 })),
+        z1: opt(num({ sig: 6 })),
+        h: opt(num({ above: 0, sig: 6 })),
+        colour: opt(RGB01),
+        kind: opt(oneOf(['landmark', 'structure', 'lamp'])),
+        clear: opt(bool())
+      })
+    )
+  ),
+  points: opt(arr(obj({ ...common, kind: oneOf(['label', 'station', 'viewpoint', 'field']), pos: XYZ, big: opt(bool()) }))),
+  /** Surface to orbit: lighters from a field point up to the stack. */
+  orbit: opt(
+    obj({
+      /** The point lighters fly from. */
+      field: PLAN_ID,
+      flight_min: num({ above: 0, sig: 5 }),
+      /** Typical time between launch windows, min. */
+      windowGap_min: num({ min: 0, sig: 5 })
+    })
+  ),
+  /** The port's capacity, from the stack and lighter model (prototype stack tool). */
+  port: opt(
+    obj({
+      /** Minimum spacing between freighters in the approach corridor, min. */
+      spacing_min: num({ above: 0, sig: 5 }),
+      /** Freighters the stack can hold at once. */
+      berths: num({ min: 0, sig: 6 }),
+      /** Days each freighter spends in the stack. */
+      daysInStack: num({ above: 0, sig: 5 }),
+      lighters: num({ min: 0, sig: 6 }),
+      /** Round trips each lighter flies a day. */
+      flightsPerLighter: num({ min: 0, sig: 5 }),
+      /** Containers per freighter, and per lighter flight. */
+      containersPerFreighter: num({ above: 0, sig: 6 }),
+      lighterCapacity: num({ above: 0, sig: 6 }),
+      /** Take-offs and landings the lighter field can handle a day. */
+      fieldMovements: num({ min: 0, sig: 6 })
+    })
+  )
+})
+export type CityPlanFile = Infer<typeof cityPlanSchema>
+
+export const cityPlanKind: KindDef<CityPlanFile> = { kind: 'cityPlan', label: 'city plan', folder: 'cityplans', schema: cityPlanSchema }
+
 // ---- the history generator's settings ----
 
 /** What history@1 plays out: where it starts, which events unlock what, and how it behaves. */
@@ -783,5 +927,6 @@ export const KINDS: readonly KindDef[] = [
   viewpointKind as KindDef,
   historySettingsKind as KindDef,
   terrainKind as KindDef,
-  cityKind as KindDef
+  cityKind as KindDef,
+  cityPlanKind as KindDef
 ]

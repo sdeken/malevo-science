@@ -8,7 +8,10 @@ cities. Every tool works from one shared model, so details stay consistent from 
 The app contains no setting and knows nothing about git. It reads and writes plain world folders
 of JSON. The author decides what is canon and commits it by hand to a repository of their own.
 
-**Status:** Phases 0–9 are built. Phase 9 added the population planner: cities on any body with
+**Status:** Phases 0–10 are built. Phase 10 added the city planner: districts, streets, rail
+and landmarks drawn on a plan and generated into buildings, timetabled services, door-to-door
+travel times (including to orbit), the port's capacity against the route network, and a 3D view
+lit by the sun at any hour. Giant planets got cloud bands. Phase 9 added the population planner: cities on any body with
 their people over time, and the conditions there at any date (local time, season, daylight,
 tide, who holds it, ships in port) with the sky overhead. Phase 8 added planet terrain: plates, mountains and seas
 generated on the sphere, rolled and locked, shaped by hand as latitude/longitude text, and

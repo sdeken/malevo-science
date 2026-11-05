@@ -29,7 +29,12 @@ const check = (cond, msg) => {
 
 async function launch() {
   const app = await electron.launch({
-    args: [appRoot, '--no-sandbox', '--disable-gpu'],
+    // SMOKE_GL=1 draws WebGL in software, to see the 3D views.
+    args: [
+      appRoot,
+      '--no-sandbox',
+      ...(process.env.SMOKE_GL ? ['--use-angle=swiftshader', '--enable-unsafe-swiftshader'] : ['--disable-gpu'])
+    ],
     env: { ...process.env, MALEVO_USER_DATA: userData, NODE_ENV: 'production' }
   })
   app.on('console', (m) => console.log('  [main]', m.text()))
@@ -660,6 +665,44 @@ try {
     cityFile.body === 'earth' && Math.abs(cityFile.lat_deg - 45) < 1 && cityFile.population?.length === 1,
     'saving writes the city, its place and its people'
   )
+
+  // 19. Phase 10: a plan for the city, a district drawn on it, a trip across it.
+  await tool('City planner')
+  await page.locator('[data-plan-city="new-city"]').click()
+  await page.locator('#startPlan').click()
+  await page.waitForSelector('#planPanel')
+  await page.waitForFunction(() => /boxes from cityplan@1/.test(document.querySelector('.plan-canvas')?.textContent ?? ''))
+  await page.locator('#drawRegion').selectOption('buildings')
+  const svgBox = await page.locator('.plan-svg').boundingBox()
+  const at = (fx, fy) => [svgBox.x + svgBox.width * fx, svgBox.y + svgBox.height * fy]
+  for (const [fx, fy] of [
+    [0.35, 0.3],
+    [0.65, 0.3],
+    [0.65, 0.45]
+  ])
+    await page.mouse.click(...at(fx, fy))
+  await page.mouse.dblclick(...at(0.35, 0.45))
+  await page.waitForSelector('#objectPanel')
+  await page.waitForFunction(() => {
+    const m = /([\d,]+) boxes from/.exec(document.querySelector('.plan-canvas')?.textContent ?? '')
+    return m && Number(m[1].replace(/,/g, '')) > 20
+  })
+  check(true, 'drawing a district fills it with buildings')
+  await page.locator('#planTravel').click()
+  await page.mouse.click(...at(0.2, 0.7))
+  await page.mouse.click(...at(0.8, 0.7))
+  await page.waitForFunction(() => /arriving/.test(document.querySelector('#travelPanel')?.textContent ?? ''))
+  check(true, 'clicking two places gives the travel time between them')
+  await page.screenshot({ path: path.join(shots, '19-cityplan.png') })
+  await page.locator('#plan3d').click()
+  await page.waitForSelector('.plan-3d')
+  await page.waitForTimeout(500)
+  await page.screenshot({ path: path.join(shots, '20-cityplan-3d.png') })
+  check(true, 'the plan switches to 3D')
+  await page.locator('.status-save').click()
+  await page.waitForFunction(() => document.querySelector('.status-saved') !== null)
+  const planFile = JSON.parse(await fs.readFile(path.join(worldDir, 'cityplans/new-city.json'), 'utf8'))
+  check(planFile.city === 'new-city' && planFile.regions?.[0]?.preset === 'buildings', 'saving writes the plan as text')
 
   // 10. The update status reports a dev build.
   const status = await page.evaluate(() => window.malevo.updates.status())

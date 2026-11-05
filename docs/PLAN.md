@@ -727,7 +727,9 @@ moons and the star, without coasts or basins. Ships in port are the arrivals tim
 - Cities on planets with population over time, the "conditions at a time" panel, and the sky view
   embedded.
 
-### Phase 10: City planner
+### Phase 10: City planner — built
+
+Built; see [DEVELOPMENT.md](DEVELOPMENT.md). Loading a prototype city file is left out.
 
 - The city format v2, timetables and travel-time routing on the shared kinematics, the 3D preview
   and the port capacity model.

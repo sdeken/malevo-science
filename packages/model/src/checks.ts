@@ -21,6 +21,7 @@ import { allRoutes, nodePath, routeWorld, trafficReport, waypointNode } from './
 import { historySettings } from './history'
 import { SURFACE_CLASSES, terrainSampler } from './terrain'
 import { cityInfos } from './cities'
+import { portCapacity } from './cityplan'
 import { templateFiles } from './template'
 import {
   calendarKind,
@@ -32,6 +33,7 @@ import {
   relationKind,
   systemKind,
   terrainKind,
+  cityPlanKind,
   type CalendarFile,
   type StoredInstant
 } from './kinds'
@@ -620,6 +622,51 @@ export const citiesCheck: Check = {
   }
 }
 
+export const cityPlansCheck: Check = {
+  id: 'cityplans',
+  title: 'City plans hold together, and their ports can take the traffic',
+  run(world, env) {
+    const out: Issue[] = []
+    for (const e of entitiesOf(world, cityPlanKind)) {
+      const f = e.value
+      const ids = new Map<string, string>()
+      for (const list of ['ground', 'water', 'lines', 'regions', 'buildings', 'points'] as const)
+        for (const o of (f[list] ?? []) as { id: string }[]) {
+          if (ids.has(o.id))
+            out.push({
+              severity: 'error',
+              check: 'cityplans',
+              code: 'duplicate-id',
+              message: `Two objects are called "${o.id}" (${ids.get(o.id)} and ${list}).`,
+              path: e.path,
+              field: list
+            })
+          else ids.set(o.id, list)
+        }
+      if (f.orbit && !(f.points ?? []).some((p) => p.id === f.orbit!.field))
+        out.push({
+          severity: 'error',
+          check: 'cityplans',
+          code: 'no-field',
+          message: `The lighter field "${f.orbit.field}" is not one of the plan's points.`,
+          path: e.path,
+          field: 'orbit.field'
+        })
+      const cap = portCapacity(world, env, f)
+      if (cap && cap.demand !== null && cap.demand > cap.capacity)
+        out.push({
+          severity: 'warning',
+          check: 'cityplans',
+          code: 'port-overloaded',
+          message: `The routes bring ${cap.demand.toFixed(1)} ships a day, but the port can take ${cap.capacity.toFixed(1)} (its ${cap.binding} is the limit).`,
+          path: e.path,
+          field: 'port'
+        })
+    }
+    return out
+  }
+}
+
 export const BUILTIN_CHECKS: readonly Check[] = [
   filesCheck,
   referencesCheck,
@@ -632,6 +679,7 @@ export const BUILTIN_CHECKS: readonly Check[] = [
   historyCheck,
   terrainCheck,
   citiesCheck,
+  cityPlansCheck,
   templateCheck,
   formatCheck
 ]

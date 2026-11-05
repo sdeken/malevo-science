@@ -16,6 +16,9 @@ import type {
   NewsDto,
   TerrainRasterDto,
   ConditionsDto,
+  PlanGeometryDto,
+  TravelDto,
+  PortCapacityDto,
   ApproachQueryDto,
   ApproachInfoDto,
   ApproachMapDto,
@@ -115,6 +118,20 @@ const api = {
     accept: (keys: string[]): Promise<number> => ipcRenderer.invoke(IPC.historyAccept, keys),
     /** When each system learned of an event. */
     news: (event: string): Promise<NewsDto | { error: string }> => ipcRenderer.invoke(IPC.historyNews, event)
+  },
+  plans: {
+    /** A city plan's generated geometry (cityplan@1). */
+    geometry: (id: string): Promise<PlanGeometryDto | null> => ipcRenderer.invoke(IPC.planGeometry, id),
+    /** The quickest way across the city (or to orbit) leaving at a local time of day (s); a local hour is hour_s. */
+    travel: (
+      id: string,
+      from: [number, number],
+      to: [number, number] | 'orbit',
+      depart: number,
+      hour_s: number
+    ): Promise<TravelDto | { error: string }> => ipcRenderer.invoke(IPC.planTravel, id, from, to, depart, hour_s),
+    /** The port's capacity against the route network's arrivals. */
+    port: (id: string): Promise<PortCapacityDto | null> => ipcRenderer.invoke(IPC.planPort, id)
   },
   cities: {
     /** Conditions at a city at an instant: local time, season, daylight, tide, who holds it, its port. */

@@ -131,6 +131,23 @@ export function bool(): Schema<boolean, false> {
   }
 }
 
+/** Any JSON value, kept as it is (for settings whose shape depends on another field, like a region's preset). */
+export function json(): Schema<unknown, false> {
+  return {
+    type: 'json',
+    optional: false as const,
+    parse: (input, field, ctx) => {
+      try {
+        JSON.stringify(input)
+        return input
+      } catch {
+        return issue(ctx, field, 'Expected plain JSON.')
+      }
+    },
+    toJson: (v) => v
+  }
+}
+
 export function oneOf<const T extends string>(values: readonly T[]): Schema<T, false> {
   return {
     type: 'enum',

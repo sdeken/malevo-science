@@ -165,6 +165,7 @@ export interface WorldSnapshot {
   historySettings: Record<string, unknown> | null
   terrains: EntityDto[]
   cities: CityInfoDto[]
+  cityPlans: EntityDto[]
   issueCounts: { error: number; warning: number; info: number }
 }
 
@@ -231,6 +232,7 @@ export type EditableKind =
   | 'historySettings'
   | 'terrain'
   | 'city'
+  | 'cityPlan'
 
 // ---- Phase 3: stars, systems, bodies ----
 
@@ -616,4 +618,40 @@ export interface ConditionsDto {
     inPort: number
   } | null
   errors: string[]
+}
+
+// ---- Phase 10: city plans ----
+
+export interface PlanBoxDto {
+  cx: number
+  cy: number
+  hw: number
+  hd: number
+  ang: number
+  z0: number
+  z1: number
+  alb: number[]
+  emit?: number[]
+  kind: string
+  src: string
+}
+
+export interface PlanGeometryDto {
+  boxes: PlanBoxDto[]
+  faces: { a: [number, number]; b: [number, number]; zLo: number; zHi: number; n: [number, number]; src: string }[]
+  stats: { boxes: number; byKind: Record<string, number> }
+}
+
+export interface TravelDto {
+  total: number
+  arrive: number
+  legs: { mode: 'walk' | 'wait' | 'ride' | 'orbit'; line?: string; from: [number, number]; to: [number, number]; duration: number }[]
+}
+
+export interface PortCapacityDto {
+  limits: { corridor: number; stack: number; fleet: number; field: number }
+  capacity: number
+  binding: 'corridor' | 'stack' | 'fleet' | 'field'
+  tripsPerFreighter: number
+  demand: number | null
 }

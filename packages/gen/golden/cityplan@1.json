@@ -1,0 +1,312 @@
+{
+  "generator": "cityplan@1",
+  "note": "Pinned output hashes of a frozen generator. Never edit; see packages/gen/tests/golden.test.ts.",
+  "cases": [
+    {
+      "seed": 1,
+      "input": {
+        "planId": "test-city",
+        "seed": 3,
+        "defaults": {
+          "groundZ": 0,
+          "surface": "mud"
+        },
+        "ground": [
+          {
+            "id": "flat",
+            "poly": [
+              [-2000, -2000],
+              [2000, -2000],
+              [2000, 0],
+              [-2000, 0]
+            ],
+            "z": 1,
+            "surface": "paved"
+          },
+          {
+            "id": "plateau",
+            "poly": [
+              [-2000, 0],
+              [2000, 0],
+              [2000, 2000],
+              [-2000, 2000]
+            ],
+            "z": 150,
+            "surface": "grass"
+          }
+        ],
+        "water": [
+          {
+            "id": "bay",
+            "poly": [
+              [-2000, -2000],
+              [2000, -2000],
+              [2000, -1500],
+              [-2000, -1500]
+            ],
+            "z": 0,
+            "kind": "sea"
+          }
+        ],
+        "regions": [
+          {
+            "id": "towers",
+            "preset": "buildings",
+            "poly": [
+              [-1500, -1200],
+              [0, -1200],
+              [0, -200],
+              [-1500, -200]
+            ],
+            "params": {
+              "block": [80, 80],
+              "street": 20,
+              "height": {
+                "kind": "peak",
+                "at": [-700, -700],
+                "radius": 500,
+                "min": 20,
+                "max": 300,
+                "skew": 2
+              }
+            }
+          },
+          {
+            "id": "cliffside",
+            "preset": "cliff",
+            "poly": [
+              [-1800, -100],
+              [1800, -100],
+              [1800, 100],
+              [-1800, 100]
+            ]
+          },
+          {
+            "id": "docks",
+            "preset": "yards",
+            "poly": [
+              [200, -1400],
+              [1800, -1400],
+              [1800, -600],
+              [200, -600]
+            ]
+          },
+          {
+            "id": "suburbs",
+            "preset": "scatter",
+            "poly": [
+              [-1800, 300],
+              [1800, 300],
+              [1800, 1800],
+              [-1800, 1800]
+            ],
+            "params": {
+              "density": 60
+            }
+          }
+        ],
+        "buildings": [
+          {
+            "id": "tower-of-note",
+            "center": [-700, -700],
+            "size": [60, 60],
+            "h": 400
+          }
+        ],
+        "lines": [
+          {
+            "id": "main-road",
+            "kind": "avenue",
+            "pts": [
+              [-1900, -300],
+              [1900, -300]
+            ]
+          },
+          {
+            "id": "tram",
+            "kind": "lightrail",
+            "pts": [
+              [-1900, -250],
+              [1900, -250]
+            ],
+            "service": {
+              "headway_s": 300,
+              "speed_ms": 15,
+              "accel_ms2": 1,
+              "dwell_s": 30,
+              "stopEvery_m": 500,
+              "hours": [5, 23]
+            }
+          },
+          {
+            "id": "incline",
+            "kind": "funicular",
+            "pts": [
+              [1000, -60, 1],
+              [1000, 60, 150]
+            ],
+            "service": {
+              "speed_ms": 5,
+              "accel_ms2": 0.6,
+              "dwell_s": 60
+            }
+          }
+        ]
+      },
+      "hash": "1a3da828703e9e"
+    },
+    {
+      "seed": 42,
+      "input": {
+        "planId": "test-city",
+        "seed": 3,
+        "defaults": {
+          "groundZ": 0,
+          "surface": "mud"
+        },
+        "ground": [
+          {
+            "id": "flat",
+            "poly": [
+              [-2000, -2000],
+              [2000, -2000],
+              [2000, 0],
+              [-2000, 0]
+            ],
+            "z": 1,
+            "surface": "paved"
+          },
+          {
+            "id": "plateau",
+            "poly": [
+              [-2000, 0],
+              [2000, 0],
+              [2000, 2000],
+              [-2000, 2000]
+            ],
+            "z": 150,
+            "surface": "grass"
+          }
+        ],
+        "water": [
+          {
+            "id": "bay",
+            "poly": [
+              [-2000, -2000],
+              [2000, -2000],
+              [2000, -1500],
+              [-2000, -1500]
+            ],
+            "z": 0,
+            "kind": "sea"
+          }
+        ],
+        "regions": [
+          {
+            "id": "towers",
+            "preset": "buildings",
+            "poly": [
+              [-1500, -1200],
+              [0, -1200],
+              [0, -200],
+              [-1500, -200]
+            ],
+            "params": {
+              "block": [80, 80],
+              "street": 20,
+              "height": {
+                "kind": "peak",
+                "at": [-700, -700],
+                "radius": 500,
+                "min": 20,
+                "max": 300,
+                "skew": 2
+              }
+            }
+          },
+          {
+            "id": "cliffside",
+            "preset": "cliff",
+            "poly": [
+              [-1800, -100],
+              [1800, -100],
+              [1800, 100],
+              [-1800, 100]
+            ]
+          },
+          {
+            "id": "docks",
+            "preset": "yards",
+            "poly": [
+              [200, -1400],
+              [1800, -1400],
+              [1800, -600],
+              [200, -600]
+            ]
+          },
+          {
+            "id": "suburbs",
+            "preset": "scatter",
+            "poly": [
+              [-1800, 300],
+              [1800, 300],
+              [1800, 1800],
+              [-1800, 1800]
+            ],
+            "params": {
+              "density": 60
+            }
+          }
+        ],
+        "buildings": [
+          {
+            "id": "tower-of-note",
+            "center": [-700, -700],
+            "size": [60, 60],
+            "h": 400
+          }
+        ],
+        "lines": [
+          {
+            "id": "main-road",
+            "kind": "avenue",
+            "pts": [
+              [-1900, -300],
+              [1900, -300]
+            ]
+          },
+          {
+            "id": "tram",
+            "kind": "lightrail",
+            "pts": [
+              [-1900, -250],
+              [1900, -250]
+            ],
+            "service": {
+              "headway_s": 300,
+              "speed_ms": 15,
+              "accel_ms2": 1,
+              "dwell_s": 30,
+              "stopEvery_m": 500,
+              "hours": [5, 23]
+            }
+          },
+          {
+            "id": "incline",
+            "kind": "funicular",
+            "pts": [
+              [1000, -60, 1],
+              [1000, 60, 150]
+            ],
+            "service": {
+              "speed_ms": 5,
+              "accel_ms2": 0.6,
+              "dwell_s": 60
+            }
+          }
+        ]
+      },
+      "hash": "1ab8159001d024"
+    }
+  ]
+}

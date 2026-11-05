@@ -16,6 +16,7 @@ export * from './history'
 export * from './solarSystem'
 export * from './terrain'
 export * from './cities'
+export * from './cityplan'
 export * from './compare'
 export { templateFiles } from './template'
 export {

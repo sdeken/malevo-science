@@ -56,6 +56,11 @@ import {
   cityKind,
   cityInfos,
   conditionsAt,
+  cityPlanKind,
+  planGeometry,
+  cityTravel,
+  portCapacity,
+  type CityPlanFile,
   newsArrival,
   KINDS,
   type HistoryProposal,
@@ -126,6 +131,9 @@ import type {
   NewsDto,
   TerrainRasterDto,
   ConditionsDto,
+  PlanGeometryDto,
+  TravelDto,
+  PortCapacityDto,
   StarField,
   StarInfoDto,
   StarSearchHit,
@@ -153,7 +161,8 @@ const KIND_DEFS: Record<EditableKind, KindDef> = {
   viewpoint: viewpointKind as KindDef,
   historySettings: historySettingsKind as KindDef,
   terrain: terrainKind as KindDef,
-  city: cityKind as KindDef
+  city: cityKind as KindDef,
+  cityPlan: cityPlanKind as KindDef
 }
 
 export class WorldSession extends EventEmitter {
@@ -297,6 +306,7 @@ export class WorldSession extends EventEmitter {
           population: c.population,
           errors: c.errors
         })),
+      cityPlans: entityDtos(world, cityPlanKind.kind),
       physics: physicsFile
         ? {
             legLimit_ly: physicsFile.foam.legLimit_ly,
@@ -495,6 +505,27 @@ export class WorldSession extends EventEmitter {
     if (this.rasters.size > 12) this.rasters.clear()
     this.rasters.set(key, r)
     return r
+  }
+
+  planGeometry(planId: string): PlanGeometryDto | null {
+    return planGeometry(this.world(), planId) as PlanGeometryDto | null
+  }
+
+  planTravel(
+    planId: string,
+    from: [number, number],
+    to: [number, number] | 'orbit',
+    depart: number,
+    hour_s: number
+  ): TravelDto | { error: string } {
+    const f = this.world().entities.get(`${cityPlanKind.kind}/${planId}`)?.value as CityPlanFile | undefined
+    if (!f) return { error: `There is no plan "${planId}".` }
+    return cityTravel(f, from, to, depart, hour_s) as TravelDto | { error: string }
+  }
+
+  planPort(planId: string): PortCapacityDto | null {
+    const f = this.world().entities.get(`${cityPlanKind.kind}/${planId}`)?.value as CityPlanFile | undefined
+    return f ? portCapacity(this.world(), this.env, f) : null
   }
 
   cityConditions(id: string, t: number): ConditionsDto | { error: string } {
