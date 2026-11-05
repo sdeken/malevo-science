@@ -21,7 +21,7 @@ import {
   perlin3,
   type Vec3
 } from '@malevo/core'
-import { contextFor, terrain, terrainField, type TerrainField } from '@malevo/gen'
+import { DEFAULT_BANDS, bands, bandsField, contextFor, terrain, terrainField, type TerrainField } from '@malevo/gen'
 import type { WorldEnv } from './env'
 import { bodyKind, terrainKind, type BodyFile, type TerrainFile } from './kinds'
 import { entitiesOf, type WorldData } from './load'
@@ -146,6 +146,7 @@ export type Biome =
   | 'rock'
   | 'highland'
   | 'basin'
+  | 'clouds'
 
 export const BIOME_COLOURS: Record<Biome, [number, number, number]> = {
   'deep-sea': [18, 42, 94],
@@ -162,7 +163,8 @@ export const BIOME_COLOURS: Record<Biome, [number, number, number]> = {
   tropical: [36, 106, 48],
   rock: [128, 118, 108],
   highland: [104, 96, 90],
-  basin: [96, 88, 80]
+  basin: [96, 88, 80],
+  clouds: [220, 200, 170]
 }
 
 export function biomeAt(c: ClimateInputs, p: Vec3, h: number, t: number, dryness: number): Biome {
@@ -208,11 +210,19 @@ export function terrainSampler(world: WorldData, env: WorldEnv, bodyId: string):
   const b = sys?.bodies.find((x) => x.id === bodyId)
   if (!b) return { error: `There is no body "${bodyId}".` }
   const seed = world.manifest?.seed ?? 0
-  const key = `${seed}|${bodyId}|${t.file.roll}|${JSON.stringify(t.file.params)}`
+  if (t.file.bands) {
+    // A giant: no surface, only cloud tops (bands@1).
+    const bctx = contextFor(bands, seed)
+    const bf = bandsField(t.file.bands, (purpose) => bctx.stream(bodyId, `roll-${t.file.roll}:${purpose}`))
+    return { height: () => 0, climate: null, sample: (p) => ({ h: 0, t: null, biome: 'clouds', colour: bf.colour(p) }) }
+  }
+  const params = t.file.params
+  if (!params) return { error: 'This terrain has neither a surface (params) nor cloud bands.' }
+  const key = `${seed}|${bodyId}|${t.file.roll}|${JSON.stringify(params)}`
   let field = fieldCache.get(key)
   if (!field) {
     const ctx = contextFor(terrain, seed)
-    field = terrainField(t.file.params, (purpose) => ctx.stream(bodyId, `roll-${t.file.roll}:${purpose}`))
+    field = terrainField(params, (purpose) => ctx.stream(bodyId, `roll-${t.file.roll}:${purpose}`))
     if (fieldCache.size > 16) fieldCache.clear()
     fieldCache.set(key, field)
   }
@@ -316,7 +326,7 @@ export function terrainRaster(
 }
 
 /** A new terrain file for a body, at the defaults. */
-export function newTerrain(bodyId: string, cls: BodyFile['class']): TerrainFile {
+export function newTerrain(bodyId: string, cls: BodyFile['class']): TerrainFile & { params: NonNullable<TerrainFile['params']> } {
   return {
     body: bodyId,
     roll: 0,
@@ -328,4 +338,9 @@ export function newTerrain(bodyId: string, cls: BodyFile['class']): TerrainFile 
       roughness: 0.5
     }
   }
+}
+
+/** A new giant's cloud bands, at the defaults for its class. */
+export function newBands(bodyId: string, cls: 'gas-giant' | 'ice-giant'): TerrainFile {
+  return { body: bodyId, roll: 0, bands: { ...DEFAULT_BANDS[cls], palette: [...DEFAULT_BANDS[cls].palette] } }
 }

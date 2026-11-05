@@ -15,13 +15,19 @@ interface Shape {
 interface TerrainValue {
   body: string
   roll: number
-  params: { plates: number; continents: number; ocean: number; mountains_km: number; roughness: number }
+  params?: { plates: number; continents: number; ocean: number; mountains_km: number; roughness: number }
+  bands?: { bands: number; contrast: number; turbulence: number; storms: number; palette: string[] }
   climate?: { greenhouse_K?: number; heatTransport?: number; temperature_K?: number; water?: boolean; rock?: string }
   shapes?: Shape[]
   lock?: { gen: string; seed?: number; inputs: Record<string, string> }
 }
 
-const SURFACE = ['rocky', 'ocean', 'dwarf']
+const SURFACE = ['rocky', 'ocean', 'dwarf', 'gas-giant', 'ice-giant']
+const GIANT = ['gas-giant', 'ice-giant']
+const DEFAULT_BANDS: Record<string, NonNullable<TerrainValue['bands']>> = {
+  'gas-giant': { bands: 14, contrast: 0.6, turbulence: 0.45, storms: 3, palette: ['#e9dcc0', '#c79a68', '#f2ead8', '#a87650', '#d8bf98'] },
+  'ice-giant': { bands: 8, contrast: 0.25, turbulence: 0.3, storms: 1, palette: ['#a8d8e4', '#8cc4d6', '#c2e6ee', '#7fb4cc'] }
+}
 const MAP_W = 512
 const MAP_H = 256
 const SHAPE_HELP: Record<ShapeKind, string> = {
@@ -127,22 +133,30 @@ function TerrainDetail({
     return (
       <div className="tool-page">
         <h1>{body.name}</h1>
-        <p>No terrain yet. A terrain is generated from a few parameters and a roll, then shaped by hand; nothing is stored as pixels.</p>
+        <p>
+          {GIANT.includes(body.cls)
+            ? 'No cloud bands yet. A giant has no surface; its look is generated from a few settings and a roll: bands, streaks and storms.'
+            : 'No terrain yet. A terrain is generated from a few parameters and a roll, then shaped by hand; nothing is stored as pixels.'}
+        </p>
         <button
           className="primary"
           id="makeTerrain"
           onClick={() =>
-            save({
-              body: body.id,
-              roll: 0,
-              params: {
-                plates: 12,
-                continents: 0.35,
-                ocean: body.cls === 'ocean' ? 0.75 : body.cls === 'dwarf' ? 0 : 0.5,
-                mountains_km: body.cls === 'dwarf' ? 3 : 6,
-                roughness: 0.5
-              }
-            })
+            save(
+              GIANT.includes(body.cls)
+                ? { body: body.id, roll: 0, bands: { ...DEFAULT_BANDS[body.cls], palette: [...DEFAULT_BANDS[body.cls].palette] } }
+                : {
+                    body: body.id,
+                    roll: 0,
+                    params: {
+                      plates: 12,
+                      continents: 0.35,
+                      ocean: body.cls === 'ocean' ? 0.75 : body.cls === 'dwarf' ? 0 : 0.5,
+                      mountains_km: body.cls === 'dwarf' ? 3 : 6,
+                      roughness: 0.5
+                    }
+                  }
+            )
           }
         >
           Make terrain
@@ -150,7 +164,8 @@ function TerrainDetail({
       </div>
     )
 
-  const setParam = (k: keyof TerrainValue['params'], x: number): void => save({ ...v, params: { ...v.params, [k]: x } })
+  const setParam = (k: keyof NonNullable<TerrainValue['params']>, x: number): void => save({ ...v, params: { ...v.params!, [k]: x } })
+  const giant = Boolean(v.bands)
   const setClimate = (patch: Partial<NonNullable<TerrainValue['climate']>>): void => {
     const c = { ...v.climate, ...patch }
     for (const k of Object.keys(c) as (keyof typeof c)[]) if (c[k] === undefined) delete c[k]
@@ -229,7 +244,12 @@ function TerrainDetail({
         <Globe raster={raster} />
       </div>
 
-      {s && (
+      {s && giant && (
+        <p className="muted small" id="terrainStats">
+          Cloud tops of a giant: no surface to stand on.
+        </p>
+      )}
+      {s && !giant && (
         <p className="muted small" id="terrainStats">
           {sig(s.ocean * 100, 3)}% under water · highest {sig(s.highest, 3)} km · deepest {sig(-s.lowest, 3)} km
           {s.meanTemp !== null && (
@@ -241,148 +261,206 @@ function TerrainDetail({
         </p>
       )}
 
-      <h3>Shaping</h3>
-      <div className="seg">
-        {(['land', 'sea', 'raise', 'lower', 'ridge'] as const).map((k) => (
-          <button
-            key={k}
-            className={drawing?.kind === k ? 'on' : ''}
-            onClick={() => setDrawing(drawing?.kind === k ? null : { kind: k, points: [] })}
-            data-shape={k}
-          >
-            {k === 'land' ? 'Land' : k === 'sea' ? 'Sea' : k === 'raise' ? 'Raise' : k === 'lower' ? 'Lower' : 'Ridge'}
-          </button>
+      {giant && v.bands && <BandsEditor value={v.bands} locked={locked} onChange={(b) => save({ ...v, bands: b })} />}
+      {!giant && v.params && (
+        <>
+          <h3>Shaping</h3>
+          <div className="seg">
+            {(['land', 'sea', 'raise', 'lower', 'ridge'] as const).map((k) => (
+              <button
+                key={k}
+                className={drawing?.kind === k ? 'on' : ''}
+                onClick={() => setDrawing(drawing?.kind === k ? null : { kind: k, points: [] })}
+                data-shape={k}
+              >
+                {k === 'land' ? 'Land' : k === 'sea' ? 'Sea' : k === 'raise' ? 'Raise' : k === 'lower' ? 'Lower' : 'Ridge'}
+              </button>
+            ))}
+          </div>
+          {drawing && (
+            <p className="small">
+              {SHAPE_HELP[drawing.kind]}{' '}
+              {drawing.points.length > 0 && (
+                <button className="link" onClick={finish}>
+                  Finish
+                </button>
+              )}{' '}
+              <button className="link" onClick={() => setDrawing(null)}>
+                Cancel
+              </button>
+            </p>
+          )}
+          {shapes.length > 0 && (
+            <table className="units" id="terrainShapes">
+              <tbody>
+                {shapes.map((sh, k) => {
+                  const set = (patch: Partial<Shape>): void =>
+                    save({ ...v, shapes: shapes.map((x, j) => (j === k ? { ...x, ...patch } : x)) })
+                  return (
+                    <tr key={k}>
+                      <td>
+                        <span className="swatch" style={{ background: SHAPE_COLOUR[sh.kind] }} /> {sh.kind}, {sh.points.length} points
+                      </td>
+                      <td>
+                        {(sh.kind === 'raise' || sh.kind === 'lower' || sh.kind === 'ridge') && (
+                          <NumberField label="Height, km" value={sh.height_km} onCommit={(x) => x !== undefined && set({ height_km: x })} />
+                        )}
+                      </td>
+                      <td>
+                        {sh.kind !== 'land' && sh.kind !== 'sea' && (
+                          <NumberField
+                            label="Width, °"
+                            value={sh.width_deg}
+                            onCommit={(x) => x !== undefined && x > 0 && set({ width_deg: x })}
+                          />
+                        )}
+                      </td>
+                      <td>
+                        <button onClick={() => save({ ...v, shapes: shapes.filter((_, j) => j !== k) })}>✕</button>
+                      </td>
+                    </tr>
+                  )
+                })}
+              </tbody>
+            </table>
+          )}
+
+          <h3>Generation</h3>
+          <fieldset disabled={locked} className="plain">
+            <div className="field-row">
+              <NumberField
+                label="Plates"
+                value={v.params.plates}
+                onCommit={(x) => x !== undefined && setParam('plates', Math.max(2, Math.min(60, Math.round(x))))}
+              />
+              <NumberField
+                label="Continental share"
+                value={v.params.continents}
+                onCommit={(x) => x !== undefined && setParam('continents', Math.max(0, Math.min(1, x)))}
+              />
+              <NumberField
+                label="Under water"
+                value={v.params.ocean}
+                hint="Share of the surface, 0–1"
+                onCommit={(x) => x !== undefined && setParam('ocean', Math.max(0, Math.min(1, x)))}
+                id="terrainOcean"
+              />
+              <NumberField
+                label="Mountains, km"
+                value={v.params.mountains_km}
+                onCommit={(x) => x !== undefined && setParam('mountains_km', Math.max(0, Math.min(30, x)))}
+              />
+              <NumberField
+                label="Roughness"
+                value={v.params.roughness}
+                onCommit={(x) => x !== undefined && setParam('roughness', Math.max(0, Math.min(1, x)))}
+              />
+            </div>
+          </fieldset>
+          {locked && <p className="muted small">Unlock to change the generation; shaping and climate stay editable.</p>}
+
+          <h3>Climate</h3>
+          <div className="field-row">
+            <NumberField
+              label="Greenhouse warming, K"
+              value={v.climate?.greenhouse_K}
+              optional
+              placeholder="from the air"
+              onCommit={(x) => setClimate({ greenhouse_K: x })}
+            />
+            <NumberField
+              label="Heat transport, 0–1"
+              value={v.climate?.heatTransport}
+              optional
+              placeholder="0.35 with air"
+              onCommit={(x) => setClimate({ heatTransport: x === undefined ? undefined : Math.max(0, Math.min(1, x)) })}
+            />
+            <NumberField
+              label="Fixed mean temperature, K"
+              value={v.climate?.temperature_K}
+              optional
+              placeholder="follows the orbit"
+              onCommit={(x) => setClimate({ temperature_K: x })}
+            />
+          </div>
+          <div className="field-row">
+            <label className="field">
+              Surface water
+              <select
+                value={v.climate?.water === undefined ? '' : v.climate.water ? 'yes' : 'no'}
+                onChange={(e) => setClimate({ water: e.target.value === '' ? undefined : e.target.value === 'yes' })}
+                id="terrainWater"
+              >
+                <option value="">With half an atmosphere or more</option>
+                <option value="yes">Yes: seas and ice</option>
+                <option value="no">No: a dry world</option>
+              </select>
+            </label>
+            <label className="field">
+              Rock colour
+              <input type="color" value={v.climate?.rock ?? '#80766c'} onChange={(e) => setClimate({ rock: e.target.value })} />
+            </label>
+            {v.climate?.rock && (
+              <button className="link" onClick={() => setClimate({ rock: undefined })}>
+                default rock
+              </button>
+            )}
+          </div>
+        </>
+      )}
+    </div>
+  )
+}
+
+function BandsEditor({
+  value,
+  locked,
+  onChange
+}: {
+  value: NonNullable<TerrainValue['bands']>
+  locked: boolean
+  onChange(b: NonNullable<TerrainValue['bands']>): void
+}): React.JSX.Element {
+  const set = (patch: Partial<NonNullable<TerrainValue['bands']>>): void => onChange({ ...value, ...patch })
+  const clamp01 = (x: number): number => Math.max(0, Math.min(1, x))
+  return (
+    <fieldset disabled={locked} className="plain" id="bandsEditor">
+      <h3>Cloud bands</h3>
+      <div className="field-row">
+        <NumberField
+          label="Bands, pole to pole"
+          value={value.bands}
+          onCommit={(x) => x !== undefined && set({ bands: Math.max(1, Math.min(60, Math.round(x))) })}
+        />
+        <NumberField label="Contrast, 0–1" value={value.contrast} onCommit={(x) => x !== undefined && set({ contrast: clamp01(x) })} />
+        <NumberField
+          label="Turbulence, 0–1"
+          value={value.turbulence}
+          onCommit={(x) => x !== undefined && set({ turbulence: clamp01(x) })}
+        />
+        <NumberField
+          label="Storms"
+          value={value.storms}
+          onCommit={(x) => x !== undefined && set({ storms: Math.max(0, Math.min(20, Math.round(x))) })}
+        />
+      </div>
+      <div className="field-row palette">
+        {value.palette.map((c, k) => (
+          <span key={k} className="palette-chip">
+            <input type="color" value={c} onChange={(e) => set({ palette: value.palette.map((x, j) => (j === k ? e.target.value : x)) })} />
+            {value.palette.length > 2 && (
+              <button className="link" title="Remove" onClick={() => set({ palette: value.palette.filter((_, j) => j !== k) })}>
+                ✕
+              </button>
+            )}
+          </span>
         ))}
-      </div>
-      {drawing && (
-        <p className="small">
-          {SHAPE_HELP[drawing.kind]}{' '}
-          {drawing.points.length > 0 && (
-            <button className="link" onClick={finish}>
-              Finish
-            </button>
-          )}{' '}
-          <button className="link" onClick={() => setDrawing(null)}>
-            Cancel
-          </button>
-        </p>
-      )}
-      {shapes.length > 0 && (
-        <table className="units" id="terrainShapes">
-          <tbody>
-            {shapes.map((sh, k) => {
-              const set = (patch: Partial<Shape>): void => save({ ...v, shapes: shapes.map((x, j) => (j === k ? { ...x, ...patch } : x)) })
-              return (
-                <tr key={k}>
-                  <td>
-                    <span className="swatch" style={{ background: SHAPE_COLOUR[sh.kind] }} /> {sh.kind}, {sh.points.length} points
-                  </td>
-                  <td>
-                    {(sh.kind === 'raise' || sh.kind === 'lower' || sh.kind === 'ridge') && (
-                      <NumberField label="Height, km" value={sh.height_km} onCommit={(x) => x !== undefined && set({ height_km: x })} />
-                    )}
-                  </td>
-                  <td>
-                    {sh.kind !== 'land' && sh.kind !== 'sea' && (
-                      <NumberField
-                        label="Width, °"
-                        value={sh.width_deg}
-                        onCommit={(x) => x !== undefined && x > 0 && set({ width_deg: x })}
-                      />
-                    )}
-                  </td>
-                  <td>
-                    <button onClick={() => save({ ...v, shapes: shapes.filter((_, j) => j !== k) })}>✕</button>
-                  </td>
-                </tr>
-              )
-            })}
-          </tbody>
-        </table>
-      )}
-
-      <h3>Generation</h3>
-      <fieldset disabled={locked} className="plain">
-        <div className="field-row">
-          <NumberField
-            label="Plates"
-            value={v.params.plates}
-            onCommit={(x) => x !== undefined && setParam('plates', Math.max(2, Math.min(60, Math.round(x))))}
-          />
-          <NumberField
-            label="Continental share"
-            value={v.params.continents}
-            onCommit={(x) => x !== undefined && setParam('continents', Math.max(0, Math.min(1, x)))}
-          />
-          <NumberField
-            label="Under water"
-            value={v.params.ocean}
-            hint="Share of the surface, 0–1"
-            onCommit={(x) => x !== undefined && setParam('ocean', Math.max(0, Math.min(1, x)))}
-            id="terrainOcean"
-          />
-          <NumberField
-            label="Mountains, km"
-            value={v.params.mountains_km}
-            onCommit={(x) => x !== undefined && setParam('mountains_km', Math.max(0, Math.min(30, x)))}
-          />
-          <NumberField
-            label="Roughness"
-            value={v.params.roughness}
-            onCommit={(x) => x !== undefined && setParam('roughness', Math.max(0, Math.min(1, x)))}
-          />
-        </div>
-      </fieldset>
-      {locked && <p className="muted small">Unlock to change the generation; shaping and climate stay editable.</p>}
-
-      <h3>Climate</h3>
-      <div className="field-row">
-        <NumberField
-          label="Greenhouse warming, K"
-          value={v.climate?.greenhouse_K}
-          optional
-          placeholder="from the air"
-          onCommit={(x) => setClimate({ greenhouse_K: x })}
-        />
-        <NumberField
-          label="Heat transport, 0–1"
-          value={v.climate?.heatTransport}
-          optional
-          placeholder="0.35 with air"
-          onCommit={(x) => setClimate({ heatTransport: x === undefined ? undefined : Math.max(0, Math.min(1, x)) })}
-        />
-        <NumberField
-          label="Fixed mean temperature, K"
-          value={v.climate?.temperature_K}
-          optional
-          placeholder="follows the orbit"
-          onCommit={(x) => setClimate({ temperature_K: x })}
-        />
-      </div>
-      <div className="field-row">
-        <label className="field">
-          Surface water
-          <select
-            value={v.climate?.water === undefined ? '' : v.climate.water ? 'yes' : 'no'}
-            onChange={(e) => setClimate({ water: e.target.value === '' ? undefined : e.target.value === 'yes' })}
-            id="terrainWater"
-          >
-            <option value="">With half an atmosphere or more</option>
-            <option value="yes">Yes: seas and ice</option>
-            <option value="no">No: a dry world</option>
-          </select>
-        </label>
-        <label className="field">
-          Rock colour
-          <input type="color" value={v.climate?.rock ?? '#80766c'} onChange={(e) => setClimate({ rock: e.target.value })} />
-        </label>
-        {v.climate?.rock && (
-          <button className="link" onClick={() => setClimate({ rock: undefined })}>
-            default rock
-          </button>
+        {value.palette.length < 8 && (
+          <button onClick={() => set({ palette: [...value.palette, value.palette[value.palette.length - 1]] })}>Add a colour</button>
         )}
       </div>
-    </div>
+      {locked && <p className="muted small">Unlock to change the bands.</p>}
+    </fieldset>
   )
 }
 

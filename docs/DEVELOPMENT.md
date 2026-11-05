@@ -247,6 +247,10 @@ module.exports = {
   - **Dry worlds** (`climate.water`, by default yes only with half an atmosphere or more) are
     rock, with frost where it is very cold; `climate.rock` sets the rock's colour.
   - `climate.temperature_K` fixes the mean temperature, so the look stops following the orbit.
+- **Giants** (gas and ice) have no surface. Their terrain file holds `bands` instead of
+  `params`: the number of bands, contrast, turbulence, storms and a palette. **bands@1**
+  (`packages/gen/src/bands.ts`) colours points on the sphere: bands by latitude bent by
+  turbulence, streaks sheared along them, and swirling storm ovals.
 - **Rasters** (height and colour maps) are derived in the main process and cached per world
   version; nothing is written to the world. **Export** saves a 2048×1024 PNG wherever you choose,
   for reference.

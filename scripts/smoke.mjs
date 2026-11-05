@@ -631,6 +631,14 @@ try {
     'saving writes the terrain as text, locked to terrain@1'
   )
 
+  await tool('Terrain')
+  await page.locator('[data-terrain-body="jupiter"]').click()
+  await page.locator('#makeTerrain').click()
+  await page.waitForSelector('#bandsEditor', { timeout: 30_000 })
+  await page.waitForFunction(() => /Cloud tops/.test(document.querySelector('#terrainStats')?.textContent ?? ''))
+  check(true, 'a gas giant gets cloud bands instead of a surface')
+  await page.evaluate(() => window.malevo.world.discard())
+
   // 18. Phase 9: a city on Earth, placed on the map, with conditions there.
   await tool('Population')
   await page.locator('#addCity').click()

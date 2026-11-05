@@ -113,3 +113,31 @@ describe('terrain', () => {
     expect(s.sample(fromLatLon(0, 180 * DEG)).t!).toBeLessThan(150)
   })
 })
+
+describe('giants', () => {
+  it('draws cloud bands for a gas giant, banded by latitude, with no surface', async () => {
+    const { newBands } = await import('@malevo/model')
+    const w = world([terrainFile('jupiter', newBands('jupiter', 'gas-giant'))])
+    expect(runChecks(w).filter((i) => i.check === 'terrain')).toEqual([])
+    const r = terrainRaster(w, {}, 'jupiter', 64, 32)
+    if ('error' in r) throw new Error(r.error)
+    expect(r.stats.ocean).toBe(0)
+    // Colour changes much more from north to south than from east to west.
+    const px = (i: number, j: number) => [...r.rgba.slice((j * 64 + i) * 4, (j * 64 + i) * 4 + 3)]
+    let ns = 0
+    let ew = 0
+    for (let j = 4; j < 28; j++)
+      for (let i = 0; i < 63; i++) {
+        ew += px(i, j).reduce((s, v, k) => s + Math.abs(v - px(i + 1, j)[k]), 0)
+        ns += px(i, j).reduce((s, v, k) => s + Math.abs(v - px(i, j + 1)[k]), 0)
+      }
+    expect(ns).toBeGreaterThan(ew * 1.5)
+    // A surface terrain on a giant is flagged.
+    const wrong = world([terrainFile('jupiter', newTerrain('jupiter', 'gas-giant'))])
+    expect(
+      runChecks(wrong)
+        .filter((i) => i.check === 'terrain')
+        .map((i) => i.code)
+    ).toEqual(['giant-needs-bands'])
+  })
+})

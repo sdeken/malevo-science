@@ -620,13 +620,26 @@ export const terrainSchema = obj({
   body: ref('body'),
   /** Which roll of terrain@1: re-rolling counts up. */
   roll: num({ integer: true, min: 0 }),
-  params: obj({
-    plates: num({ integer: true, min: 2, max: 60 }),
-    continents: num({ min: 0, max: 1, sig: 4 }),
-    ocean: num({ min: 0, max: 1, sig: 4 }),
-    mountains_km: num({ min: 0, max: 30, sig: 4 }),
-    roughness: num({ min: 0, max: 1, sig: 4 })
-  }),
+  /** A solid surface's generation (terrain@1). */
+  params: opt(
+    obj({
+      plates: num({ integer: true, min: 2, max: 60 }),
+      continents: num({ min: 0, max: 1, sig: 4 }),
+      ocean: num({ min: 0, max: 1, sig: 4 }),
+      mountains_km: num({ min: 0, max: 30, sig: 4 }),
+      roughness: num({ min: 0, max: 1, sig: 4 })
+    })
+  ),
+  /** A giant's cloud bands (bands@1), instead of a surface. */
+  bands: opt(
+    obj({
+      bands: num({ integer: true, min: 1, max: 60 }),
+      contrast: num({ min: 0, max: 1, sig: 4 }),
+      turbulence: num({ min: 0, max: 1, sig: 4 }),
+      storms: num({ integer: true, min: 0, max: 20 }),
+      palette: arr(COLOR, { min: 2, max: 8 })
+    })
+  ),
   climate: opt(
     obj({
       /** Warming by the air, K. Absent: worked out from the surface pressure. */

@@ -538,14 +538,33 @@ export const terrainCheck: Check = {
     const seen = new Map<string, string>()
     for (const e of [...entitiesOf(world, terrainKind)].sort((a, b) => compareStrings(a.id, b.id))) {
       const body = world.entities.get(`body/${e.value.body}`)?.value as { class?: string; name?: string } | undefined
-      if (body && !SURFACE_CLASSES.includes(body.class as never))
+      const giant = body?.class === 'gas-giant' || body?.class === 'ice-giant'
+      if (body && !giant && !SURFACE_CLASSES.includes(body.class as never))
         out.push({
           severity: 'warning',
           check: 'terrain',
           code: 'no-surface',
-          message: `${body.name ?? e.value.body} is a ${body.class}, which has no solid surface to shape.`,
+          message: `${body.name ?? e.value.body} is a ${body.class}, which has no surface or cloud tops to draw.`,
           path: e.path,
           field: 'body'
+        })
+      else if (body && giant && !e.value.bands)
+        out.push({
+          severity: 'warning',
+          check: 'terrain',
+          code: 'giant-needs-bands',
+          message: `${body.name ?? e.value.body} is a ${body.class}: it has cloud bands (bands), not a solid surface (params).`,
+          path: e.path,
+          field: 'params'
+        })
+      else if (body && !giant && !e.value.params)
+        out.push({
+          severity: 'error',
+          check: 'terrain',
+          code: 'surface-needs-params',
+          message: `${body.name ?? e.value.body} has a solid surface: its terrain needs params.`,
+          path: e.path,
+          field: 'params'
         })
       const other = seen.get(e.value.body)
       if (other)

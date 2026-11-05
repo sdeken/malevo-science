@@ -1638,3 +1638,9 @@ fieldset.plain {
   width: 530px;
   flex: none;
 }
+
+.palette-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+}

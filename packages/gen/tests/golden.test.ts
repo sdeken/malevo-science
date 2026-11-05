@@ -72,6 +72,12 @@ const CASES: Record<string, { seed: number; input: unknown }[]> = {
       { plates: 5, continents: 0.6, ocean: 0.3, mountains_km: 9, roughness: 0.9 }
     ].map((params, k) => ({ seed, input: { body: `world-${k}`, roll: k, params, points: TERRAIN_POINTS } }))
   ),
+  'bands@1': [1, 42].flatMap((seed) =>
+    [
+      { bands: 14, contrast: 0.6, turbulence: 0.45, storms: 3, palette: ['#e9dcc0', '#c79a68', '#f2ead8', '#a87650'] },
+      { bands: 8, contrast: 0.25, turbulence: 0.3, storms: 1, palette: ['#a8d8e4', '#8cc4d6'] }
+    ].map((params, k) => ({ seed, input: { body: `giant-${k}`, roll: k, params, points: TERRAIN_POINTS } }))
+  ),
   'placeholder-names@1': [1, 42, 4242, 0xffffffff].flatMap((seed) =>
     [0, 1, 2, 3, 4, 5, 6, 7].map((palette) => ({ seed, input: { ids: ['a', 'b', 'c', 'sys-001', 'sys-002', 'x.y_z'], palette } }))
   )
