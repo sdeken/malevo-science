@@ -281,7 +281,8 @@ export class WorldSession extends EventEmitter {
         ? {
             legLimit_ly: physicsFile.foam.legLimit_ly,
             topSpeed_c: physicsFile.foam.topSpeed_c,
-            collapseRadius_au: physicsFile.foam.collapseRadius_au
+            collapseRadius_au: physicsFile.foam.collapseRadius_au,
+            loadRule: physicsFile.foam.loadRule
           }
         : null,
       issueCounts: { error: count('error'), warning: count('warning'), info: count('info') }

@@ -1,6 +1,6 @@
 import { useLayoutEffect, useMemo, useRef, useState } from 'react'
-import { AU, stateAt, type OrbitalElements } from '@malevo/core'
-import type { ElementsInfo, SystemInfoDto } from '../../../../shared/types'
+import { AU, M_SUN, collapseRegions, collapseSlice, stateAt, type MassPoint, type OrbitalElements, type Vec3 } from '@malevo/core'
+import type { ElementsInfo, PhysicsSummary, SystemInfoDto } from '../../../../shared/types'
 import { sig, starColour } from '../../components/fields'
 
 export interface Drawn {
@@ -18,6 +18,8 @@ export interface Drawn {
 
 interface Props {
   system: SystemInfoDto
+  /** The world's foam settings, for the collapse surface. */
+  foam: PhysicsSummary | null
   now: number
   selected: string | null
   onSelect(id: string | null): void
@@ -32,10 +34,13 @@ const R = SIZE / 2 - 24
 
 /**
  * The system seen from above (its reference plane), at the current date:
- * orbits, where each body is now, the habitable zone (green band) and the
- * collapse radius around the star, inside which the foam fails (dashed).
+ * orbits, where each body is now, the habitable zone (green band) and where
+ * the foam collapses (dashed): the slice, in this plane, of the collapse
+ * surface @malevo/core works out from every body's tide at the current date.
+ * A giant out past the star's region has its own; a close one bulges the
+ * star's region to take it in.
  */
-export function OrbitView({ system, now, selected, onSelect, center, bodies, scale }: Props): React.JSX.Element {
+export function OrbitView({ system, foam, now, selected, onSelect, center, bodies, scale }: Props): React.JSX.Element {
   const box = useRef<HTMLDivElement>(null)
   const [width, setWidth] = useState(SIZE)
   useLayoutEffect(() => {
@@ -66,6 +71,39 @@ export function OrbitView({ system, now, selected, onSelect, center, bodies, sca
     const m = map(r)
     return r === 0 ? [0, 0] : [(x / r) * m, -(y / r) * m]
   }
+
+  // The collapse surface at the current date, sliced in the system plane (positions relative to the star).
+  const collapse = useMemo(() => {
+    if (!foam || !system.star || system.star.mass === null) return []
+    const els = new Map(system.bodies.filter((b) => b.elements && b.cls !== 'belt').map((b) => [b.id, b]))
+    const abs = (id: string, guard = 0): Vec3 | null => {
+      const b = els.get(id)
+      if (!b || guard > 20) return null
+      const r = stateAt(toElements(b.elements!), now).r
+      const p = b.parent ? abs(b.parent, guard + 1) : [0, 0, 0]
+      return p ? [r[0] + p[0], r[1] + p[1], r[2] + p[2]] : null
+    }
+    const masses: MassPoint[] = [{ pos: [0, 0, 0], mass: system.star.mass * M_SUN }]
+    for (const id of els.keys()) {
+      const p = abs(id)
+      if (p) masses.push({ pos: p, mass: els.get(id)!.mass })
+    }
+    const settings = { collapseRadius: foam.collapseRadius_au * AU, rule: foam.loadRule }
+    return collapseRegions(masses, settings, { minRadius: outer / 400, steps: 160 }).map((r) => ({
+      star: r.body === 0,
+      points: collapseSlice(r, settings, masses, [1, 0, 0], [0, 1, 0], 120)
+    }))
+  }, [foam, system, now, outer])
+  const hostPos = useMemo((): Vec3 => {
+    if (center === null) return [0, 0, 0]
+    const byId = new Map(system.bodies.map((b) => [b.id, b]))
+    let p: Vec3 = [0, 0, 0]
+    for (let b = byId.get(center), g = 0; b?.elements && g < 20; b = b.parent ? byId.get(b.parent) : undefined, g++) {
+      const r = stateAt(toElements(b.elements), now).r
+      p = [p[0] + r[0], p[1] + r[1], p[2] + r[2]]
+    }
+    return p
+  }, [center, system, now])
 
   const orbits = useMemo(
     () =>
@@ -120,16 +158,23 @@ export function OrbitView({ system, now, selected, onSelect, center, bodies, sca
             <title>Habitable zone</title>
           </path>
         )}
-        {center === null && system.collapse && (
-          <g className="ov-collapse">
-            <circle r={map(system.collapse)}>
-              <title>The foam collapses inside this radius</title>
-            </circle>
-            <text x={0} y={-map(system.collapse) - 4}>
-              collapse {sig(system.collapse / AU, 3)} AU
-            </text>
-          </g>
-        )}
+        {collapse.map((c, k) => {
+          const pts = c.points.map((p) => at(p[0] - hostPos[0], p[1] - hostPos[1]))
+          if (pts.length < 3) return null
+          const top = pts.reduce((a, b) => (b[1] < a[1] ? b : a))
+          return (
+            <g key={`c-${k}`} className="ov-collapse">
+              <polygon points={pts.map((p) => `${p[0].toFixed(1)},${p[1].toFixed(1)}`).join(' ')}>
+                <title>The foam collapses inside this line (every body's tide, at the current date)</title>
+              </polygon>
+              {c.star && center === null && system.collapse && (
+                <text x={top[0]} y={top[1] - 4}>
+                  collapse {sig(system.collapse / AU, 3)} AU
+                </text>
+              )}
+            </g>
+          )
+        })}
         {orbits
           .filter(({ b }) => b.extent && center === null)
           .map(({ b }) => (

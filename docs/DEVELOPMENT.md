@@ -202,6 +202,17 @@ module.exports = {
   day and the year of the planet it belongs to. A planet locked to its star has no solar day to
   follow.
 
+### The collapse surface
+
+- **Where the foam collapses** is the surface where the load from every body's tide reaches 1
+  (`collapseRegions`, `collapseMesh` and `collapseSlice` in `packages/core/src/foam.ts`).
+- **Regions:** each massive body has a region, found along rays from its centre, as a 3D mesh. A
+  body whose centre lies inside a bigger body's region has none of its own; it bulges that
+  region instead.
+- **The orbit view** draws each region's slice in the system plane, at the current date. A giant
+  out past the star's region shows its own; one close enough merges with the star's. A region is
+  assumed star-shaped about its centre: a lee's dent shows, a hole deep inside does not.
+
 ### The Solar System
 
 - **Every new world starts with the real Solar System** (`packages/model/src/solarSystem.ts`):

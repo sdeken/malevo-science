@@ -317,6 +317,7 @@ export interface PhysicsSummary {
   legLimit_ly: number
   topSpeed_c: number
   collapseRadius_au: number
+  loadRule: 'max-eigen' | 'rss'
 }
 
 /** Stars near a point, packed for drawing. */

@@ -302,6 +302,7 @@ function SystemDetail({
           </div>
           <OrbitView
             system={system}
+            foam={snapshot.physics}
             now={now}
             selected={selectedBody}
             onSelect={setSelectedBody}

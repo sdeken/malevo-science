@@ -1103,7 +1103,8 @@ details.overrides summary {
   fill: color-mix(in srgb, var(--ok) 16%, transparent);
 }
 
-.ov-collapse circle {
+.ov-collapse circle,
+.ov-collapse polygon {
   fill: none;
   stroke: var(--now);
   stroke-dasharray: 5 4;

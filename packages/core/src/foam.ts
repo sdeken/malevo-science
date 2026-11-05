@@ -145,3 +145,137 @@ export function legsNeeded(distance: number, s: Pick<FoamSettings, 'legLimit'>):
 export function foamTime(distance: number, s: Pick<FoamSettings, 'topSpeed' | 'gravityLimit'>, g = 0): number {
   return distance / topSpeedWithGravity(s, g)
 }
+
+// ---- the collapse surface ----
+
+/**
+ * One connected region where the foam collapses, seen from the body at its
+ * heart. A giant far enough from its star has a region of its own; one close
+ * enough lies inside the star's region, which then bulges to take it in.
+ * The surface is found along rays from the centre, so a region is assumed to
+ * be star-shaped about it: each ray's crossing is the outermost one (a lee's
+ * dent shows; a hole deep inside does not).
+ */
+export interface CollapseRegion {
+  /** Index of the body at its heart. */
+  body: number
+  center: Vec3
+  /** How far out from the centre the region can reach (it takes in any body whose own region might touch it), m. */
+  reach: number
+  /** Distance along a unit direction from the centre to the surface, m. */
+  radial(dir: Vec3): number
+}
+
+/**
+ * The collapse regions of a set of bodies, biggest first. A body whose centre
+ * lies inside a bigger body's region adds to that region and has none of its
+ * own. Bodies too small to matter (collapse radius under `minRadius`) are
+ * never centres, though their tides still count.
+ */
+export function collapseRegions(
+  bodies: readonly MassPoint[],
+  s: Pick<FoamSettings, 'collapseRadius' | 'rule'>,
+  opts: { minRadius?: number; steps?: number } = {}
+): CollapseRegion[] {
+  const own = bodies.map((b) => collapseRadius(b.mass, s))
+  const order = bodies.map((_, i) => i).sort((a, b) => bodies[b].mass - bodies[a].mass || a - b)
+  const steps = opts.steps ?? 240
+  const regions: CollapseRegion[] = []
+  const inside = (r: CollapseRegion, p: Vec3): boolean => {
+    const d: Vec3 = [p[0] - r.center[0], p[1] - r.center[1], p[2] - r.center[2]]
+    const n = Math.hypot(d[0], d[1], d[2])
+    return n === 0 || n < r.radial([d[0] / n, d[1] / n, d[2] / n])
+  }
+  for (const i of order) {
+    if (own[i] < (opts.minRadius ?? 0)) continue
+    const c = bodies[i].pos
+    if (regions.some((r) => inside(r, c))) continue
+    // How far out to look: the body's own radius, stretched to take in any body whose region might touch it.
+    let reach = 1.6 * own[i]
+    for (let changed = true; changed;) {
+      changed = false
+      bodies.forEach((b, j) => {
+        if (j === i) return
+        const d = Math.hypot(b.pos[0] - c[0], b.pos[1] - c[1], b.pos[2] - c[2])
+        const far = d + 1.6 * own[j]
+        if (d - 1.6 * own[j] < reach && far > reach) {
+          reach = far
+          changed = true
+        }
+      })
+    }
+    const cache = new Map<string, number>()
+    regions.push({
+      body: i,
+      center: c,
+      reach,
+      radial(dir) {
+        const key = `${dir[0].toFixed(6)},${dir[1].toFixed(6)},${dir[2].toFixed(6)}`
+        const hit = cache.get(key)
+        if (hit !== undefined) return hit
+        const s0 = firstCollapseAlong(c, dir, bodies, s, reach, 0, reach / steps)
+        const r = s0 ?? 0
+        cache.set(key, r)
+        return r
+      }
+    })
+  }
+  return regions
+}
+
+/** The region's surface as a mesh: `lat` × `lon` vertices on rays from its centre, and the triangles between them. */
+export function collapseMesh(r: CollapseRegion, lat = 24, lon = 48): { vertices: Vec3[]; triangles: [number, number, number][] } {
+  const vertices: Vec3[] = []
+  for (let a = 0; a <= lat; a++) {
+    const th = (Math.PI * a) / lat
+    for (let b = 0; b < lon; b++) {
+      const ph = (2 * Math.PI * b) / lon
+      const d: Vec3 = [Math.sin(th) * Math.cos(ph), Math.sin(th) * Math.sin(ph), Math.cos(th)]
+      const k = r.radial(d)
+      vertices.push([r.center[0] + d[0] * k, r.center[1] + d[1] * k, r.center[2] + d[2] * k])
+    }
+  }
+  const triangles: [number, number, number][] = []
+  for (let a = 0; a < lat; a++)
+    for (let b = 0; b < lon; b++) {
+      const p = a * lon + b
+      const q = a * lon + ((b + 1) % lon)
+      triangles.push([p, p + lon, q], [q, p + lon, q + lon])
+    }
+  return { vertices, triangles }
+}
+
+/**
+ * The region's outline in a plane through `origin` spanned by unit vectors
+ * `u` and `v` (the system plane: origin at the star, u = x, v = y): the
+ * slice of its surface, as points in that plane. Empty when the plane misses
+ * the region.
+ */
+export function collapseSlice(
+  r: CollapseRegion,
+  s: Pick<FoamSettings, 'collapseRadius' | 'rule'>,
+  bodies: readonly MassPoint[],
+  u: Vec3,
+  v: Vec3,
+  n = 180
+): Vec3[] {
+  // Rays go out within the plane from the centre's foot in it.
+  const nrm: Vec3 = [u[1] * v[2] - u[2] * v[1], u[2] * v[0] - u[0] * v[2], u[0] * v[1] - u[1] * v[0]]
+  const off = r.center[0] * nrm[0] + r.center[1] * nrm[1] + r.center[2] * nrm[2]
+  const foot: Vec3 = [r.center[0] - nrm[0] * off, r.center[1] - nrm[1] * off, r.center[2] - nrm[2] * off]
+  if (foamLoad(foot, bodies, s) < 1) return []
+  // Within the region's own reach, so a separate region beyond it is not mistaken for this one's edge.
+  const reach = r.reach + Math.abs(off)
+  const out: Vec3[] = []
+  for (let k = 0; k < n; k++) {
+    const a = (2 * Math.PI * k) / n
+    const d: Vec3 = [
+      u[0] * Math.cos(a) + v[0] * Math.sin(a),
+      u[1] * Math.cos(a) + v[1] * Math.sin(a),
+      u[2] * Math.cos(a) + v[2] * Math.sin(a)
+    ]
+    const t = firstCollapseAlong(foot, d, bodies, s, reach, 0, reach / 300) ?? 0
+    out.push([foot[0] + d[0] * t, foot[1] + d[1] * t, foot[2] + d[2] * t])
+  }
+  return out
+}
