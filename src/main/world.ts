@@ -52,6 +52,8 @@ import {
   proposeHistory,
   solarSystemFor,
   charactersOf,
+  planTrip,
+  shipKind,
   countProseWords,
   proseFiles,
   isProsePath,
@@ -140,6 +142,8 @@ import type {
   PlanGeometryDto,
   TravelDto,
   PortCapacityDto,
+  TripPlanDto,
+  TripQueryDto,
   StarField,
   StarInfoDto,
   StarSearchHit,
@@ -168,7 +172,8 @@ const KIND_DEFS: Record<EditableKind, KindDef> = {
   historySettings: historySettingsKind as KindDef,
   terrain: terrainKind as KindDef,
   city: cityKind as KindDef,
-  cityPlan: cityPlanKind as KindDef
+  cityPlan: cityPlanKind as KindDef,
+  ship: shipKind as KindDef
 }
 
 export class WorldSession extends EventEmitter {
@@ -314,6 +319,7 @@ export class WorldSession extends EventEmitter {
           errors: c.errors
         })),
       cityPlans: entityDtos(world, cityPlanKind.kind),
+      ships: entityDtos(world, shipKind.kind),
       prose: (() => {
         const files = this.editor.files()
         const dirty = new Set(this.editor.dirty)
@@ -580,6 +586,10 @@ export class WorldSession extends EventEmitter {
     const f = this.world().entities.get(`${cityPlanKind.kind}/${planId}`)?.value as CityPlanFile | undefined
     if (!f) return { error: `There is no plan "${planId}".` }
     return cityTravel(f, from, to, depart, hour_s) as TravelDto | { error: string }
+  }
+
+  planTrip(q: TripQueryDto): TripPlanDto | { error: string } {
+    return planTrip(this.world(), this.env, q)
   }
 
   planPort(planId: string): PortCapacityDto | null {

@@ -202,6 +202,38 @@ module.exports = {
   day and the year of the planet it belongs to. A planet locked to its star has no solar day to
   follow.
 
+### Trips
+
+- **The route planner is idealized:** every crawl is flip-and-burn at the world's cruise
+  acceleration, and the tanks never run short.
+- **The trip planner** (`packages/model/src/trips.ts`, the **Trip planner** tool) flies a
+  particular ship along a charted route, between any two of its waypoints, in either direction.
+- **A ship** is `ships/<id>.json`:
+  - masses: dry mass and propellant capacity, in tonnes;
+  - engine: exhaust speed (default the world's), total thrust in MN, and a comfort cap in g
+    (default the world's cruise acceleration);
+  - a reserve kept at arrival: a share of the tanks, or the Δv for an orbital insertion, the
+    larger if both;
+  - foam power in GW (fusion fuel burned to make and hold the foam, at `FUSION_ENERGY` =
+    3.5×10¹⁴ J/kg), and the torch's throttle in the foam (run to dump heat);
+  - the refuelling rate in tonnes per hour.
+- **Burns** (`speedChange` and `crawl` in `packages/core/src/torch.ts`) run at thrust ÷
+  current mass, capped at the comfort acceleration. Mass falls by the rocket equation as they
+  go, so a heavy ship is thrust-limited until it burns off propellant.
+- **Each leg** is flown on what is in the tanks at its start:
+  - the departure burn from the port out to the foam, using the approach model's crawl
+    distance toward the next waypoint;
+  - the foam, at the world's top speed, burning fuel for the foam and the torch;
+  - the arrival burn from the drop to the port, worked out at the time of the drop.
+
+  If flip-and-burn on both crawls would leave less than the reserve, the planner finds the
+  highest cruise speed (one cap for both crawls) that leaves it, and the ship coasts between its
+  burns. A leg that cannot be flown even crawling slowly says so.
+- **Refuelling:** every port (a system) and station sells fuel, taking the longer of the
+  stopover and the time to pump the tanks full. A bare star is a pass-through: the ship drops
+  and lifts again, with no crawl and no fuel. Each leg also shows the route planner's idealized
+  time.
+
 ### Physics settings
 
 - **The World tool edits `settings/physics.json` in place:**

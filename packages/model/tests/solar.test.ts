@@ -12,6 +12,7 @@ import {
   solarSystemFor,
   systemFrame,
   systemInfo,
+  planTrip,
   allRoutes,
   approachInfo,
   bodyPosition,
@@ -180,14 +181,55 @@ describe('trip times follow the physics settings', () => {
     return r.crawl!
   }
 
-  it('foam time scales with the top speed, the crawl with the acceleration, and the tanks cap it', () => {
+  it('foam time scales with the top speed and the crawl with the acceleration; tanks do not cap the route planner', () => {
     const base = withPhysics(() => {})
     const fast = withPhysics((p) => (p.foam.topSpeed_c = (p.foam.topSpeed_c as number) * 2))
     expect(foamTime(fast) / foamTime(base)).toBeCloseTo(0.5, 6)
     const hard = withPhysics((p) => (p.torch.cruiseAccel_g = (p.torch.cruiseAccel_g as number) * 4))
     expect(crawl(hard) / crawl(base)).toBeCloseTo(0.5, 3)
-    // Tanks too small for the flip-and-burn speed: the crawl coasts in the middle and takes longer.
+    // The route planner is idealized: tanks never cap it (the trip planner flies a real ship).
     const dry = withPhysics((p) => (p.torch.exhaustSpeed_c = 0.0001))
-    expect(crawl(dry)).toBeGreaterThan(crawl(base) * 1.5)
+    expect(crawl(dry)).toBeCloseTo(crawl(base), 3)
+  })
+})
+
+describe('the trip planner', () => {
+  const tripWorld = (ship: Record<string, unknown>) =>
+    readWorld([
+      { path: 'world.json', text: '{"format": 1, "name": "S", "seed": 1}' },
+      ...templateFiles(),
+      ...solFiles(),
+      { path: 'systems/prox.json', text: JSON.stringify({ name: 'Proxima', star: 'hip.70890' }) },
+      { path: 'routes/r.json', text: JSON.stringify({ name: 'R', waypoints: [{ system: 'sol' }, { system: 'prox' }] }) },
+      { path: 'ships/s.json', text: JSON.stringify(ship) }
+    ])
+  const plan = (ship: Record<string, unknown>) => {
+    const p = planTrip(tripWorld(ship), env, { ship: 's', route: 'r', from: 0, to: 1, t: 0 })
+    if ('error' in p) throw new Error(p.error)
+    return p
+  }
+  const base = { name: 'S', dryMass_t: 5000, propellant_t: 50000, thrust_MN: 1000, reserve: { share: 0.1 } }
+
+  it('flies flip-and-burn at the comfort cap when thrust and tanks are ample, close to the idealized time', () => {
+    const p = plan(base)
+    expect(p.legs).toHaveLength(1)
+    expect(p.legs[0].speedCap).toBeNull()
+    expect(p.total / p.ideal!).toBeGreaterThan(0.98)
+    expect(p.total / p.ideal!).toBeLessThan(1.02)
+  })
+
+  it('coasts at a lower cruise speed when the tanks are short, and still arrives with the reserve', () => {
+    const p = plan({ ...base, propellant_t: 600 })
+    const leg = p.legs[0]
+    expect(leg.speedCap).toBeGreaterThan(0)
+    expect(leg.depart!.coast.time).toBeGreaterThan(0)
+    expect(leg.propellantEnd).toBeGreaterThanOrEqual(0.1 * 600_000 - 1)
+    expect(p.total).toBeGreaterThan(p.ideal! * 1.2)
+  })
+
+  it('is slower with too little thrust for the comfort cap, and says when a leg cannot be flown', () => {
+    expect(plan({ ...base, thrust_MN: 10 }).total).toBeGreaterThan(plan(base).total * 1.5)
+    const hopeless = plan({ ...base, propellant_t: 600, foamPower_GW: 1e8 })
+    expect(hopeless.legs[0].problems.join(' ')).toMatch(/cannot cover this leg/)
   })
 })

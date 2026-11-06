@@ -744,6 +744,12 @@ appears. Not yet built: a check that guesses a speaker and notices when a line u
 name for them. Also not yet built: placing chapters on the timeline from `when:`/`where:` front
 matter.
 
+### Trip planner — built
+
+Built; see [DEVELOPMENT.md](DEVELOPMENT.md). Ships are world files. The trip planner flies one
+along a charted route with its own thrust, tanks and reserve, refuelling at every port, against
+the route planner's idealized times.
+
 ### Phase 11 onward
 
 - `malevo report` fact sheets (can come earlier if useful).

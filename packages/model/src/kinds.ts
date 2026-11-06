@@ -553,6 +553,36 @@ export type NebulaFile = Infer<typeof nebulaSchema>
 
 export const nebulaKind: KindDef<NebulaFile> = { kind: 'nebula', label: 'nebula', folder: 'nebulae', schema: nebulaSchema }
 
+/** A particular ship, for the trip planner: its masses, engine, tanks and habits. */
+export const shipSchema = obj({
+  name: name(),
+  /** Empty of propellant, tonnes. */
+  dryMass_t: num({ above: 0, sig: 9 }),
+  /** Propellant the tanks hold when full, tonnes. */
+  propellant_t: num({ above: 0, sig: 9 }),
+  /** Exhaust speed; absent: the world's torch setting. */
+  exhaustSpeed_c: opt(num({ above: 0, max: 1, sig: 9 })),
+  /** Total thrust at full power, meganewtons. */
+  thrust_MN: num({ above: 0, sig: 9 }),
+  /** The most acceleration the crew will take, g; thrust is throttled to it. Absent: the world's cruise acceleration. */
+  comfort_g: opt(num({ above: 0, sig: 9 })),
+  /** What must be left on arrival: a share of the tanks, or enough Δv for any orbital insertion (the larger, if both). */
+  reserve: obj({
+    share: opt(num({ min: 0, max: 1, sig: 6 })),
+    dv_kms: opt(num({ min: 0, sig: 9 }))
+  }),
+  /** Power drawn to make and hold the foam, gigawatts, from the ship's fusion fuel. */
+  foamPower_GW: opt(num({ min: 0, sig: 9 })),
+  /** How hard the torch runs in the foam to dump heat, as a share of full thrust. */
+  foamThrottle: opt(num({ min: 0, max: 1, sig: 6 })),
+  /** How fast a port can fill the tanks, tonnes per hour. */
+  refuel_tph: opt(num({ above: 0, sig: 9 })),
+  note: opt(str({ max: 400 }))
+})
+export type ShipFile = Infer<typeof shipSchema>
+
+export const shipKind: KindDef<ShipFile> = { kind: 'ship', label: 'ship', folder: 'ships', schema: shipSchema }
+
 /** A stop on a route: exactly one of a system, a station, or a bare star (somewhere to drop out of the foam). */
 export const waypointSchema = obj({
   system: opt(ref('system')),
@@ -939,5 +969,6 @@ export const KINDS: readonly KindDef[] = [
   historySettingsKind as KindDef,
   terrainKind as KindDef,
   cityKind as KindDef,
-  cityPlanKind as KindDef
+  cityPlanKind as KindDef,
+  shipKind as KindDef
 ]

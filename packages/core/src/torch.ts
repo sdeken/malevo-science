@@ -92,3 +92,95 @@ export function jetPower(mass: number, accel: number, exhaustSpeed: number): num
 export function apparentMagnitude(luminosity: number, distance: number): number {
   return -26.74 - 2.5 * Math.log10(luminosity / L_SUN) + 5 * Math.log10(distance / AU)
 }
+
+// ---- a particular ship: thrust-limited burns, tanks, coasting ----
+
+/** Energy released per kilogram of fusion fuel burned (deuterium–helium-3, all of it turned to use), J/kg. */
+export const FUSION_ENERGY = 3.5e14
+
+export interface Engine {
+  /** Exhaust speed, m/s. */
+  exhaust: number
+  /** Total thrust at full power, N. */
+  thrust: number
+  /** The most acceleration the crew will take, m/s² (thrust is throttled to it). */
+  maxAccel: number
+}
+
+export interface BurnStep {
+  time: number
+  distance: number
+}
+
+export interface Burn {
+  /** Speeding up from rest. */
+  accel: BurnStep
+  /** At the peak speed, engine off. */
+  coast: BurnStep
+  /** Slowing to rest. */
+  decel: BurnStep
+  peakSpeed: number
+  /** Propellant used, kg. */
+  propellant: number
+  /** Mass at the end, kg. */
+  massEnd: number
+}
+
+/**
+ * A change of speed of `dv` from `v0` (up when dv > 0, down when dv < 0)
+ * starting at mass m0: acceleration is thrust / mass, capped at maxAccel,
+ * and mass falls by the rocket equation as it goes.
+ */
+export function speedChange(m0: number, v0: number, dv: number, e: Engine, steps = 200): BurnStep & { massEnd: number } {
+  const n = Math.max(1, steps)
+  const h = Math.abs(dv) / n
+  const sign = dv >= 0 ? 1 : -1
+  let m = m0
+  let v = v0
+  let time = 0
+  let distance = 0
+  for (let k = 0; k < n; k++) {
+    const a = Math.min(e.thrust / m, e.maxAccel)
+    const dt = h / a
+    const vNext = v + sign * h
+    distance += ((v + vNext) / 2) * dt
+    time += dt
+    v = vNext
+    m *= Math.exp(-h / e.exhaust)
+  }
+  return { time, distance, massEnd: m }
+}
+
+/**
+ * Rest to rest over `distance` (a crawl between a port and the foam's edge):
+ * speed up, coast, slow down. The peak speed is the flip-halfway speed, or
+ * `speedCap` if that is lower (then the middle is a coast).
+ */
+export function crawl(distance: number, m0: number, e: Engine, speedCap = Infinity): Burn {
+  const span = (v: number): number => {
+    const up = speedChange(m0, 0, v, e)
+    const down = speedChange(up.massEnd, v, -v, e)
+    return up.distance + down.distance
+  }
+  // The flip speed: speeding up and slowing down cover the distance exactly.
+  let hi = Math.sqrt(distance * e.maxAccel) * 1.2 + 1
+  while (span(hi) < distance) hi *= 2
+  let lo = 0
+  for (let i = 0; i < 50; i++) {
+    const mid = (lo + hi) / 2
+    if (span(mid) < distance) lo = mid
+    else hi = mid
+  }
+  const peak = Math.min((lo + hi) / 2, speedCap)
+  const up = speedChange(m0, 0, peak, e)
+  const down = speedChange(up.massEnd, peak, -peak, e)
+  const coastDistance = Math.max(0, distance - up.distance - down.distance)
+  return {
+    accel: { time: up.time, distance: up.distance },
+    coast: { time: peak > 0 ? coastDistance / peak : 0, distance: coastDistance },
+    decel: { time: down.time, distance: down.distance },
+    peakSpeed: peak,
+    propellant: m0 - down.massEnd,
+    massEnd: down.massEnd
+  }
+}

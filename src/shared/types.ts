@@ -180,6 +180,7 @@ export interface WorldSnapshot {
   viewpoints: EntityDto[]
   /** settings/history.json, if the world has it. */
   historySettings: Record<string, unknown> | null
+  ships: EntityDto[]
   /** Prose files (chapters, notes): any .md outside the format's own folders, by path. */
   prose: { path: string; words: number; dirty: boolean }[]
   /** characters/<id>.md, read. */
@@ -256,6 +257,7 @@ export type EditableKind =
   | 'terrain'
   | 'city'
   | 'cityPlan'
+  | 'ship'
 
 // ---- Phase 3: stars, systems, bodies ----
 
@@ -590,6 +592,54 @@ export interface NewsDto {
   from: string
   t0: number
   arrivals: { system: string; t: number; via: 'here' | 'radio' | 'ships'; path: string[] }[]
+}
+
+// ---- Trips ----
+
+export interface TripQueryDto {
+  ship: string
+  route: string
+  from: number
+  to: number
+  t: number
+}
+
+export interface TripBurnDto {
+  accel: { time: number; distance: number }
+  coast: { time: number; distance: number }
+  decel: { time: number; distance: number }
+  peakSpeed: number
+  propellant: number
+  massEnd: number
+}
+
+export interface TripLegDto {
+  from: string
+  to: string
+  fromName: string
+  toName: string
+  departs: number
+  arrives: number
+  depart: TripBurnDto | null
+  foam: { time: number; propellant: number }
+  arrive: TripBurnDto | null
+  refuel: { time: number; propellant: number } | null
+  propellantStart: number
+  propellantEnd: number
+  speedCap: number | null
+  ideal: number | null
+  problems: string[]
+}
+
+export interface TripPlanDto {
+  ship: string
+  shipName: string
+  legs: TripLegDto[]
+  departs: number
+  arrives: number
+  total: number
+  ideal: number | null
+  problems: string[]
 }
 
 // ---- Writing ----

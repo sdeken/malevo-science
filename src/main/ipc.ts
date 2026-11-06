@@ -53,7 +53,8 @@ const EDITABLE: readonly EditableKind[] = [
   'historySettings',
   'terrain',
   'city',
-  'cityPlan'
+  'cityPlan',
+  'ship'
 ]
 const asKind = (k: unknown): EditableKind => {
   if (!EDITABLE.includes(k as EditableKind)) throw new Error(`"${String(k)}" cannot be edited.`)
@@ -148,6 +149,10 @@ export function registerIpc(deps: IpcDeps): void {
   ipcMain.handle(IPC.worldCheck, () => world.check())
   ipcMain.handle(IPC.worldAddTemplate, () => world.addTemplate())
   ipcMain.handle(IPC.worldAddSolarSystem, () => world.addSolarSystem())
+  ipcMain.handle(IPC.tripPlan, (_e, q: unknown) => {
+    const v = (q ?? {}) as Record<string, unknown>
+    return world.planTrip({ ship: String(v.ship), route: String(v.route), from: Number(v.from), to: Number(v.to), t: Number(v.t) })
+  })
   ipcMain.handle(IPC.proseRead, (_e, p: unknown) => world.proseText(String(p)))
   ipcMain.handle(IPC.proseWrite, (_e, p: unknown, text: unknown) => world.writeProse(String(p), text === null ? null : String(text)))
   ipcMain.handle(IPC.worldAddKnownPlanets, (_e, sys: unknown, candidates: unknown) =>

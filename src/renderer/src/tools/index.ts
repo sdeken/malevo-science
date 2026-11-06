@@ -4,6 +4,7 @@ import { compareTool } from './compare/CompareTool'
 import { culturesTool } from './cultures/CulturesTool'
 import { defineTools } from './registry'
 import { routesTool } from './routes/RoutesTool'
+import { tripsTool } from './trips/TripsTool'
 import { skyTool } from './sky/SkyTool'
 import { approachTool } from './approach/ApproachTool'
 import { historyTool } from './history/HistoryTool'
@@ -26,6 +27,7 @@ export const TOOLS = defineTools([
   populationTool,
   cityPlanTool,
   routesTool,
+  tripsTool,
   skyTool,
   approachTool,
   culturesTool,

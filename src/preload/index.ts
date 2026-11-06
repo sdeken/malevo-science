@@ -15,6 +15,8 @@ import type {
   HistoryProposalDto,
   NewsDto,
   TerrainRasterDto,
+  TripPlanDto,
+  TripQueryDto,
   ConditionsDto,
   PlanGeometryDto,
   TravelDto,
@@ -146,6 +148,10 @@ const api = {
     /** Save a 2048×1024 colour or height map where the author chooses. Resolves to the path, or null if cancelled. */
     export: (body: string, what: 'colour' | 'height' | 'clouds'): Promise<string | null> =>
       ipcRenderer.invoke(IPC.terrainExport, body, what)
+  },
+  trips: {
+    /** A ship flying a charted route between two of its waypoints. */
+    plan: (q: TripQueryDto): Promise<TripPlanDto | { error: string }> => ipcRenderer.invoke(IPC.tripPlan, q)
   },
   prose: {
     /** A prose or character file's current text (unsaved changes included), or null. */

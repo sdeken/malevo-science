@@ -799,6 +799,29 @@ try {
   const div = await fs.readFile(path.join(worldDir, 'characters', 'div.md'), 'utf8')
   check(div === '---\nname: Div\nnames:\n  - T\n---\n', `and the character as a short header (${JSON.stringify(div)})`)
 
+  // 21. The trip planner: a ship flying Sol to Proxima, then with short tanks.
+  await page.evaluate(() =>
+    window.malevo.world.setEntity('route', 'sol-proxima', {
+      name: 'Sol–Proxima',
+      waypoints: [{ system: 'sol' }, { system: 'proxima-centauri' }]
+    })
+  )
+  await tool('Trip planner')
+  await page.locator('#newShipName').fill('Test ship')
+  await page.locator('#newShip').click()
+  await page.waitForSelector('#shipEditor')
+  await page.locator('#tripRoute').selectOption('sol-proxima')
+  await page.waitForSelector('[data-trip-leg="0"]', { timeout: 30_000 })
+  check(/port to port/.test((await page.locator('#tripResult').textContent()) ?? ''), 'a ship flies a route port to port, leg by leg')
+  await page.locator('#shipProp').fill('400')
+  await page.locator('#shipProp').press('Enter')
+  await page.waitForFunction(() => /tanks hold it to/.test(document.querySelector('#tripTable')?.textContent ?? ''), null, {
+    timeout: 30_000
+  })
+  check(true, 'with short tanks it holds a lower cruise speed and coasts')
+  await page.screenshot({ path: path.join(shots, '21-trip.png') })
+  await page.evaluate(() => window.malevo.world.discard())
+
   // 10. The update status reports a dev build.
   const status = await page.evaluate(() => window.malevo.updates.status())
   check(status.state === 'unavailable', 'an unpackaged build reports updates as unavailable')
