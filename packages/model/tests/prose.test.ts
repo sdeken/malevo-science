@@ -9,7 +9,9 @@ import {
   nameForms,
   nameUses,
   parseCharacter,
-  splitFrontMatter
+  splitFrontMatter,
+  countProseWords,
+  noteParts
 } from '@malevo/model'
 import { WorldEditor } from '@malevo/model/node'
 
@@ -96,5 +98,19 @@ describe('prose and characters', () => {
     expect(shown).toContain('\n\n---\n\n')
     expect(shown).toContain('`"x" -- y` and [[check "this" -- now]]')
     expect(dumbProse(shown)).toBe(file)
+  })
+
+  it('hangs a note on the words after its last colon', () => {
+    expect(noteParts('TK better description for: food')).toEqual({ note: 'TK better description for', anchor: 'food' })
+    expect(noteParts('CQ how tf does this work')).toEqual({ note: 'CQ how tf does this work', anchor: null })
+    expect(noteParts('CQ: check this')).toEqual({ note: 'CQ: check this', anchor: null })
+    expect(noteParts('AQ is it 12:30: the clock')).toEqual({ note: 'AQ is it 12:30', anchor: 'the clock' })
+  })
+
+  it('counts words strictly: no header, no headings, only a note’s anchor', () => {
+    const text =
+      "---\nwhen: x\n---\n# Chapter One\n\nShe ate the [[TK better description of: food]] slowly.[[CQ how tf does this work]]\n\n## Part\n\nIt was well-known--or not---Div's.\n"
+    // She ate the food slowly (5) + It was well-known or not Div's (6)
+    expect(countProseWords(text)).toBe(11)
   })
 })

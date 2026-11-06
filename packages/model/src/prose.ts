@@ -332,3 +332,45 @@ function smartenText(s: string): string {
 export function dumbProse(text: string): string {
   return text.replace(/[“”]/g, '"').replace(/[‘’]/g, "'").replace(/—/g, '---').replace(/–/g, '--').replace(/‒/g, '-').replace(/…/g, '...')
 }
+
+// ---- editor's notes and word counts ----
+
+/** Codes that start a note when typed as a word in capitals. */
+export const NOTE_CODES = ['TK', 'CQ', 'AQ', 'XX', 'NB'] as const
+
+/**
+ * An editor's note's parts. The words after its last colon are its anchor:
+ * they stay in the text (and count), with the note hung on them:
+ * `TK better description for: food` → note `TK better description for`,
+ * anchor `food`. A colon straight after a lone code (`CQ: check this`) is
+ * not an anchor's.
+ */
+export function noteParts(text: string): { note: string; anchor: string | null } {
+  const m = /^(.*\S)\s*:\s+(\S.*)$/.exec(text)
+  if (!m || /^[A-Z]{2,4}$/.test(m[1].trim())) return { note: text, anchor: null }
+  return { note: m[1], anchor: m[2].trim() }
+}
+
+/** Words in a run of text: dashes (`--`, `—`, `–`) separate words; hyphens and apostrophes join them. */
+export function countWords(text: string): number {
+  return (text.replace(/--+|[‒-―]/g, ' ').match(/[\p{L}\p{N}][\p{L}\p{N}'’-]*/gu) ?? []).length
+}
+
+/**
+ * A strict word count of a prose file: not its header, not its headings, and
+ * of each editor's note only its anchor words.
+ */
+export function countProseWords(text: string): number {
+  const { body } = splitFrontMatter(text)
+  let n = 0
+  let fenced = false
+  for (const line of body.split('\n')) {
+    if (/^\s*(```|~~~)/.test(line)) {
+      fenced = !fenced
+      continue
+    }
+    if (fenced || /^\s{0,3}#{1,6}\s/.test(line)) continue
+    n += countWords(line.replace(/\[\[([^[\]\n]*)\]\]/g, (_, inner: string) => ` ${noteParts(inner).anchor ?? ''} `))
+  }
+  return n
+}

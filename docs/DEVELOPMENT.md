@@ -380,15 +380,23 @@ module.exports = {
 - **Link speech:** text between guillemets «like this» is drawn in italics. Typing `<<` or `>>`
   gives the guillemet itself. The guillemets are plain characters in the file, safe in any
   editor (unlike `<<…>>`, which Markdown reads as an HTML tag).
-- **Editor's notes** are written `[[like this]]` in the file. On the page each is a single
-  marker that the cursor steps over, with the note in a margin column beside it, as in Word.
-  - **Starting a note:** typing TK or CQ as a word (in capitals), or `[[`, drops a marker and
-    opens its note. TK and CQ stay as the note's first word. Ctrl+Alt+M or **+ note** does the
-    same.
+- **Editor's notes** are written `[[like this]]` in the file. On the page each is a thin line in
+  the text that the cursor steps over, with the note in a margin column beside it, as in Word.
+  A faint line joins each marker to its note.
+  - **Anchored notes:** the words after a note's last colon are its anchor
+    (`noteParts`). `[[TK better description for: food]]` shows "food" in the text, faintly
+    underlined, with the note "TK better description for" in the margin. A colon straight
+    after a lone code (`[[CQ: check this]]`) does not make an anchor.
+  - **Starting a note:** typing a code as a word in capitals (TK to come, CQ checked or
+    check, AQ author query, XX placeholder, NB note well), or `[[`, drops a marker and opens
+    its note. The code stays as the note's first word. Ctrl+Alt+M or **+ note** does the same.
   - **Writing it:** Escape (or Enter) returns to the text just after the marker.
-  - **Finding them:** click a marker or a note to edit it. The bar counts the notes, and
-    **next** opens each in turn.
-  - Word counts leave notes out.
+  - **Finding them:** click a marker, anchor words or a note to edit it. The bar counts the
+    notes, and **next** opens each in turn.
+  - **Hiding them:** untick **notes** in the bar to hide markers, underlines, lines and the
+    margin while you write. They stay in the file.
+- **Word counts are strict** (`countProseWords`): no header, no headings, and of a note only
+  its anchor words. Dashes separate words; hyphens and apostrophes join them.
 - **The page's type is yours,** kept in the app's settings, not the world. Under **Aa**: the
   font (with a list of installed fonts), size, leading, old-style figures (on by default, as
   in books), and justified or ragged text.

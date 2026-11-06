@@ -52,8 +52,8 @@ import {
   proposeHistory,
   solarSystemFor,
   charactersOf,
+  countProseWords,
   proseFiles,
-  splitFrontMatter,
   isProsePath,
   knownPlanetsFor,
   terrainKind,
@@ -320,7 +320,7 @@ export class WorldSession extends EventEmitter {
         const text = new Map(files.map((f) => [f.path, f.text]))
         return proseFiles(files, KINDS).map((p) => ({
           path: p,
-          words: countWords(splitFrontMatter(text.get(p) ?? '').body),
+          words: countProseWords(text.get(p) ?? ''),
           dirty: dirty.has(p)
         }))
       })(),
@@ -979,8 +979,4 @@ function routesDto(
         }
       : null
   return { routes, nodes, traffic }
-}
-
-function countWords(text: string): number {
-  return (text.match(/[\p{L}\p{N}][\p{L}\p{N}'’-]*/gu) ?? []).length
 }

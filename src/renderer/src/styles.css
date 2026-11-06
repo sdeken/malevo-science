@@ -2070,19 +2070,72 @@ fieldset.plain {
   min-width: min(22em, 100%);
 }
 
+.prose-spread {
+  position: relative;
+}
+
+/* An editor's note in the text: a thin line, or its anchor words faintly underlined. */
 .prose-page .note-anchor {
   display: inline-block;
-  width: 0.45em;
-  height: 0.45em;
-  margin: 0 0.1em;
-  border-radius: 50%;
-  background: #d9a632;
-  vertical-align: 0.5em;
+  width: 0;
+  height: 1.05em;
+  margin: 0 1px;
+  border-left: 2px solid #d9a632;
+  vertical-align: -0.15em;
   cursor: pointer;
+}
+
+.prose-page .note-anchor.anchored {
+  display: inline;
+  height: auto;
+  margin: 0;
+  border: none;
+  vertical-align: baseline;
+  text-decoration: underline dotted #d9a632;
+  text-underline-offset: 3px;
 }
 
 .prose-page .note-anchor.ProseMirror-selectednode {
   outline: 2px solid var(--accent);
+}
+
+/* Notes hidden while writing: the markers vanish, anchor words read as plain text. */
+.notes-hidden .prose-page .note-anchor:not(.anchored) {
+  border-left-color: transparent;
+  margin: 0;
+}
+
+.notes-hidden .prose-page .note-anchor.anchored {
+  text-decoration: none;
+}
+
+.notes-hidden .note-margin {
+  visibility: hidden;
+}
+
+.note-lines {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+  overflow: visible;
+}
+
+.note-lines path {
+  fill: none;
+  stroke: #d9a632;
+  stroke-width: 1;
+  opacity: 0.35;
+}
+
+.note-lines path.open {
+  opacity: 0.9;
+  stroke-width: 1.5;
+}
+
+.note-on {
+  font-style: italic;
 }
 
 .prose-page .link-speech {

@@ -7,6 +7,8 @@ import {
   characterText,
   nameForms,
   nameUses,
+  noteParts,
+  countWords,
   proseFileName,
   smartenProse,
   splitFrontMatter,
@@ -30,6 +32,7 @@ function WritingView({ world, snapshot }: ToolProps): React.JSX.Element {
   const character = side ? chars.find((c) => c.id === side.id) : undefined
   const [page, setPage] = useState<PageSettings>(DEFAULT_PAGE)
   const [pageOpen, setPageOpen] = useState(false)
+  const [showNotes, setShowNotes] = useWorldPref<boolean>(world.root, 'writingShowNotes', true)
   useEffect(() => {
     void window.malevo.settings.get().then((st) => setPage(st.page ?? DEFAULT_PAGE))
   }, [])
@@ -108,6 +111,8 @@ function WritingView({ world, snapshot }: ToolProps): React.JSX.Element {
             forms={forms}
             version={snapshot.version}
             onName={(id) => setSide({ kind: 'character', id })}
+            showNotes={showNotes}
+            setShowNotes={setShowNotes}
           />
         ) : (
           <div className="tool-page">
@@ -154,8 +159,12 @@ function ProseEditor({
   path,
   forms,
   version,
-  onName
+  onName,
+  showNotes,
+  setShowNotes
 }: {
+  showNotes: boolean
+  setShowNotes(on: boolean): void
   path: string
   forms: NameForm[]
   version: number
@@ -170,7 +179,9 @@ function ProseEditor({
   const [accepted, setAccepted] = useState(false)
   const [loaded, setLoaded] = useState(false)
   const [stats, setStats] = useState({ words: 0, notes: 0 })
-  const [notes, setNotes] = useState<(NoteAt & { top: number })[]>([])
+  const [notes, setNotes] = useState<PlacedNote[]>([])
+  const [rails, setRails] = useState({ page: 0, margin: 0 })
+  const spreadRef = useRef<HTMLDivElement>(null)
   const [openNote, setOpenNote] = useState<number | null>(null)
   const openRef = useRef((pos: number) => setOpenNote(pos))
   const marginRef = useRef<HTMLDivElement>(null)
@@ -222,23 +233,31 @@ function ProseEditor({
     }
   })
 
-  /** Place each note's card in the margin beside its marker, pushed down so none overlap. */
+  /**
+   * Place each note's card in the margin beside its marker, pushed down so none overlap, and work out the
+   * line joining them: from the marker (the end of its anchor words) out to the page's edge, then to the card.
+   */
   const layout = (e: Editor | null = editor): void => {
     const margin = marginRef.current
-    if (!e || !margin) return
+    const spread = spreadRef.current
+    if (!e || !margin || !spread) return
     requestAnimationFrame(() => {
-      const top0 = margin.getBoundingClientRect().top
+      const box = spread.getBoundingClientRect()
+      const page = e.view.dom.getBoundingClientRect()
+      setRails({ page: page.right - box.left, margin: margin.getBoundingClientRect().left - box.left })
       let floor = -Infinity
       const placed = findNotes(e.state.doc).map((n) => {
-        let anchor = 0
-        try {
-          anchor = e.view.coordsAtPos(n.pos).top - top0
-        } catch {
-          anchor = floor
+        let ax = 0
+        let ay = floor
+        const dom = e.view.nodeDOM(n.pos) as HTMLElement | null
+        if (dom?.getBoundingClientRect) {
+          const r = dom.getBoundingClientRect()
+          ax = r.right - box.left
+          ay = r.top + r.height * 0.75 - box.top
         }
-        const top = Math.max(anchor, floor + 6)
-        floor = top + 26 + 17 * Math.floor(n.text.length / 32)
-        return { ...n, top }
+        const top = Math.max(ay - 10, floor + 6)
+        floor = top + 26 + 17 * Math.floor(noteParts(n.text).note.length / 32)
+        return { ...n, top, ax, ay }
       })
       setNotes(placed)
     })
@@ -287,6 +306,8 @@ function ProseEditor({
     editor?.commands.setNameForms(forms)
   }, [editor, forms])
 
+  useEffect(() => layout(), [showNotes]) // eslint-disable-line react-hooks/exhaustive-deps
+
   useEffect(() => {
     const onResize = (): void => layout()
     window.addEventListener('resize', onResize)
@@ -303,7 +324,7 @@ function ProseEditor({
   }
 
   return (
-    <div className="prose-shell">
+    <div className={showNotes ? 'prose-shell' : 'prose-shell notes-hidden'}>
       <div className="prose-bar small muted">
         <code>{path}</code> · {stats.words.toLocaleString()} words
         {parts.current.front && <span> · keeps its header as written</span>}
@@ -326,6 +347,10 @@ function ProseEditor({
         >
           + note
         </button>
+        <label className="check" title="Hide the notes while you write; they stay in the file">
+          <input type="checkbox" checked={showNotes} onChange={(e) => setShowNotes(e.target.checked)} id="showNotes" />
+          notes
+        </label>
       </div>
       {rewrite && !accepted && (
         <div className="notice" id="rewriteNotice">
@@ -348,8 +373,19 @@ function ProseEditor({
         }}
       >
         {loaded || <p className="muted">Opening…</p>}
-        <div className="prose-spread">
+        <div className="prose-spread" ref={spreadRef}>
           <EditorContent editor={editor} />
+          {showNotes && (
+            <svg className="note-lines" aria-hidden="true">
+              {notes.map((n) => (
+                <path
+                  key={n.pos}
+                  className={n.pos === openNote ? 'open' : undefined}
+                  d={`M ${n.ax} ${n.ay} L ${rails.page + 4} ${n.ay} L ${rails.margin} ${n.top + 11}`}
+                />
+              ))}
+            </svg>
+          )}
           <div className="note-margin" ref={marginRef} id="noteMargin">
             {notes.map((n) =>
               n.pos === openNote ? (
@@ -369,7 +405,8 @@ function ProseEditor({
                 />
               ) : (
                 <div key={n.pos} className="note-card" style={{ top: n.top }} onClick={() => setOpenNote(n.pos)} title="Edit this note">
-                  {n.text || <span className="muted">(empty)</span>}
+                  {noteParts(n.text).note || <span className="muted">(empty)</span>}
+                  {noteParts(n.text).anchor && <span className="note-on muted"> on “{noteParts(n.text).anchor}”</span>}
                 </div>
               )
             )}
@@ -429,11 +466,21 @@ function NoteCard({
   )
 }
 
+type PlacedNote = NoteAt & { top: number; ax: number; ay: number }
+
+/** A strict count: not headings, and of a note only its anchor words (as countProseWords counts the file). */
 function statsOf(editor: Editor): { words: number; notes: number } {
-  return {
-    words: (editor.getText().match(/[\p{L}\p{N}][\p{L}\p{N}'’-]*/gu) ?? []).length,
-    notes: findNotes(editor.state.doc).length
-  }
+  let words = 0
+  let notes = 0
+  editor.state.doc.descendants((node) => {
+    if (node.type.name === 'heading') return false
+    if (node.type.name === 'editorNote') {
+      notes++
+      words += countWords(noteParts(String(node.attrs.text ?? '')).anchor ?? '')
+    } else if (node.isText) words += countWords(node.text ?? '')
+    return true
+  })
+  return { words, notes }
 }
 
 // ---- the page's type ----

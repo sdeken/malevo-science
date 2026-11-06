@@ -17,7 +17,7 @@ import Typography from '@tiptap/extension-typography'
 import { NodeSelection, Plugin, PluginKey } from '@tiptap/pm/state'
 import { Decoration, DecorationSet } from '@tiptap/pm/view'
 import type { Node as PMNode } from '@tiptap/pm/model'
-import { dumbProse, escapeProse } from '@malevo/model'
+import { NOTE_CODES, dumbProse, escapeProse, noteParts } from '@malevo/model'
 
 // ---- editor's notes ----
 
@@ -40,8 +40,8 @@ export interface EditorNoteOptions {
   onOpen: (pos: number) => void
 }
 
-/** Starts a note: TK or CQ typed as a word (kept as the note's first word), or `[[`. */
-const STARTERS = /(?:^|[\s([{“‘—–‒])(TK|CQ)$/
+/** Starts a note: a code (TK, CQ, AQ, XX, NB) typed as a word, kept as the note's first word; or `[[`. */
+const STARTERS = new RegExp(`(?:^|[\\s([{\u201c\u2018\u2014\u2013\u2012])(${NOTE_CODES.join('|')})$`)
 
 export const EditorNote = Node.create<EditorNoteOptions>({
   name: 'editorNote',
@@ -59,7 +59,15 @@ export const EditorNote = Node.create<EditorNoteOptions>({
     return [{ tag: 'span[data-note]', getAttrs: (el) => ({ text: (el as HTMLElement).getAttribute('data-note') ?? '' }) }]
   },
   renderHTML({ node }) {
-    return ['span', { 'data-note': node.attrs.text, class: 'note-anchor', title: node.attrs.text || 'Editor’s note' }]
+    // A thin line in the text; a note with an anchor ("…: food") shows its anchor words instead.
+    const { note, anchor } = noteParts(String(node.attrs.text ?? ''))
+    const attrs = {
+      'data-note': node.attrs.text,
+      class: anchor ? 'note-anchor anchored' : 'note-anchor',
+      title: note || 'Editor’s note',
+      contenteditable: 'false'
+    }
+    return anchor ? ['span', attrs, anchor] : ['span', attrs]
   },
   markdownTokenName: 'editorNote',
   markdownTokenizer: {
