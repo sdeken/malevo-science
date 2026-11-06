@@ -8,7 +8,6 @@
  * pending files and nothing else. Each edit is one undo step; a pending write
  * that brings a file back to what is on disk simply disappears.
  */
-import { isProsePath } from './prose'
 import { promises as fs } from 'node:fs'
 import path from 'node:path'
 import { compareStrings } from '@malevo/core'
@@ -153,7 +152,6 @@ export function entityText<T>(kind: KindDef<T>, value: T): string {
 /** Edits may only touch files the world format owns: an entity's .json, its .md note, or its .js script. */
 export function assertWorldPath(p: string, kinds: readonly KindDef[]): void {
   if (kinds.some((k) => k.file === p)) return
-  if (isProsePath(p, kinds)) return
   const m = /^([a-z]+)\/([^/]+)\.(json|md|js)$/.exec(p)
   const kind = m && kinds.find((k) => k.folder === m[1])
   if (!m || !kind || !isId(m[2]) || (m[3] === 'js' && !kind.scripts))

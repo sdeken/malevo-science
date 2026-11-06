@@ -14,29 +14,12 @@ export interface Settings {
   /** Most recent first. */
   recentWorlds: string[]
   autoUpdate: boolean
-  /** How the writing page looks (yours, not the world's). */
-  page: PageSettings
 }
-
-export interface PageSettings {
-  /** A font family name; empty for the built-in book face. */
-  font: string
-  /** px */
-  size: number
-  /** Line height, as a multiple of the size. */
-  leading: number
-  /** Old-style (text) figures, as in books. */
-  oldstyle: boolean
-  justify: boolean
-}
-
-export const DEFAULT_PAGE: PageSettings = { font: '', size: 17, leading: 1.6, oldstyle: true, justify: true }
 
 export const DEFAULT_SETTINGS: Settings = {
   lastWorld: null,
   recentWorlds: [],
-  autoUpdate: true,
-  page: DEFAULT_PAGE
+  autoUpdate: true
 }
 
 export const MAX_RECENT_WORLDS = 10
@@ -181,10 +164,6 @@ export interface WorldSnapshot {
   /** settings/history.json, if the world has it. */
   historySettings: Record<string, unknown> | null
   ships: EntityDto[]
-  /** Prose files (chapters, notes): any .md outside the format's own folders, by path. */
-  prose: { path: string; words: number; dirty: boolean }[]
-  /** characters/<id>.md, read. */
-  characters: CharacterDto[]
   /** settings/physics.json as written, if the world has it (for editing). */
   physicsSettings: Record<string, unknown> | null
   terrains: EntityDto[]
@@ -640,18 +619,6 @@ export interface TripPlanDto {
   arrives: number
   total: number
   ideal: number | null
-  problems: string[]
-}
-
-// ---- Writing ----
-
-export interface CharacterDto {
-  id: string
-  path: string
-  name: string
-  names: { name: string; usedBy: string[]; note?: string }[]
-  notes: string
-  extra: string[]
   problems: string[]
 }
 

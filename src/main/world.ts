@@ -51,13 +51,9 @@ import {
   historySettingsKind,
   proposeHistory,
   solarSystemFor,
-  charactersOf,
   planTrip,
   sizeShipForTrip,
   shipKind,
-  countProseWords,
-  proseFiles,
-  isProsePath,
   knownPlanetsFor,
   terrainKind,
   terrainRaster,
@@ -321,17 +317,6 @@ export class WorldSession extends EventEmitter {
         })),
       cityPlans: entityDtos(world, cityPlanKind.kind),
       ships: entityDtos(world, shipKind.kind),
-      prose: (() => {
-        const files = this.editor.files()
-        const dirty = new Set(this.editor.dirty)
-        const text = new Map(files.map((f) => [f.path, f.text]))
-        return proseFiles(files, KINDS).map((p) => ({
-          path: p,
-          words: countProseWords(text.get(p) ?? ''),
-          dirty: dirty.has(p)
-        }))
-      })(),
-      characters: charactersOf(this.editor.files()),
       physics: physicsFile
         ? {
             legLimit_ly: physicsFile.foam.legLimit_ly,
@@ -678,18 +663,6 @@ export class WorldSession extends EventEmitter {
       for (const p of [`${base}.json`, `${base}.md`, `${base}.js`]) if (files.has(p)) changes.push({ path: p, text: null })
     }
     this.editor!.edit(changes)
-    this.changed()
-  }
-
-  /** The current text of a prose file (with unsaved changes), or null if there is none. */
-  proseText(p: string): string | null {
-    return this.editor!.files().find((f) => f.path === p)?.text ?? null
-  }
-
-  /** Write (or with null, delete) a prose or character file: unsaved, one undo step. */
-  writeProse(p: string, text: string | null): void {
-    if (!isProsePath(p, KINDS)) throw new WorldError('io', `"${p}" is not a prose file (a .md file outside the world format's folders).`)
-    this.editor!.edit([{ path: p, text }])
     this.changed()
   }
 

@@ -735,14 +735,13 @@ Built; see [DEVELOPMENT.md](DEVELOPMENT.md). Loading a prototype city file is le
   and the port capacity model.
 - Optional loading of a prototype city file as a starting sketch.
 
-### Writing — built
+### Writing — removed
 
-Built; see [DEVELOPMENT.md](DEVELOPMENT.md). Chapters are plain Markdown in the world folder,
-edited on a novel page. Character files list the names each character goes by. `@` inserts a
-name as plain text, names are recognised by reading, and a report shows where each name
-appears. Not yet built: a check that guesses a speaker and notices when a line uses the wrong
-name for them. Also not yet built: placing chapters on the timeline from `when:`/`where:` front
-matter.
+A writing tool (chapters as Markdown on a novel page, character files, editor's marks in the
+margin) was built and then taken out. The author writes in plain Markdown in their own editor.
+This app stays a science and fact repository to check that writing against. A manuscript
+preparation step (checking for stray editor's marks, producing the submission format) may come
+later as a separate tool.
 
 ### Trip planner — built
 

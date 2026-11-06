@@ -15,12 +15,10 @@ import { starsTool } from './stars/StarsTool'
 import { systemsTool } from './systems/SystemsTool'
 import { timelineTool } from './timeline/TimelineTool'
 import { worldTool } from './world/WorldTool'
-import { writingTool } from './writing/WritingTool'
 
 /** Every tool, in sidebar order. */
 export const TOOLS = defineTools([
   timelineTool,
-  writingTool,
   starsTool,
   systemsTool,
   terrainTool,

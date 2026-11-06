@@ -53,7 +53,7 @@ const api = {
   },
   settings: {
     get: (): Promise<Settings> => ipcRenderer.invoke(IPC.settingsGet),
-    set: (patch: Partial<Pick<Settings, 'autoUpdate' | 'page'>>): Promise<Settings> => ipcRenderer.invoke(IPC.settingsSet, patch)
+    set: (patch: Partial<Pick<Settings, 'autoUpdate'>>): Promise<Settings> => ipcRenderer.invoke(IPC.settingsSet, patch)
   },
   world: {
     current: (): Promise<WorldInfo | null> => ipcRenderer.invoke(IPC.worldCurrent),
@@ -155,12 +155,6 @@ const api = {
     /** The least tanks, and thrust per engine, that hold the comfort acceleration through a trip with the reserve. */
     size: (q: TripQueryDto): Promise<{ propellant_t: number; thrust_MN: number; hardest: string } | { error: string }> =>
       ipcRenderer.invoke(IPC.tripSize, q)
-  },
-  prose: {
-    /** A prose or character file's current text (unsaved changes included), or null. */
-    read: (path: string): Promise<string | null> => ipcRenderer.invoke(IPC.proseRead, path),
-    /** Write (null: delete) a prose or character file: unsaved and undoable, like any edit. */
-    write: (path: string, text: string | null): Promise<void> => ipcRenderer.invoke(IPC.proseWrite, path, text)
   },
   approach: {
     info: (q: ApproachQueryDto): Promise<ApproachInfoDto | { error: string }> => ipcRenderer.invoke(IPC.approachInfo, q),

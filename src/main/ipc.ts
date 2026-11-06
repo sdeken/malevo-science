@@ -1,4 +1,3 @@
-import { sanitizePage } from './settings'
 import { app, dialog, ipcMain, nativeImage, shell, BrowserWindow } from 'electron'
 import { promises as fs } from 'node:fs'
 import { WORLD_FORMAT } from '@malevo/model'
@@ -101,7 +100,6 @@ export function registerIpc(deps: IpcDeps): void {
   ipcMain.handle(IPC.settingsSet, async (_e, patch: unknown) => {
     const safe: Partial<Settings> = {}
     if (patch && typeof patch === 'object' && 'autoUpdate' in patch) safe.autoUpdate = Boolean((patch as Settings).autoUpdate)
-    if (patch && typeof patch === 'object' && 'page' in patch) safe.page = sanitizePage((patch as Settings).page)
     return settings.set(safe)
   })
 
@@ -155,8 +153,6 @@ export function registerIpc(deps: IpcDeps): void {
   }
   ipcMain.handle(IPC.tripPlan, (_e, q: unknown) => world.planTrip(tripQuery(q)))
   ipcMain.handle(IPC.tripSize, (_e, q: unknown) => world.sizeShip(tripQuery(q)))
-  ipcMain.handle(IPC.proseRead, (_e, p: unknown) => world.proseText(String(p)))
-  ipcMain.handle(IPC.proseWrite, (_e, p: unknown, text: unknown) => world.writeProse(String(p), text === null ? null : String(text)))
   ipcMain.handle(IPC.worldAddKnownPlanets, (_e, sys: unknown, candidates: unknown) =>
     world.addKnownPlanets(String(sys), candidates === true)
   )

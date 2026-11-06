@@ -755,51 +755,7 @@ try {
   const planFile = JSON.parse(await fs.readFile(path.join(worldDir, 'cityplans/new-city.json'), 'utf8'))
   check(planFile.city === 'new-city' && planFile.regions?.[0]?.preset === 'buildings', 'saving writes the plan as text')
 
-  // 20. Writing: a character with a nickname, a chapter typed with "@", saved as plain Markdown.
-  await tool('Writing')
-  await page.locator('#newCharacterName').fill('Div')
-  await page.locator('#newCharacter').click()
-  await page.waitForSelector('#characterEditor')
-  await page.locator('#addNickname').fill('T')
-  await page.locator('#addNickname').press('Enter')
-  await page.waitForFunction(() => document.querySelector('[data-character="div"]')?.textContent?.includes('T'))
-  check(true, 'a character takes a nickname')
-  await page.locator('#newProseTitle').fill('Chapter One')
-  await page.locator('#newProse').click()
-  await page.waitForSelector('.prose-page h1')
-  await page.locator('.prose-page h1').click()
-  await page.keyboard.press('End')
-  await page.keyboard.press('Enter')
-  await page.keyboard.type('It rained. @T')
-  await page.waitForSelector('.name-suggest')
-  await page.keyboard.press('Enter')
-  await page.keyboard.type(' waited. "Yes" -- [[')
-  await page.waitForSelector('#noteEditor textarea')
-  await page.keyboard.type('check & fix')
-  await page.keyboard.press('Escape')
-  await page.keyboard.type(' done.')
-  await page.waitForSelector('.prose-page .note-anchor')
-  check(
-    /\u201cYes\u201d \u2013 /.test(await page.locator('.prose-page p', { hasText: 'Yes' }).innerText()),
-    'the page shows typographer’s quotes and dashes, and "[[" opens a note in the margin'
-  )
-  await page.waitForSelector('.prose-page .name-mark')
-  check(
-    (await page.locator('.prose-page .name-mark').innerText()) === 'T',
-    'typing "@" offers the names, inserts the plain name, and marks it'
-  )
-  await page.waitForFunction(() => document.querySelector('[data-prose="Chapter One.md"] .dirty-dot') !== null, null, { timeout: 10_000 })
-  await page.locator('.status-save').click()
-  await page.waitForFunction(() => document.querySelector('.status-saved') !== null)
-  const chapter = await fs.readFile(path.join(worldDir, 'Chapter One.md'), 'utf8')
-  check(
-    chapter === '# Chapter One\n\nIt rained. T waited. "Yes" -- [[check & fix]] done.\n',
-    `saving writes the chapter as plain Markdown, editor's marks and all (${JSON.stringify(chapter)})`
-  )
-  const div = await fs.readFile(path.join(worldDir, 'characters', 'div.md'), 'utf8')
-  check(div === '---\nname: Div\nnames:\n  - T\n---\n', `and the character as a short header (${JSON.stringify(div)})`)
-
-  // 21. The trip planner: a ship flying Sol to Proxima, then with short tanks.
+  // 20. The trip planner: a ship flying Sol to Proxima, then with short tanks.
   await page.evaluate(() =>
     window.malevo.world.setEntity('route', 'sol-proxima', {
       name: 'Sol–Proxima',
