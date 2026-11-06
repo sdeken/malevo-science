@@ -1,5 +1,5 @@
 import path from 'node:path'
-import { app, BrowserWindow, powerMonitor, shell } from 'electron'
+import { app, BrowserWindow, powerMonitor, session, shell } from 'electron'
 import { IPC } from '../shared/ipc'
 import { confirmLeave, registerIpc } from './ipc'
 import { buildMenu } from './menu'
@@ -46,6 +46,9 @@ const updater = new Updater({
 })
 
 function createWindow(): BrowserWindow {
+  // The writing page's font picker lists installed fonts (Chromium's local-fonts permission); nothing else changes.
+  session.defaultSession.setPermissionRequestHandler((_wc, _permission, callback) => callback(true))
+  session.defaultSession.setPermissionCheckHandler(() => true)
   const win = new BrowserWindow({
     width: 1280,
     height: 800,

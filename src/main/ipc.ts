@@ -1,3 +1,4 @@
+import { sanitizePage } from './settings'
 import { app, dialog, ipcMain, nativeImage, shell, BrowserWindow } from 'electron'
 import { promises as fs } from 'node:fs'
 import { WORLD_FORMAT } from '@malevo/model'
@@ -99,6 +100,7 @@ export function registerIpc(deps: IpcDeps): void {
   ipcMain.handle(IPC.settingsSet, async (_e, patch: unknown) => {
     const safe: Partial<Settings> = {}
     if (patch && typeof patch === 'object' && 'autoUpdate' in patch) safe.autoUpdate = Boolean((patch as Settings).autoUpdate)
+    if (patch && typeof patch === 'object' && 'page' in patch) safe.page = sanitizePage((patch as Settings).page)
     return settings.set(safe)
   })
 

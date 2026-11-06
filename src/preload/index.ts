@@ -51,7 +51,7 @@ const api = {
   },
   settings: {
     get: (): Promise<Settings> => ipcRenderer.invoke(IPC.settingsGet),
-    set: (patch: Partial<Pick<Settings, 'autoUpdate'>>): Promise<Settings> => ipcRenderer.invoke(IPC.settingsSet, patch)
+    set: (patch: Partial<Pick<Settings, 'autoUpdate' | 'page'>>): Promise<Settings> => ipcRenderer.invoke(IPC.settingsSet, patch)
   },
   world: {
     current: (): Promise<WorldInfo | null> => ipcRenderer.invoke(IPC.worldCurrent),

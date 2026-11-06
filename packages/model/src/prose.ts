@@ -261,3 +261,74 @@ export function escapeProse(text: string): string {
     .replace(/&(?=#?\w+;)/g, '\\&')
     .replace(/<(?=[A-Za-z/!?])/g, '\\<')
 }
+
+// ---- typographer's quotes and dashes, shown but never saved ----
+
+/**
+ * The page shows typographer's quotes and dashes while the file keeps plain
+ * ones. `smartenProse` turns a file's Markdown into what the page shows;
+ * `dumbProse` turns shown text back into what the file holds. For any file
+ * written with plain quotes and hyphens, dumbProse(smartenProse(x)) is x.
+ *
+ * | file  | page | notes                                 |
+ * | ----- | ---- | ------------------------------------- |
+ * | `"`   | “ ”  | opening or closing by context          |
+ * | `'`   | ‘ ’  | after a letter or digit, an apostrophe |
+ * | `---` | —    | em dash                                |
+ * | `--`  | –    | en dash                                |
+ * | ` - ` | ‒    | a spaced single hyphen (figure dash, so it saves back as one hyphen) |
+ * | `...` | …    |                                        |
+ *
+ * Code (`…` and fenced blocks), [[editor's notes]], and lines that are only a
+ * scene break (`---`) are left alone.
+ */
+export function smartenProse(md: string): string {
+  const out: string[] = []
+  let fenced = false
+  for (const line of md.split('\n')) {
+    if (/^\s*(```|~~~)/.test(line)) {
+      fenced = !fenced
+      out.push(line)
+      continue
+    }
+    if (fenced || /^\s*([-*_])(\s*\1){2,}\s*$/.test(line)) {
+      out.push(line)
+      continue
+    }
+    // Leave code spans and editor's notes as written.
+    out.push(
+      line
+        .split(/(`[^`]*`|\[\[[^[\]\n]*\]\])/)
+        .map((part, k) => (k % 2 ? part : smartenText(part)))
+        .join('')
+    )
+  }
+  return out.join('\n')
+}
+
+const OPENS = /[\s([{—–‒“‘]/
+
+function smartenText(s: string): string {
+  let t = s
+    .replace(/---/g, '—')
+    .replace(/--/g, '–')
+    .replace(/(?<=\s)-(?=\s)/g, '‒')
+    .replace(/\.\.\./g, '…')
+  let out = ''
+  for (let i = 0; i < t.length; i++) {
+    const c = t[i]
+    const prev = i > 0 ? out[out.length - 1] : ''
+    if (c === '"') out += !prev || OPENS.test(prev) ? '“' : '”'
+    else if (c === "'") {
+      const next = t[i + 1] ?? ''
+      out += /[\p{L}\p{N}]/u.test(prev) ? '’' : (!prev || OPENS.test(prev)) && /[\p{L}\p{N}]/u.test(next) ? '‘' : '’'
+    } else out += c
+  }
+  t = out
+  return t
+}
+
+/** Shown typography back to the file's plain characters. */
+export function dumbProse(text: string): string {
+  return text.replace(/[“”]/g, '"').replace(/[‘’]/g, "'").replace(/—/g, '---').replace(/–/g, '--').replace(/‒/g, '-').replace(/…/g, '...')
+}

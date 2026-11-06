@@ -1,5 +1,16 @@
 import { describe, expect, it } from 'vitest'
-import { KINDS, characterText, escapeProse, isProsePath, nameForms, nameUses, parseCharacter, splitFrontMatter } from '@malevo/model'
+import {
+  KINDS,
+  characterText,
+  dumbProse,
+  escapeProse,
+  smartenProse,
+  isProsePath,
+  nameForms,
+  nameUses,
+  parseCharacter,
+  splitFrontMatter
+} from '@malevo/model'
 import { WorldEditor } from '@malevo/model/node'
 
 const DIV = `---
@@ -74,5 +85,16 @@ describe('prose and characters', () => {
     expect(escapeProse('a *star* and snake_case')).toBe('a \\*star\\* and snake\\_case')
     expect(escapeProse('[text](not a link) &amp; <em>')).toBe('[text\\](not a link) \\&amp; \\<em>')
     expect(escapeProse('~~gone~~')).toBe('\\~\\~gone\\~\\~')
+  })
+
+  it('shows typographer’s quotes and dashes, and gives the file back as it was', () => {
+    const file =
+      '# One\n\n"You\'re late," he said -- or maybe---no. \'Tis the \'90s. It\'s Div\'s - and *hers*...\n\n---\n\nCode `"x" -- y` and [[check "this" -- now]] stay.\n'
+    const shown = smartenProse(file)
+    expect(shown).toContain('\u201cYou\u2019re late,\u201d he said \u2013 or maybe\u2014no.')
+    expect(shown).toContain('Div\u2019s \u2012 and *hers*\u2026')
+    expect(shown).toContain('\n\n---\n\n')
+    expect(shown).toContain('`"x" -- y` and [[check "this" -- now]]')
+    expect(dumbProse(shown)).toBe(file)
   })
 })

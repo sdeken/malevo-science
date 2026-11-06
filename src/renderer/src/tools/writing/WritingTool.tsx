@@ -2,23 +2,23 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { EditorContent, useEditor, type Editor } from '@tiptap/react'
 import StarterKit from '@tiptap/starter-kit'
 import { Markdown } from '@tiptap/markdown'
-import Typography from '@tiptap/extension-typography'
 import {
   CHARACTERS_DIR,
   characterText,
   nameForms,
   nameUses,
   proseFileName,
+  smartenProse,
   splitFrontMatter,
   type Character,
   type NameForm,
   type NameUse
 } from '@malevo/model'
-import type { CharacterDto, WorldSnapshot } from '../../../../shared/types'
+import { DEFAULT_PAGE, type CharacterDto, type PageSettings, type WorldSnapshot } from '../../../../shared/types'
 import { TextField } from '../../components/fields'
 import { holdPendingWrite, slugId, useWorldPref } from '../../state'
 import type { ToolDefinition, ToolProps } from '../registry'
-import { EditorMarks, MARK_RE, PlainProse, UnderscoreItalic, findEditorMarks } from './marks'
+import { EditorNote, LinkSpeech, PlainProse, ProseDashes, ProseTypography, UnderscoreItalic, findNotes, type NoteAt } from './marks'
 import { Names } from './names'
 
 function WritingView({ world, snapshot }: ToolProps): React.JSX.Element {
@@ -28,11 +28,39 @@ function WritingView({ world, snapshot }: ToolProps): React.JSX.Element {
   const forms = useMemo(() => nameForms(chars as Character[]), [chars])
   const file = snapshot.prose.find((p) => p.path === open) ?? null
   const character = side ? chars.find((c) => c.id === side.id) : undefined
+  const [page, setPage] = useState<PageSettings>(DEFAULT_PAGE)
+  const [pageOpen, setPageOpen] = useState(false)
+  useEffect(() => {
+    void window.malevo.settings.get().then((st) => setPage(st.page ?? DEFAULT_PAGE))
+  }, [])
+  const savePage = (next: PageSettings): void => {
+    setPage(next)
+    void window.malevo.settings.set({ page: next })
+  }
+  const pageStyle = {
+    '--prose-font': page.font ? `"${page.font}", ${BOOK_STACK}` : BOOK_STACK,
+    '--prose-size': `${page.size}px`,
+    '--prose-leading': String(page.leading),
+    '--prose-nums': page.oldstyle ? 'oldstyle-nums proportional-nums' : 'lining-nums',
+    '--prose-align': page.justify ? 'justify' : 'left'
+  } as React.CSSProperties
 
   return (
-    <div className="split-tool writing">
+    <div className="split-tool writing" style={pageStyle}>
       <nav className="split-list">
-        <h2>Writing</h2>
+        <div className="field-row tight">
+          <h2>Writing</h2>
+          <span className="spacer" />
+          <button
+            className={pageOpen ? 'on small' : 'small'}
+            onClick={() => setPageOpen(!pageOpen)}
+            title="Font and page"
+            id="pageSettings"
+          >
+            Aa
+          </button>
+        </div>
+        {pageOpen && <PagePanel page={page} onChange={savePage} />}
         <NewProse snapshot={snapshot} onMade={setOpen} />
         <ul id="proseList">
           {snapshot.prose.map((p) => (
@@ -141,7 +169,11 @@ function ProseEditor({
   const [rewrite, setRewrite] = useState<{ lines: number; before: string; after: string } | null>(null)
   const [accepted, setAccepted] = useState(false)
   const [loaded, setLoaded] = useState(false)
-  const [stats, setStats] = useState({ words: 0, marks: 0 })
+  const [stats, setStats] = useState({ words: 0, notes: 0 })
+  const [notes, setNotes] = useState<(NoteAt & { top: number })[]>([])
+  const [openNote, setOpenNote] = useState<number | null>(null)
+  const openRef = useRef((pos: number) => setOpenNote(pos))
+  const marginRef = useRef<HTMLDivElement>(null)
 
   const flush = async (): Promise<void> => {
     if (!timer.current || !editor || !ready.current) return
@@ -171,9 +203,11 @@ function ProseEditor({
       StarterKit.configure({ link: false, italic: false }),
       UnderscoreItalic,
       Markdown,
-      Typography,
+      ProseTypography,
+      ProseDashes,
+      LinkSpeech,
       Names.configure({ forms }),
-      EditorMarks,
+      EditorNote.configure({ onOpen: (pos) => openRef.current(pos) }),
       PlainProse
     ],
     contentType: 'markdown',
@@ -181,11 +215,34 @@ function ProseEditor({
     editorProps: { attributes: { class: 'prose-page', spellcheck: 'true' } },
     onUpdate: ({ transaction, editor: e }) => {
       setStats(statsOf(e))
+      layout(e)
       if (!ready.current || !transaction.docChanged) return
       if (timer.current) clearTimeout(timer.current)
       timer.current = setTimeout(() => void flushRef.current(), WRITE_DELAY)
     }
   })
+
+  /** Place each note's card in the margin beside its marker, pushed down so none overlap. */
+  const layout = (e: Editor | null = editor): void => {
+    const margin = marginRef.current
+    if (!e || !margin) return
+    requestAnimationFrame(() => {
+      const top0 = margin.getBoundingClientRect().top
+      let floor = -Infinity
+      const placed = findNotes(e.state.doc).map((n) => {
+        let anchor = 0
+        try {
+          anchor = e.view.coordsAtPos(n.pos).top - top0
+        } catch {
+          anchor = floor
+        }
+        const top = Math.max(anchor, floor + 6)
+        floor = top + 26 + 17 * Math.floor(n.text.length / 32)
+        return { ...n, top }
+      })
+      setNotes(placed)
+    })
+  }
 
   // Load the file; reload it if it changed elsewhere (undo, another tool, the disk) while we were not typing.
   useEffect(() => {
@@ -199,7 +256,8 @@ function ProseEditor({
       const lead = /^\n*/.exec(body)![0]
       parts.current = { front, lead }
       last.current = text
-      editor.commands.setContent(body.slice(lead.length), { contentType: 'markdown', emitUpdate: false })
+      // The page shows typographer's quotes and dashes; saving turns them back into what the file holds.
+      editor.commands.setContent(smartenProse(body.slice(lead.length)), { contentType: 'markdown', emitUpdate: false })
       // Opening and saving an untouched file must leave it as it was: say so if the editor would rewrite it.
       const again = editor.getMarkdown().replace(/\s+$/, '')
       const was = body.slice(lead.length).replace(/\s+$/, '')
@@ -214,11 +272,12 @@ function ProseEditor({
       ready.current = true
       setStats(statsOf(editor))
       setLoaded(true)
+      layout(editor)
     })
     return () => {
       live = false
     }
-  }, [editor, path, version])
+  }, [editor, path, version]) // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     editor?.setEditable(!rewrite || accepted)
@@ -228,6 +287,21 @@ function ProseEditor({
     editor?.commands.setNameForms(forms)
   }, [editor, forms])
 
+  useEffect(() => {
+    const onResize = (): void => layout()
+    window.addEventListener('resize', onResize)
+    return () => window.removeEventListener('resize', onResize)
+  })
+
+  /** Back to the text, just after the note's marker. */
+  const closeNote = (pos: number): void => {
+    setOpenNote(null)
+    if (!editor) return
+    // Focus at once (Tiptap's focus command waits a frame, and keys typed meanwhile would be lost).
+    editor.commands.setTextSelection(pos + 1)
+    editor.view.focus()
+  }
+
   return (
     <div className="prose-shell">
       <div className="prose-bar small muted">
@@ -236,21 +310,21 @@ function ProseEditor({
         <span className="spacer" />
         <button
           className="link"
-          onClick={() => editor?.chain().focus().nextEditorMark().run()}
-          disabled={!stats.marks}
-          title="Jump to the next [[editor’s mark]]"
+          onClick={() => editor?.chain().focus().nextNote().run()}
+          disabled={!stats.notes}
+          title="Open the next editor’s note"
           id="nextMark"
         >
-          {stats.marks === 1 ? '1 editor’s mark' : `${stats.marks} editor’s marks`}
-          {stats.marks > 0 && ' → next'}
+          {stats.notes === 1 ? '1 note' : `${stats.notes} notes`}
+          {stats.notes > 0 && ' → next'}
         </button>
         <button
           className="link"
-          onClick={() => editor?.chain().focus().insertEditorMark().run()}
-          title="Wrap the selection in [[ ]] (Ctrl+Alt+M), or type [["
+          onClick={() => editor?.chain().focus().insertNote().run()}
+          title="Add an editor’s note here (Ctrl+Alt+M, or type TK, CQ or [[)"
           id="addMark"
         >
-          [[ add ]]
+          + note
         </button>
       </div>
       {rewrite && !accepted && (
@@ -266,23 +340,188 @@ function ProseEditor({
       <div
         className="prose-scroll"
         onClick={(e) => {
-          const el = (e.target as HTMLElement).closest('.name-mark') as HTMLElement | null
-          if (el?.dataset.character) onName(el.dataset.character)
+          const el = e.target as HTMLElement
+          const name = el.closest('.name-mark') as HTMLElement | null
+          if (name?.dataset.character) onName(name.dataset.character)
+          const anchor = el.closest('.note-anchor') as HTMLElement | null
+          if (anchor && editor) setOpenNote(editor.view.posAtDOM(anchor, 0))
         }}
       >
         {loaded || <p className="muted">Opening…</p>}
-        <EditorContent editor={editor} />
+        <div className="prose-spread">
+          <EditorContent editor={editor} />
+          <div className="note-margin" ref={marginRef} id="noteMargin">
+            {notes.map((n) =>
+              n.pos === openNote ? (
+                <NoteCard
+                  key={`open-${n.pos}`}
+                  note={n}
+                  onChange={(text) => editor?.commands.setNoteText(n.pos, text)}
+                  onClose={() => closeNote(n.pos)}
+                  onDelete={() => {
+                    setOpenNote(null)
+                    editor
+                      ?.chain()
+                      .focus()
+                      .deleteRange({ from: n.pos, to: n.pos + 1 })
+                      .run()
+                  }}
+                />
+              ) : (
+                <div key={n.pos} className="note-card" style={{ top: n.top }} onClick={() => setOpenNote(n.pos)} title="Edit this note">
+                  {n.text || <span className="muted">(empty)</span>}
+                </div>
+              )
+            )}
+          </div>
+        </div>
       </div>
     </div>
   )
 }
 
-function statsOf(editor: Editor): { words: number; marks: number } {
-  const text = editor.getText()
+/** A note being written: Escape or Enter returns to the text just after its marker. */
+function NoteCard({
+  note,
+  onChange,
+  onClose,
+  onDelete
+}: {
+  note: NoteAt & { top: number }
+  onChange(text: string): void
+  onClose(): void
+  onDelete(): void
+}): React.JSX.Element {
+  const [text, setText] = useState(note.text)
+  const ref = useRef<HTMLTextAreaElement>(null)
+  useEffect(() => {
+    const el = ref.current
+    if (!el) return
+    el.focus()
+    el.setSelectionRange(el.value.length, el.value.length)
+  }, [])
+  return (
+    <div className="note-card open" style={{ top: note.top }} id="noteEditor">
+      <textarea
+        ref={ref}
+        value={text}
+        rows={Math.max(2, Math.ceil(text.length / 30))}
+        onChange={(e) => {
+          // A note is one line in the file, without brackets.
+          const v = e.target.value.replace(/[[\]\n]/g, '')
+          setText(v)
+          onChange(v)
+        }}
+        onKeyDown={(e) => {
+          if (e.key === 'Escape' || e.key === 'Enter') {
+            e.preventDefault()
+            onClose()
+          }
+        }}
+      />
+      <div className="note-actions small">
+        <span className="muted">Esc to return</span>
+        <button className="link" onClick={onDelete}>
+          Remove
+        </button>
+      </div>
+    </div>
+  )
+}
+
+function statsOf(editor: Editor): { words: number; notes: number } {
   return {
-    words: (text.replace(MARK_RE, ' ').match(/[\p{L}\p{N}][\p{L}\p{N}'’-]*/gu) ?? []).length,
-    marks: findEditorMarks(editor.state.doc).length
+    words: (editor.getText().match(/[\p{L}\p{N}][\p{L}\p{N}'’-]*/gu) ?? []).length,
+    notes: findNotes(editor.state.doc).length
   }
+}
+
+// ---- the page's type ----
+
+const BOOK_STACK = "'Iowan Old Style', 'Palatino Linotype', Palatino, 'Book Antiqua', Georgia, serif"
+
+/** Font, size, leading and figures for the page: yours, kept in the app's settings, not the world. */
+function PagePanel({ page, onChange }: { page: PageSettings; onChange(p: PageSettings): void }): React.JSX.Element {
+  const [fonts, setFonts] = useState<string[] | null>(null)
+  const [note, setNote] = useState<string | null>(null)
+  const listFonts = async (): Promise<void> => {
+    const q = (window as unknown as { queryLocalFonts?: () => Promise<{ family: string }[]> }).queryLocalFonts
+    if (!q) {
+      setNote('This version cannot list installed fonts; type a font’s name instead.')
+      return
+    }
+    try {
+      const all = await q()
+      setFonts([...new Set(all.map((f) => f.family))].sort((a, b) => (a < b ? -1 : a > b ? 1 : 0)))
+    } catch (err) {
+      setNote(`Could not list fonts (${(err as Error).message}); type a font’s name instead.`)
+    }
+  }
+  return (
+    <div className="page-panel" id="pagePanel">
+      <label className="field">
+        Font
+        <input
+          list="fontList"
+          defaultValue={page.font}
+          placeholder="The built-in book face"
+          onChange={(e) => onChange({ ...page, font: e.target.value.trim() })}
+          id="pageFont"
+        />
+        <datalist id="fontList">
+          {(fonts ?? []).map((f) => (
+            <option key={f} value={f} />
+          ))}
+        </datalist>
+      </label>
+      {!fonts && (
+        <button className="link small" onClick={() => void listFonts()}>
+          List my installed fonts
+        </button>
+      )}
+      {note && <p className="muted small">{note}</p>}
+      <div className="field-row tight">
+        <label className="field">
+          Size, px
+          <input
+            type="number"
+            min={10}
+            max={32}
+            step={0.5}
+            value={page.size}
+            onChange={(e) => onChange({ ...page, size: Number(e.target.value) || page.size })}
+          />
+        </label>
+        <label className="field">
+          Leading
+          <input
+            type="number"
+            min={1}
+            max={2.5}
+            step={0.05}
+            value={page.leading}
+            onChange={(e) => onChange({ ...page, leading: Number(e.target.value) || page.leading })}
+          />
+        </label>
+      </div>
+      <label className="check">
+        <input
+          type="checkbox"
+          checked={page.oldstyle}
+          onChange={(e) => onChange({ ...page, oldstyle: e.target.checked })}
+          id="pageOldstyle"
+        />
+        Old-style figures (if the font has them)
+      </label>
+      <label className="check">
+        <input type="checkbox" checked={page.justify} onChange={(e) => onChange({ ...page, justify: e.target.checked })} />
+        Justified
+      </label>
+      <p className="page-sample" style={{ fontFamily: 'var(--prose-font)', fontVariantNumeric: 'var(--prose-nums)' as never }}>
+        “In 1947, 23 ships left Altaris—none came back.”
+      </p>
+    </div>
+  )
 }
 
 // ---- making files ----

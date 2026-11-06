@@ -1,6 +1,6 @@
 import { promises as fs } from 'node:fs'
 import path from 'node:path'
-import { DEFAULT_SETTINGS, MAX_RECENT_WORLDS, type Settings } from '../shared/types'
+import { DEFAULT_PAGE, DEFAULT_SETTINGS, MAX_RECENT_WORLDS, type PageSettings, type Settings } from '../shared/types'
 
 /** App settings in userData/settings.json. Never written into a world folder. */
 export class SettingsStore {
@@ -50,7 +50,8 @@ function sanitize(s: Settings): Settings {
   return {
     lastWorld: typeof s.lastWorld === 'string' && s.lastWorld ? s.lastWorld : null,
     recentWorlds: dedupe(recent).slice(0, MAX_RECENT_WORLDS),
-    autoUpdate: typeof s.autoUpdate === 'boolean' ? s.autoUpdate : DEFAULT_SETTINGS.autoUpdate
+    autoUpdate: typeof s.autoUpdate === 'boolean' ? s.autoUpdate : DEFAULT_SETTINGS.autoUpdate,
+    page: sanitizePage(s.page)
   }
 }
 
@@ -67,4 +68,17 @@ export function samePath(a: string, b: string): boolean {
     return process.platform === 'win32' ? r.toLowerCase() : r
   }
   return norm(a) === norm(b)
+}
+
+export function sanitizePage(p: unknown): PageSettings {
+  const v = (p && typeof p === 'object' ? p : {}) as Partial<PageSettings>
+  const num = (x: unknown, lo: number, hi: number, d: number): number =>
+    typeof x === 'number' && Number.isFinite(x) ? Math.max(lo, Math.min(hi, x)) : d
+  return {
+    font: typeof v.font === 'string' ? v.font.replace(/["';{}<>]/g, '').slice(0, 100) : DEFAULT_PAGE.font,
+    size: num(v.size, 10, 32, DEFAULT_PAGE.size),
+    leading: num(v.leading, 1, 2.5, DEFAULT_PAGE.leading),
+    oldstyle: typeof v.oldstyle === 'boolean' ? v.oldstyle : DEFAULT_PAGE.oldstyle,
+    justify: typeof v.justify === 'boolean' ? v.justify : DEFAULT_PAGE.justify
+  }
 }

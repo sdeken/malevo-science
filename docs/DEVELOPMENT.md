@@ -368,11 +368,30 @@ module.exports = {
   read back as formatting (`escapeProse`): `\`, backticks, `*` and `_`, `~~`, `](` and `[^`,
   entity-like `&name;`, and tag-like `<em>`. Ampersands, angle brackets, lone tildes and
   brackets stay as they are.
-- **Editor's marks** are notes to yourself written as `[[double brackets]]`. They stay plain text
-  in the file. The editor draws them highlighted with faint brackets, and typing `[[` closes the
-  pair. Ctrl+Alt+M (or **[[ add ]]**) wraps the selection or inserts an empty pair. The bar
-  counts the marks in the file, and **next** jumps from one to the next. Word counts leave them
-  out.
+- **Typographer's quotes and dashes are shown, never saved.** The file keeps plain
+  characters; the page shows them typeset (`smartenProse` on loading, `dumbProse` on saving):
+  - `"` and `'` as “ ” and ‘ ’;
+  - `--` as an en dash –, `---` as an em dash —, and a spaced ` - ` as ‒ (a figure dash,
+    so it saves back as one hyphen);
+  - `...` as ….
+
+  Typing works the same way. Code, editor's notes, and lines that are only a scene break are
+  left alone.
+- **Link speech:** text between guillemets «like this» is drawn in italics. Typing `<<` or `>>`
+  gives the guillemet itself. The guillemets are plain characters in the file, safe in any
+  editor (unlike `<<…>>`, which Markdown reads as an HTML tag).
+- **Editor's notes** are written `[[like this]]` in the file. On the page each is a single
+  marker that the cursor steps over, with the note in a margin column beside it, as in Word.
+  - **Starting a note:** typing TK or CQ as a word (in capitals), or `[[`, drops a marker and
+    opens its note. TK and CQ stay as the note's first word. Ctrl+Alt+M or **+ note** does the
+    same.
+  - **Writing it:** Escape (or Enter) returns to the text just after the marker.
+  - **Finding them:** click a marker or a note to edit it. The bar counts the notes, and
+    **next** opens each in turn.
+  - Word counts leave notes out.
+- **The page's type is yours,** kept in the app's settings, not the world. Under **Aa**: the
+  font (with a list of installed fonts), size, leading, old-style figures (on by default, as
+  in books), and justified or ragged text.
 - **Untouched files stay untouched.** On opening, the tool checks whether the editor would
   write the file differently, for example `_italic_` as `*italic*`. If it would, it shows an
   example and stays read-only until you choose **Edit anyway**. A file you only read is never

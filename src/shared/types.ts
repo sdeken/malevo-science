@@ -14,12 +14,29 @@ export interface Settings {
   /** Most recent first. */
   recentWorlds: string[]
   autoUpdate: boolean
+  /** How the writing page looks (yours, not the world's). */
+  page: PageSettings
 }
+
+export interface PageSettings {
+  /** A font family name; empty for the built-in book face. */
+  font: string
+  /** px */
+  size: number
+  /** Line height, as a multiple of the size. */
+  leading: number
+  /** Old-style (text) figures, as in books. */
+  oldstyle: boolean
+  justify: boolean
+}
+
+export const DEFAULT_PAGE: PageSettings = { font: '', size: 17, leading: 1.6, oldstyle: true, justify: true }
 
 export const DEFAULT_SETTINGS: Settings = {
   lastWorld: null,
   recentWorlds: [],
-  autoUpdate: true
+  autoUpdate: true,
+  page: DEFAULT_PAGE
 }
 
 export const MAX_RECENT_WORLDS = 10
