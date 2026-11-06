@@ -1917,7 +1917,7 @@ fieldset.plain {
 
 .prose-scroll {
   flex: 1;
-  overflow-y: auto;
+  overflow: auto;
   padding: 32px 16px 96px;
   background: var(--bg-sunken);
 }
@@ -1926,7 +1926,7 @@ fieldset.plain {
   max-width: 34em;
   min-height: 60vh;
   margin: 0 auto;
-  padding: 64px 72px;
+  padding: 64px clamp(20px, 7%, 72px);
   background: var(--paper);
   color: var(--ink);
   box-shadow: 0 1px 6px rgba(0, 0, 0, 0.18);
@@ -2021,7 +2021,7 @@ fieldset.plain {
 }
 
 .writing-side {
-  width: 340px;
+  width: clamp(240px, 26vw, 340px);
   flex: none;
   overflow-y: auto;
   padding: 10px 12px;
@@ -2065,8 +2065,9 @@ fieldset.plain {
 }
 
 .prose-spread > div:first-child {
+  /* The page keeps a readable width; the margin and the padding give way first. */
   flex: 0 1 34em;
-  min-width: 0;
+  min-width: min(22em, 100%);
 }
 
 .prose-page .note-anchor {
@@ -2090,8 +2091,8 @@ fieldset.plain {
 
 .note-margin {
   position: relative;
-  width: 230px;
-  flex: none;
+  flex: 0 1 230px;
+  min-width: 110px;
 }
 
 .note-card {
