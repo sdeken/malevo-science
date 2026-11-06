@@ -2356,8 +2356,23 @@ fieldset.plain {
   font-weight: 600;
 }
 
-.naming-sources {
-  margin: 10px 0 4px;
+.naming-setup .checks {
+  margin: 8px 0;
+}
+
+.new-naming {
+  display: grid;
+  gap: 6px;
+}
+
+.slider-field .slider {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+}
+
+.slider-field input[type='range'] {
+  width: 160px;
 }
 
 .naming .concept {
@@ -2431,10 +2446,11 @@ fieldset.plain {
   font-weight: 600;
 }
 
-.name-card .name-from {
+.name-card .name-note {
   overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
 }
 
 .name-card .card-actions {
@@ -2448,28 +2464,39 @@ fieldset.plain {
   padding: 2px 6px;
 }
 
-.name-card .card-actions button.on {
-  background: var(--accent);
+.name-card .rate-hate.on {
+  background: var(--danger);
+  border-color: var(--danger);
   color: var(--accent-text);
+}
+
+.name-card .rate-like.on {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: var(--accent-text);
+}
+
+.name-card .rate-love.on {
+  background: var(--ok);
+  border-color: var(--ok);
+  color: var(--accent-text);
+}
+
+.name-card.hate {
+  opacity: 0.55;
+}
+
+.name-card.like {
   border-color: var(--accent);
 }
 
-.name-card.liked {
-  border-color: var(--accent);
-}
-
-.name-card.locked {
-  border-color: var(--warn, #e0a43c);
-  box-shadow: inset 0 0 0 1px var(--warn, #e0a43c);
-}
-
-.name-card.chosen {
+.name-card.love {
   border-color: var(--ok);
   box-shadow: inset 0 0 0 2px var(--ok);
 }
 
 .name-card .warn {
-  color: var(--warn, #e0a43c);
+  color: var(--warn);
 }
 
 .batch-row {
@@ -2477,30 +2504,36 @@ fieldset.plain {
   gap: 12px;
 }
 
-.naming-chosen {
+.naming .loved {
   display: flex;
-  gap: 12px;
-  align-items: center;
-  margin: 6px 0;
+  flex-wrap: wrap;
+  gap: 4px 10px;
+  align-items: baseline;
+  margin: 4px 0 8px;
+}
+
+#namingChosen {
   font-size: 1.1em;
 }
 
-.naming-rounds li .liked {
+.naming-transcript .rated-love {
+  font-weight: 700;
+  color: var(--ok);
+}
+
+.naming-transcript .rated-like {
   font-weight: 600;
 }
 
-.naming-rounds li .locked {
-  font-weight: 700;
-  color: var(--warn, #e0a43c);
+.naming-transcript .rated-hate {
+  opacity: 0.6;
 }
 
-.naming-rounds,
-.naming-record {
+.naming-transcript {
   margin: 16px 0;
 }
 
-.naming-rounds ol,
-.naming-record ol {
+.naming-transcript ol {
   font-size: 0.9em;
   padding-left: 1.6em;
 }

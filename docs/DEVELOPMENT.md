@@ -458,53 +458,50 @@ module.exports = {
 
 ### Names
 
-- **Ten at a time, steered by the person.** The Names tool shows a batch of ten names. The
-  person likes the ones that are close, locks the ones they really like, and draws the next
-  ten. Locked names carry into every later batch. Liked and locked names drive the next batch
-  (weight 3), and names liked in earlier batches still count, for less (weight 1). A name once
-  shown is never shown again as new. A few rounds in, something should fit; the person marks
-  it chosen.
-- **A brainstorm, not an oracle.** Nothing ranks, scores or suggests. Each batch is a plain
-  procedure (`packages/model/src/namegen.ts`), drawn with a recorded seed, and each name says how
-  it was made. A batch is shared out between the sources the person ticks:
-  - **Words:** from the word list. The first batch draws from the neighbourhood of the senses
-    ticked for the words looked up. Later batches draw 70% from one link around each liked
-    word, with the same kinds of link, and the rest from that first neighbourhood ("near what
-    you liked: Ponderous → derived → heft").
-  - **Invented:** an order-2 letter chain over the liked names and the person's example names.
-    The word list's own words fill in, lightly, when there is too little to go on. Half are
-    small changes to a liked name instead: a vowel or consonant swapped, or two liked names
-    spliced after a vowel ("Tobrin × Mirel").
-  - **Pairs:** two liked names together ("A B", "A of B", "The A B"), one per pair of names.
+- **No smarts, on purpose.** The Names tool does what a person could do with a thesaurus, a
+  dictionary, name lists and a lot of time: look things up, measure how alike two names are, and
+  draw at random. It never writes, combines, ranks or picks a name, and it never calls out to a
+  language model. The person's ratings only change the odds of the next draw.
+- **Rounds of ten.** The person rates each name: hate it, neutral (the default), like it, or love
+  it. Every rating so far tips the next round (`packages/model/src/namegen.ts`):
+  - love pulls with weight 3 and like with 1;
+  - hate pushes with −2;
+  - neutral does nothing.
 
-  A source with nothing to go on gives its share to the others.
-- **The word list** is WordNet 3.1 (Princeton's licence, in `out/wordnet/LICENSE`), from the
-  `wordnet-db` package. `scripts/build-wordnet.mjs` packs it into `out/wordnet/wordnet.json`
-  during `npm run build`. Main loads it the first time the tool asks (`src/main/lexicon.ts`).
-  Parsing and exploring are in `packages/model/src/lexicon.ts`.
-- **Setting up the words:** looking up a word finds its base form ("lumbering" → lumber, as
-  well as lumbering) and lists every sense with its definition. The person ticks the senses
-  they mean, the links to follow, and how far (1 to 3 links):
-  - similar (similar to, see also, attribute, pertains to, ...);
-  - derived forms, broader, narrower;
-  - parts and wholes, topic and region, opposites, causes and entails.
-
-  Synonyms always come along. **Defined using** adds senses whose definition uses the
-  looked-up word as it appears in the ticked senses ("sloth: slow-moving arboreal mammals").
-  Words can be narrowed by part of speech, by WordNet's category ("animal (noun)"), by number
-  of letters, and to single words.
-- **A name already in the world** (a system, body, ship, station, culture, polity, city, route or
-  character) says so on its card.
-- **The record** is `namings/<id>.json`. It holds the brief, the sources, the example names, and
-  the ticked senses, copied with their definitions so the file reads without the app. It also
-  holds the links and narrowing, every batch (time, seed, names with how each was made, liked,
-  locked) and the chosen name with a note. `log` lists each step with the wall-clock time:
-  - looked up, meant this sense;
-  - followed these links, narrowed;
-  - drew batch N (and from what);
-  - liked, locked, chose.
-
-  Undo takes a step back out of the log along with the change.
+  A name once shown is never shown again. Each candidate is drawn with odds exp(k × score). k is
+  the **lean** times 1.5 × the log of the pool's size, so the same lean tips fifty candidates and
+  fifty thousand alike. Lean 0 ignores the ratings.
+- **Words, by meaning** (ship names, or "an adverb that means dumb"):
+  - The pool is WordNet. Optionally, the person looks up words and ticks the senses they mean. The
+    pool is then those senses' neighbourhood, along the ticked kinds of link (1 to 3 links out),
+    plus "defined using" (senses whose definition uses the looked-up word).
+  - With nothing looked up, every word that passes the filters is in play: part of speech, kind
+    of thing (WordNet's categories: animal, artifact, person …), letters, single words.
+  - A rated word's neighbourhood is near it. The same sense counts 1, one link out 0.8 and two
+    links out 0.6, along similar, derived, broader and narrower links plus the ticked ones. That
+    is scaled by the rating (love 1, like ⅓, hate −⅔), so loving a fish brings in its sibling
+    fish.
+  - "Pertains to" links are also followed backwards, so an adjective leads to its adverbs.
+  - Optionally, sound counts as well (the "liked by: meaning ↔ sound" slider).
+- **People's names, by sound:**
+  - Real given and/or family names come from the languages the person picks. The lists are from
+    the faker package (MIT), packed by `scripts/build-names.mjs` into `out/names/names.json`:
+    45 languages written in Latin letters.
+  - Made-up names, a chosen share of each round, come from an order-2 letter chain over the
+    names in play and the liked ones. Loved names count 12 and liked ones 4.
+  - Likeness is in the letters: pairs of letters with the word's edges, how it begins and ends,
+    its vowel and consonant pattern, and its length, compared by cosine. So loving Dorrie and
+    hating Gertrude leans toward Dorine, Corrine, Carie.
+- **Each card says what the name is,** for information: a definition, "given name · German", or
+  "made up". This is not stored. A name already used in the world (a system, body, ship,
+  station, culture, polity, city, route or character) says so.
+- **Settling:** the person settles on a name, either a loved one or anything they type.
+- **The record** is `namings/<id>.json`: the settings it draws with, the **transcript** (each
+  round as shown, with the time, the mode and the person's rating of each name) and the name
+  settled on. Nothing else is stored. "Copy transcript" gives it as text.
+- **WordNet 3.1** (Princeton's licence, in `out/wordnet/LICENSE`) comes from the `wordnet-db`
+  package and is packed by `scripts/build-wordnet.mjs`. Main loads both lists on first use
+  (`src/main/lexicon.ts`).
 
 ### Cities and conditions
 

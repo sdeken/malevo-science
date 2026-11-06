@@ -1,27 +1,19 @@
 import { useEffect, useMemo, useState } from 'react'
-import {
-  LINK_GROUP_NAMES,
-  NAME_SOURCES,
-  newNaming,
-  passesNarrow,
-  type ExploreResult,
-  type LinkGroup,
-  type NameSource,
-  type NamingFile,
-  type NamingStep,
-  type Sense
-} from '@malevo/model'
+import { LEX_FILES, LINK_GROUP_NAMES, newNaming, type LinkGroup, type NamingFile, type Sense } from '@malevo/model'
 import type { WorldSnapshot } from '../../../../shared/types'
 import { NumberField, TextField } from '../../components/fields'
 import { slugId, useWorldPref } from '../../state'
 import type { ToolDefinition, ToolProps } from '../registry'
 
 /**
- * The Names tool: a brainstorm, not an oracle. It shows ten names at a time;
- * the person likes some and locks the ones they really like, and the next ten
- * are drawn from those (packages/model/src/namegen.ts), until something fits.
- * The tool never ranks or suggests; every batch, like, lock and choice is
- * recorded with the time in namings/<id>.json.
+ * The Names tool: a brainstorm with no smarts. It shows ten names a round:
+ * words from the word list, or people's names and made-up names by sound.
+ * The person rates each (hate, neutral, like, love), and the ratings tip the
+ * odds of the next round toward names like the liked ones and away from the
+ * hated ones (packages/model/src/namegen.ts). It never writes, combines or
+ * picks a name. The person settles on a name, from the rounds or not, and
+ * namings/<id>.json keeps the transcript: each round as shown, with its
+ * ratings, and the name settled on.
  */
 function NamesView({ world, snapshot }: ToolProps): React.JSX.Element {
   const [namingId, setNamingId] = useWorldPref<string | null>(world.root, 'naming', null)
@@ -32,7 +24,7 @@ function NamesView({ world, snapshot }: ToolProps): React.JSX.Element {
         <h2>Names</h2>
         <ul>
           {snapshot.namings.map((n) => {
-            const chosen = n.value?.chosen as string | undefined
+            const chosen = (n.value?.chosen as { text?: string } | undefined)?.text
             const rounds = (n.value?.rounds as unknown[] | undefined)?.length ?? 0
             return (
               <li key={n.id}>
@@ -47,7 +39,7 @@ function NamesView({ world, snapshot }: ToolProps): React.JSX.Element {
                       ? chosen
                         ? `→ ${chosen}`
                         : rounds
-                          ? `${rounds} batch${rounds === 1 ? '' : 'es'}`
+                          ? `${rounds} round${rounds === 1 ? '' : 's'}`
                           : 'not started'
                       : 'has errors'}
                   </span>
@@ -63,9 +55,10 @@ function NamesView({ world, snapshot }: ToolProps): React.JSX.Element {
           <>
             <h1>Names</h1>
             <p className="muted">
-              A brainstorm for a name, ten at a time. Like the ones that are close, lock the ones you love, and the next ten are drawn from
-              them: words near the ones you liked, new names built from their sounds, and pairs of them. A few rounds in, something should
-              fit. Nothing is ranked or suggested, and every round is recorded with the name. Start one for whatever needs naming.
+              Ten names a round. Rate each one (hate it, like it, love it, or leave it be) and the next ten lean toward names like the ones
+              you liked and away from the ones you hated. Words come from a dictionary, by meaning; people’s names come from lists of real
+              given and family names and from made-up names, by sound. The tool never writes or picks a name; you settle on one, from the
+              rounds or not, and the session keeps a transcript of every round and your ratings.
             </p>
           </>
         ) : (
@@ -80,26 +73,30 @@ const now = (): string => new Date().toISOString()
 
 function NewNaming({ snapshot, onMade }: { snapshot: WorldSnapshot; onMade(id: string): void }): React.JSX.Element {
   const [name, setName] = useState('')
+  const [mode, setMode] = useState<'words' | 'sounds'>('words')
   return (
     <form
-      className="field-row tight"
+      className="new-naming"
       onSubmit={(e) => {
         e.preventDefault()
         const id = slugId(
           name,
           snapshot.namings.map((s) => s.id)
         )
-        void window.malevo.names.senses('').then((r) => {
-          const source = 'source' in r ? r.source : undefined
-          void window.malevo.world.setEntity('naming', id, newNaming(name.trim(), source, now())).then(() => onMade(id))
-        })
+        void window.malevo.world.setEntity('naming', id, newNaming(name.trim(), mode)).then(() => onMade(id))
         setName('')
       }}
     >
       <input value={name} onChange={(e) => setName(e.target.value)} placeholder="Something to name…" id="newNamingName" />
-      <button type="submit" disabled={!name.trim()} id="newNaming">
-        Start
-      </button>
+      <div className="field-row tight">
+        <select value={mode} onChange={(e) => setMode(e.target.value as 'words' | 'sounds')} id="newNamingMode">
+          <option value="words">Words</option>
+          <option value="sounds">People’s names</option>
+        </select>
+        <button type="submit" disabled={!name.trim()} id="newNaming">
+          Start
+        </button>
+      </div>
     </form>
   )
 }
@@ -119,8 +116,15 @@ type Pos = keyof typeof POS_LABELS
 const posOf = (s: Sense): Pos => (s.pos === 's' ? 'a' : s.pos)
 const categoryLabel = (c: string): string => {
   const [pos, what] = c.split('.')
-  return what === 'all' || what === 'Tops' ? `${pos} (general)` : `${what} (${pos})`
+  return what === 'all' || what === 'Tops'
+    ? `${pos} (general)`
+    : what === 'pert'
+      ? 'relational (adj)'
+      : what === 'ppl'
+        ? 'participle (adj)'
+        : `${what}`
 }
+const POS_OF_FILE: Record<string, Pos> = { noun: 'n', verb: 'v', adj: 'a', adv: 'r' }
 
 /** Every name already used in the world, lowercased, with what uses it. */
 function namesInUse(snapshot: WorldSnapshot): Map<string, string[]> {
@@ -140,8 +144,7 @@ function namesInUse(snapshot: WorldSnapshot): Map<string, string[]> {
     ['nebula', snapshot.nebulae],
     ['culture', snapshot.cultures],
     ['polity', snapshot.polities],
-    ['city', snapshot.cities],
-    ['naming', snapshot.namings]
+    ['city', snapshot.cities]
   ]
   for (const [kind, list] of kinds) for (const e of list) add(e.value?.name, `${kind} ${e.id}`)
   for (const r of snapshot.routes) add((r as unknown as { name?: string }).name, `route ${r.id}`)
@@ -152,126 +155,217 @@ function namesInUse(snapshot: WorldSnapshot): Map<string, string[]> {
   return out
 }
 
-function Naming({ id, file, snapshot }: { id: string; file: NamingFile; snapshot: WorldSnapshot }): React.JSX.Element {
-  /** Every change goes through here, with the line it adds to the record. */
-  const change = (patch: Partial<NamingFile>, step: NamingStep, text: string): void => {
-    const next = { ...file, ...patch, log: [...file.log, { at: now(), step, text }] } as Record<string, unknown>
-    for (const k of Object.keys(next)) if (next[k] === undefined) delete next[k]
-    void window.malevo.world.setEntity('naming', id, next)
-  }
-  const [explored, setExplored] = useState<ExploreResult | { error: string } | null>(null)
-  const active = file.concepts.filter((c) => c.senses.length)
-  const query = JSON.stringify({ concepts: active.map((c) => ({ word: c.word, senses: c.senses.map((s) => s.id) })), ...file.links })
-  useEffect(() => {
-    if (!active.length) {
-      setExplored(null)
-      return
-    }
-    let live = true
-    const q = JSON.parse(query) as { concepts: { word: string; senses: string[] }[]; groups: LinkGroup[]; depth: number; defined: boolean }
-    void window.malevo.names
-      .explore({ concepts: q.concepts, links: q.groups, depth: q.depth, defined: q.defined })
-      .then((r) => live && setExplored(r))
-    return () => {
-      live = false
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [query])
-  const [setupOpen, setSetupOpen] = useState(!file.rounds.length)
+type Save = (next: NamingFile) => void
 
+function Naming({ id, file, snapshot }: { id: string; file: NamingFile; snapshot: WorldSnapshot }): React.JSX.Element {
+  const save: Save = (next) => {
+    const clean = JSON.parse(JSON.stringify(next)) as NamingFile
+    void window.malevo.world.setEntity('naming', id, clean)
+  }
+  const [setupOpen, setSetupOpen] = useState(!file.rounds.length)
+  /** What each shown name is (a definition, "given name · German"): for this sitting only, not stored. */
+  const [notes, setNotes] = useState<Record<string, string>>({})
   return (
     <section className="naming" id="naming">
       <div className="field-row">
-        <TextField
-          label="Naming"
-          value={file.name}
-          onCommit={(v) => v.trim() && change({ name: v.trim() }, 'brief', `Renamed the brainstorm “${v.trim()}”.`)}
-          id="namingName"
-        />
+        <TextField label="Naming" value={file.name} onCommit={(v) => v.trim() && save({ ...file, name: v.trim() })} id="namingName" />
+        <label className="field">
+          Draw
+          <select value={file.mode} onChange={(e) => save({ ...file, mode: e.target.value as 'words' | 'sounds' })} id="namingMode">
+            <option value="words">Words, by meaning</option>
+            <option value="sounds">People’s names, by sound</option>
+          </select>
+        </label>
       </div>
-      <Brief file={file} change={change} />
       <details className="naming-setup" open={setupOpen} onToggle={(e) => setSetupOpen((e.target as HTMLDetailsElement).open)}>
         <summary>Where names come from</summary>
-        <Sources file={file} change={change} />
-        {file.sources.includes('words') && (
-          <>
-            <Concepts file={file} change={change} />
-            <Links file={file} change={change} />
-            <Narrow file={file} change={change} explored={explored} />
-          </>
-        )}
-        {file.sources.includes('sounds') && <Examples file={file} change={change} />}
+        {file.mode === 'words' ? <WordsSetup file={file} save={save} /> : <SoundsSetup file={file} save={save} />}
+        <Slider
+          label="Lean"
+          left="wander"
+          right="stay close to what I liked"
+          value={file.focus}
+          onCommit={(focus) => save({ ...file, focus })}
+          id="namingFocus"
+        />
       </details>
-      <Batch file={file} change={change} snapshot={snapshot} />
-      <Rounds file={file} />
-      <Record file={file} />
+      <Round file={file} save={save} snapshot={snapshot} notes={notes} setNotes={setNotes} />
+      <Settle file={file} save={save} />
+      <Transcript file={file} />
     </section>
   )
 }
 
-type Change = (patch: Partial<NamingFile>, step: NamingStep, text: string) => void
-
-function Brief({ file, change }: { file: NamingFile; change: Change }): React.JSX.Element {
-  const [draft, setDraft] = useState(file.brief ?? '')
-  useEffect(() => setDraft(file.brief ?? ''), [file.brief])
+function Slider({
+  label,
+  left,
+  right,
+  value,
+  onCommit,
+  id
+}: {
+  label: string
+  left: string
+  right: string
+  value: number
+  onCommit(v: number): void
+  id?: string
+}): React.JSX.Element {
+  const [draft, setDraft] = useState(value)
+  useEffect(() => setDraft(value), [value])
+  const commit = (): void => {
+    if (draft !== value) onCommit(draft)
+  }
   return (
-    <label className="field">
-      What should the name carry? (your words)
-      <textarea
-        id="namingBrief"
-        rows={2}
-        value={draft}
-        onChange={(e) => setDraft(e.target.value)}
-        onBlur={() =>
-          draft.trim() !== (file.brief ?? '') && change({ brief: draft.trim() || undefined }, 'brief', `Brief: “${draft.trim()}”`)
-        }
-      />
+    <label className="field slider-field">
+      {label}
+      <span className="slider">
+        <span className="muted small">{left}</span>
+        <input
+          type="range"
+          min={0}
+          max={1}
+          step={0.05}
+          value={draft}
+          onChange={(e) => setDraft(Number(e.target.value))}
+          onPointerUp={commit}
+          onKeyUp={commit}
+          onBlur={commit}
+          id={id}
+        />
+        <span className="muted small">{right}</span>
+      </span>
     </label>
   )
 }
 
-function Concepts({ file, change }: { file: NamingFile; change: Change }): React.JSX.Element {
+function WordsSetup({ file, save }: { file: NamingFile; save: Save }): React.JSX.Element {
+  const w = file.words
+  const set = (patch: Partial<NamingFile['words']>): void => save({ ...file, words: { ...w, ...patch } })
+  const categories = LEX_FILES.filter((c) => {
+    const p = POS_OF_FILE[c.split('.')[0]]
+    return (!w.pos.length || w.pos.includes(p)) && c !== 'noun.Tops'
+  })
+  return (
+    <div className="words-setup">
+      <Concepts file={file} set={set} />
+      <div className="checks">
+        <span>Follow:</span>
+        <span className="muted small">synonyms always</span>
+        {LINK_GROUP_NAMES.map((g) => (
+          <label key={g}>
+            <input
+              type="checkbox"
+              checked={w.links.includes(g)}
+              onChange={(e) => set({ links: e.target.checked ? [...w.links, g] : w.links.filter((x) => x !== g) })}
+              data-link={g}
+            />
+            {LINK_LABELS[g]}
+          </label>
+        ))}
+        <label title="Words whose definition uses a word you looked up">
+          <input type="checkbox" checked={w.defined} onChange={(e) => set({ defined: e.target.checked })} data-link="defined" />
+          Defined using
+        </label>
+        <NumberField
+          label="Links out"
+          value={w.depth}
+          onCommit={(x) => x !== undefined && x >= 1 && x <= 3 && set({ depth: Math.round(x) })}
+          id="linkDepth"
+        />
+      </div>
+      <div className="checks">
+        <span>Only:</span>
+        {(Object.keys(POS_LABELS) as Pos[]).map((p) => (
+          <label key={p}>
+            <input
+              type="checkbox"
+              checked={w.pos.includes(p)}
+              onChange={(e) => set({ pos: e.target.checked ? [...w.pos, p] : w.pos.filter((x) => x !== p) })}
+              data-pos={p}
+            />
+            {POS_LABELS[p]}
+          </label>
+        ))}
+        <label>
+          <input type="checkbox" checked={w.singleWords} onChange={(e) => set({ singleWords: e.target.checked })} id="singleWords" />
+          single words
+        </label>
+      </div>
+      <details className="categories">
+        <summary>Kinds of thing{w.categories.length ? `: ${w.categories.map(categoryLabel).join(', ')}` : ' (any)'}</summary>
+        <div className="checks">
+          {categories.map((c) => (
+            <label key={c}>
+              <input
+                type="checkbox"
+                checked={w.categories.includes(c)}
+                onChange={(e) => set({ categories: e.target.checked ? [...w.categories, c] : w.categories.filter((x) => x !== c) })}
+                data-category={c}
+              />
+              {categoryLabel(c)}
+            </label>
+          ))}
+        </div>
+      </details>
+      <div className="field-row">
+        <NumberField
+          label="Letters, at least"
+          value={w.minLetters}
+          optional
+          onCommit={(x) => set({ minLetters: x && x > 0 ? Math.round(x) : undefined })}
+        />
+        <NumberField
+          label="at most"
+          value={w.maxLetters}
+          optional
+          onCommit={(x) => set({ maxLetters: x && x > 0 ? Math.round(x) : undefined })}
+        />
+        <Slider label="Liked by" left="meaning" right="sound" value={w.sound} onCommit={(sound) => set({ sound })} id="wordsSound" />
+      </div>
+      <p className="muted small">
+        With no word looked up, every word that passes these filters is in play. Rating a word pulls in the words near it in the dictionary.
+      </p>
+    </div>
+  )
+}
+
+function Concepts({ file, set }: { file: NamingFile; set(patch: Partial<NamingFile['words']>): void }): React.JSX.Element {
+  const concepts = file.words.concepts
   const [word, setWord] = useState('')
   const [senses, setSenses] = useState<Record<string, Sense[] | string>>({})
   const [open, setOpen] = useState<string | null>(null)
-  const fetchSenses = (w: string): void => {
-    if (senses[w]) return
-    void window.malevo.names.senses(w).then((r) => setSenses((s) => ({ ...s, [w]: 'error' in r ? r.error : r.senses })))
-  }
   useEffect(() => {
-    for (const c of file.concepts) fetchSenses(c.word)
+    for (const c of concepts)
+      if (!senses[c.word])
+        void window.malevo.names.senses(c.word).then((r) => setSenses((s) => ({ ...s, [c.word]: 'error' in r ? r.error : r.senses })))
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [file.concepts.length])
+  }, [concepts.length])
   return (
     <div className="naming-concepts">
-      <h3>Words for what it’s like</h3>
       <form
         className="field-row tight"
         onSubmit={(e) => {
           e.preventDefault()
           const w = word.trim().toLowerCase()
-          if (!w || file.concepts.some((c) => c.word === w)) return
+          if (!w || concepts.some((c) => c.word === w)) return
           void window.malevo.names.senses(w).then((r) => {
-            const list = 'error' in r ? [] : r.senses
-            setSenses((s) => ({ ...s, [w]: 'error' in r ? r.error : list }))
-            change(
-              { concepts: [...file.concepts, { word: w, senses: [] }] },
-              'look-up',
-              list.length
-                ? `Looked up “${w}”: ${list.length} sense${list.length === 1 ? '' : 's'}.`
-                : `Looked up “${w}”: not in the word list.`
-            )
+            setSenses((s) => ({ ...s, [w]: 'error' in r ? r.error : r.senses }))
+            set({ concepts: [...concepts, { word: w, senses: [] }] })
             setOpen(w)
           })
           setWord('')
         }}
       >
-        <input value={word} onChange={(e) => setWord(e.target.value)} placeholder="slow, lumbering, patient…" id="conceptWord" />
+        <label className="field grow">
+          Words for what it means (optional)
+          <input value={word} onChange={(e) => setWord(e.target.value)} placeholder="slow, dumb, sweet…" id="conceptWord" />
+        </label>
         <button type="submit" disabled={!word.trim()} id="addConcept">
           Look up
         </button>
       </form>
-      {file.concepts.map((c, ci) => {
+      {concepts.map((c, ci) => {
         const list = senses[c.word]
         const chosen = new Set(c.senses.map((s) => s.id))
         const isOpen = open === c.word || !c.senses.length
@@ -284,10 +378,7 @@ function Concepts({ file, change }: { file: NamingFile; change: Change }): React
               <span className="muted small">
                 {c.senses.length ? `${c.senses.length} sense${c.senses.length === 1 ? '' : 's'} ticked` : 'tick the senses you mean'}
               </span>
-              <button
-                className="small"
-                onClick={() => change({ concepts: file.concepts.filter((_, i) => i !== ci) }, 'remove-word', `Set aside “${c.word}”.`)}
-              >
+              <button className="small" onClick={() => set({ concepts: concepts.filter((_, i) => i !== ci) })}>
                 Remove
               </button>
             </div>
@@ -297,7 +388,7 @@ function Concepts({ file, change }: { file: NamingFile; change: Change }): React
               ) : !list ? (
                 <p className="muted small">…</p>
               ) : !list.length ? (
-                <p className="muted small">Not in the word list.</p>
+                <p className="muted small">Not in the dictionary.</p>
               ) : (
                 <ul className="senses">
                   {list.map((s) => (
@@ -307,14 +398,10 @@ function Concepts({ file, change }: { file: NamingFile; change: Change }): React
                           type="checkbox"
                           checked={chosen.has(s.id)}
                           onChange={(e) => {
-                            const senses = e.target.checked
+                            const next = e.target.checked
                               ? [...c.senses, { id: s.id, words: s.words, gloss: s.gloss }]
                               : c.senses.filter((x) => x.id !== s.id)
-                            change(
-                              { concepts: file.concepts.map((x, i) => (i === ci ? { ...x, senses } : x)) },
-                              e.target.checked ? 'sense' : 'unsense',
-                              `${e.target.checked ? 'Meant' : 'Did not mean'} “${c.word}” as ${s.words.join(', ')}: ${s.gloss.split(/;\s*"/)[0]}`
-                            )
+                            set({ concepts: concepts.map((x, i) => (i === ci ? { ...x, senses: next } : x)) })
                           }}
                         />
                         <span className="muted small">{POS_LABELS[posOf(s)].slice(0, -1)}</span> <strong>{s.words.join(', ')}</strong> —{' '}
@@ -331,203 +418,102 @@ function Concepts({ file, change }: { file: NamingFile; change: Change }): React
   )
 }
 
-function Links({ file, change }: { file: NamingFile; change: Change }): React.JSX.Element {
-  const l = file.links
-  const describe = (x: NamingFile['links']): string =>
-    `${x.groups.map((g) => LINK_LABELS[g].toLowerCase()).join(', ') || 'synonyms only'}${x.defined ? ', defined using' : ''}; ${x.depth} link${x.depth === 1 ? '' : 's'} out`
-  const set = (x: NamingFile['links']): void => change({ links: x }, 'links', `Followed ${describe(x)}.`)
+type Locale = { id: string; label: string; given: number; family: number }
+
+function SoundsSetup({ file, save }: { file: NamingFile; save: Save }): React.JSX.Element {
+  const s = file.sounds
+  const set = (patch: Partial<NamingFile['sounds']>): void => save({ ...file, sounds: { ...s, ...patch } })
+  const [locales, setLocales] = useState<Locale[] | string | null>(null)
+  useEffect(() => {
+    void window.malevo.names.locales().then((r) => setLocales('error' in r ? r.error : r.locales))
+  }, [])
   return (
-    <div className="naming-links">
-      <h3>Links to follow</h3>
+    <div className="sounds-setup">
       <div className="checks">
-        <span className="muted small">Synonyms always.</span>
-        {LINK_GROUP_NAMES.map((g) => (
-          <label key={g}>
-            <input
-              type="checkbox"
-              checked={l.groups.includes(g)}
-              onChange={(e) => set({ ...l, groups: e.target.checked ? [...l.groups, g] : l.groups.filter((x) => x !== g) })}
-              data-link={g}
-            />
-            {LINK_LABELS[g]}
-          </label>
-        ))}
-        <label title="Senses whose definition uses one of the chosen words (one step; not followed further)">
-          <input type="checkbox" checked={l.defined} onChange={(e) => set({ ...l, defined: e.target.checked })} data-link="defined" />
-          Defined using
+        <span>Names:</span>
+        <label>
+          <input type="checkbox" checked={s.given} onChange={(e) => set({ given: e.target.checked })} id="soundsGiven" />
+          given
         </label>
-        <NumberField
-          label="Links out"
-          value={l.depth}
-          onCommit={(x) => x !== undefined && x >= 1 && x <= 3 && set({ ...l, depth: Math.round(x) })}
-          id="linkDepth"
-        />
-      </div>
-    </div>
-  )
-}
-
-const SOURCE_LABELS: Record<NameSource, { label: string; hint: string }> = {
-  words: { label: 'Words', hint: 'Words from the word list, near the senses you tick and near the names you like' },
-  sounds: { label: 'Invented', hint: 'New names built from the letters of names you like and your example names' },
-  pairs: { label: 'Pairs', hint: 'Two names you liked together: “A B”, “A of B”, “The A B”' }
-}
-
-function Sources({ file, change }: { file: NamingFile; change: Change }): React.JSX.Element {
-  return (
-    <div className="checks naming-sources">
-      <span>Draw from:</span>
-      {NAME_SOURCES.map((src) => (
-        <label key={src} title={SOURCE_LABELS[src].hint}>
-          <input
-            type="checkbox"
-            checked={file.sources.includes(src)}
-            onChange={(e) => {
-              const sources = e.target.checked
-                ? NAME_SOURCES.filter((x) => x === src || file.sources.includes(x))
-                : file.sources.filter((x) => x !== src)
-              change(
-                { sources },
-                'sources',
-                `Drawing from: ${sources.map((x) => SOURCE_LABELS[x].label.toLowerCase()).join(', ') || 'nothing'}.`
-              )
-            }}
-            data-source={src}
-          />
-          {SOURCE_LABELS[src].label}
+        <label>
+          <input type="checkbox" checked={s.family} onChange={(e) => set({ family: e.target.checked })} id="soundsFamily" />
+          family
         </label>
-      ))}
-    </div>
-  )
-}
-
-function Narrow({
-  file,
-  change,
-  explored
-}: {
-  file: NamingFile
-  change: Change
-  explored: ExploreResult | { error: string } | null
-}): React.JSX.Element {
-  const n = file.narrow
-  const words = useMemo(() => (explored && !('error' in explored) ? explored.words : []), [explored])
-  const categories = useMemo(() => [...new Set(words.flatMap((w) => w.senses.map((s) => s.category)))].sort(), [words])
-  const inReach = words.filter((w) => passesNarrow(w, n)).length
-  const setNarrow = (x: NamingFile['narrow'], text: string): void => {
-    const clean = { ...x } as Record<string, unknown>
-    for (const k of Object.keys(clean))
-      if (clean[k] === undefined || clean[k] === false || (Array.isArray(clean[k]) && !(clean[k] as unknown[]).length)) delete clean[k]
-    change({ narrow: clean as NamingFile['narrow'] }, 'narrow', text)
-  }
-  return (
-    <div className="naming-narrow">
-      <h3>Which words</h3>
-      <div className="field-row narrow-row">
-        <div className="checks">
-          {(Object.keys(POS_LABELS) as Pos[]).map((p) => (
-            <label key={p}>
-              <input
-                type="checkbox"
-                checked={n.pos?.includes(p) ?? false}
-                onChange={(e) => {
-                  const pos = e.target.checked ? [...(n.pos ?? []), p] : (n.pos ?? []).filter((x) => x !== p)
-                  setNarrow({ ...n, pos }, pos.length ? `Only ${pos.map((x) => POS_LABELS[x]).join(', ')}.` : 'Any part of speech.')
-                }}
-                data-pos={p}
-              />
-              {POS_LABELS[p]}
-            </label>
-          ))}
-          <label>
-            <input
-              type="checkbox"
-              checked={n.singleWords ?? false}
-              onChange={(e) => setNarrow({ ...n, singleWords: e.target.checked }, e.target.checked ? 'Single words only.' : 'Phrases too.')}
-            />
-            single words
-          </label>
-        </div>
-        <NumberField
-          label="At most letters"
-          value={n.maxLetters}
-          optional
-          onCommit={(x) =>
-            setNarrow({ ...n, maxLetters: x && x > 0 ? Math.round(x) : undefined }, x ? `At most ${Math.round(x)} letters.` : 'Any length.')
-          }
-          id="narrowLetters"
-        />
+        <select value={s.gender} onChange={(e) => set({ gender: e.target.value as 'any' | 'female' | 'male' })} id="soundsGender">
+          <option value="any">any given names</option>
+          <option value="female">feminine given names</option>
+          <option value="male">masculine given names</option>
+        </select>
       </div>
-      {categories.length > 1 && (
-        <details className="categories">
-          <summary>Kinds of thing{n.categories?.length ? `: ${n.categories.map(categoryLabel).join(', ')}` : ' (any)'}</summary>
+      <details className="categories" open={!s.locales.length}>
+        <summary>
+          Languages:{' '}
+          {s.locales.length
+            ? s.locales.map((id) => (Array.isArray(locales) ? (locales.find((l) => l.id === id)?.label ?? id) : id)).join(', ')
+            : 'none'}
+        </summary>
+        {typeof locales === 'string' ? (
+          <p className="error small">{locales}</p>
+        ) : !locales ? (
+          <p className="muted small">…</p>
+        ) : (
           <div className="checks">
-            {categories.map((c) => (
-              <label key={c}>
+            {locales.map((l) => (
+              <label key={l.id} title={`${l.given} given, ${l.family} family names`}>
                 <input
                   type="checkbox"
-                  checked={n.categories?.includes(c) ?? false}
-                  onChange={(e) => {
-                    const categories = e.target.checked ? [...(n.categories ?? []), c] : (n.categories ?? []).filter((x) => x !== c)
-                    setNarrow(
-                      { ...n, categories },
-                      categories.length ? `Only kinds: ${categories.map(categoryLabel).join(', ')}.` : 'Any kind of thing.'
-                    )
-                  }}
-                  data-category={c}
+                  checked={s.locales.includes(l.id)}
+                  onChange={(e) => set({ locales: e.target.checked ? [...s.locales, l.id] : s.locales.filter((x) => x !== l.id) })}
+                  data-locale={l.id}
                 />
-                {categoryLabel(c)}
+                {l.label}
               </label>
             ))}
           </div>
-        </details>
-      )}
-      <p className="muted small" id="wordsInReach">
-        {!file.concepts.some((c) => c.senses.length)
-          ? 'Tick a sense of a word above for words to draw on.'
-          : !explored
-            ? 'Looking… (the first time takes a few seconds)'
-            : 'error' in explored
-              ? explored.error
-              : `${inReach} of ${words.length} words in reach${explored.capped.length ? ' (some neighbourhoods were cut short: fewer links out?)' : ''}.`}
+        )}
+      </details>
+      <div className="field-row">
+        <NumberField
+          label="Letters, at least"
+          value={s.minLetters}
+          optional
+          onCommit={(x) => set({ minLetters: x && x > 0 ? Math.round(x) : undefined })}
+        />
+        <NumberField
+          label="at most"
+          value={s.maxLetters}
+          optional
+          onCommit={(x) => set({ maxLetters: x && x > 0 ? Math.round(x) : undefined })}
+        />
+        <Slider label="Made up" left="none" right="all" value={s.invented} onCommit={(invented) => set({ invented })} id="soundsInvented" />
+      </div>
+      <p className="muted small">
+        Made-up names follow the letter patterns of the names in play and of the ones you liked. Likeness is in the letters (pairs of
+        letters, how a name starts and ends, its vowels and consonants, its length), not in meaning.
       </p>
     </div>
   )
 }
 
-function Examples({ file, change }: { file: NamingFile; change: Change }): React.JSX.Element {
-  const shown = (file.examples ?? []).join(', ')
-  const [draft, setDraft] = useState(shown)
-  useEffect(() => setDraft(shown), [shown])
-  return (
-    <label className="field">
-      Names that sound right, for invented names (optional, comma-separated)
-      <input
-        id="namingExamples"
-        value={draft}
-        placeholder="Aldren, Corvane, Mirel…"
-        onChange={(e) => setDraft(e.target.value)}
-        onBlur={() => {
-          const list = draft
-            .split(/[,\n]/)
-            .map((x) => x.trim())
-            .filter(Boolean)
-          if (list.join(', ') === shown) return
-          change(
-            { examples: list.length ? list : undefined },
-            'examples',
-            list.length ? `Example names: ${list.join(', ')}.` : 'No example names.'
-          )
-        }}
-        onKeyDown={(e) => e.key === 'Enter' && (e.target as HTMLInputElement).blur()}
-      />
-    </label>
-  )
-}
+const RATE_BUTTONS: { rating: 'hate' | 'like' | 'love'; label: string; title: string }[] = [
+  { rating: 'hate', label: '✕ Hate', title: 'Fewer like this' },
+  { rating: 'like', label: '+ Like', title: 'More like this' },
+  { rating: 'love', label: '♥ Love', title: 'A real candidate: many more like this' }
+]
 
-const sourceTag = (s: string): string => (s === 'locked' ? 'locked' : (SOURCE_LABELS[s as NameSource]?.label.toLowerCase() ?? s))
-
-function Batch({ file, change, snapshot }: { file: NamingFile; change: Change; snapshot: WorldSnapshot }): React.JSX.Element {
+function Round({
+  file,
+  save,
+  snapshot,
+  notes,
+  setNotes
+}: {
+  file: NamingFile
+  save: Save
+  snapshot: WorldSnapshot
+  notes: Record<string, string>
+  setNotes(f: (n: Record<string, string>) => Record<string, string>): void
+}): React.JSX.Element {
   const round = file.rounds[file.rounds.length - 1] ?? null
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -535,124 +521,64 @@ function Batch({ file, change, snapshot }: { file: NamingFile; change: Change; s
 
   const next = async (): Promise<void> => {
     setError(null)
-    const locked = round?.locked ?? []
-    const liked = round ? [...new Set([...round.locked, ...round.liked])] : []
-    const earlier = [...new Set(file.rounds.slice(0, -1).flatMap((r) => [...r.locked, ...r.liked]))].filter((x) => !liked.includes(x))
-    const seed = Math.floor(Math.random() * 2 ** 31)
     setBusy(true)
-    const made = await window.malevo.names.batch({
-      count: Math.max(5, 10 - locked.length),
-      sources: file.sources,
-      seed,
-      concepts: file.concepts.filter((c) => c.senses.length).map((c) => ({ word: c.word, senses: c.senses.map((s) => s.id) })),
-      links: file.links.groups,
-      depth: file.links.depth,
-      defined: file.links.defined,
-      narrow: file.narrow,
-      examples: file.examples ?? [],
-      liked,
-      earlier,
-      exclude: file.rounds.flatMap((r) => r.names.map((x) => x.text))
+    const w = file.words
+    const made = await window.malevo.names.round({
+      mode: file.mode,
+      count: 10,
+      seed: Math.floor(Math.random() * 2 ** 31),
+      focus: file.focus,
+      words: { ...w, concepts: w.concepts.map((c) => ({ word: c.word, senses: c.senses.map((s) => s.id) })) },
+      sounds: file.sounds,
+      rated: file.rounds.flatMap((r) => r.names)
     })
     setBusy(false)
     if ('error' in made) return setError(made.error)
     if (!made.length)
       return setError(
-        'Nothing to draw from yet: tick a sense of a word (for words), write a few example names (for invented names), or like a couple of names (for pairs).'
+        file.mode === 'words'
+          ? 'No words pass these settings: loosen the filters, or tick a sense of a word you looked up.'
+          : 'No names pass these settings: pick a language, or allow more letters.'
       )
-    const carried = locked.map((text) => {
-      const prev = round?.names.find((x) => x.text === text)
-      return {
-        text,
-        source: 'locked' as const,
-        from: prev ? (prev.source === 'locked' ? prev.from : `${sourceTag(prev.source)}: ${prev.from}`) : ''
-      }
+    setNotes((n) => ({ ...n, ...Object.fromEntries(made.map((x) => [x.text, x.note])) }))
+    save({
+      ...file,
+      rounds: [...file.rounds, { at: now(), mode: file.mode, names: made.map((x) => ({ text: x.text, rating: 'neutral' as const })) }]
     })
-    const k = file.rounds.length + 1
-    change(
-      { rounds: [...file.rounds, { at: now(), seed, names: [...carried, ...made], liked: [], locked }] },
-      'batch',
-      `Batch ${k}: ${made.map((x) => x.text).join(', ')}.` +
-        (liked.length ? ` Drawn from ${liked.join(', ')}.` : '') +
-        (locked.length ? ` Locked: ${locked.join(', ')}.` : '')
-    )
+  }
+  const rate = (i: number, rating: NamingFile['rounds'][number]['names'][number]['rating']): void => {
+    const names = round!.names.map((x, j) => (j === i ? { ...x, rating } : x))
+    save({ ...file, rounds: [...file.rounds.slice(0, -1), { ...round!, names }] })
   }
 
-  const setRound = (patch: Partial<NamingFile['rounds'][number]>, step: NamingStep, text: string): void =>
-    change({ rounds: [...file.rounds.slice(0, -1), { ...round!, ...patch }] }, step, text)
-
   return (
-    <div className="naming-batch">
-      <h3>{round ? `Batch ${file.rounds.length}` : 'Names'}</h3>
-      {file.chosen && (
-        <div className="naming-chosen" id="namingChosen">
-          <span>
-            Chosen: <strong>{file.chosen}</strong>
-          </span>
-          <NoteField
-            value={file.note}
-            placeholder="why…"
-            onCommit={(note) => change({ note }, 'note', note ? `Note: ${note}` : 'Note removed.')}
-          />
-        </div>
-      )}
+    <div className="naming-round">
+      <h3>{round ? `Round ${file.rounds.length}` : 'Names'}</h3>
       {round && (
         <div className="batch" id="batch">
-          {round.names.map((x) => {
-            const liked = round.liked.includes(x.text)
-            const locked = round.locked.includes(x.text)
-            const chosen = file.chosen === x.text
+          {round.names.map((x, i) => {
             const used = inUse.get(x.text.toLowerCase())
             return (
-              <div
-                className={`name-card${liked ? ' liked' : ''}${locked ? ' locked' : ''}${chosen ? ' chosen' : ''}`}
-                key={x.text}
-                data-name={x.text}
-              >
+              <div className={`name-card ${x.rating}`} key={x.text} data-name={x.text}>
                 <div className="name-text">{x.text}</div>
-                <div className="muted small name-from" title={x.from}>
-                  {sourceTag(x.source)}: {x.from}
-                </div>
+                {notes[x.text] && (
+                  <div className="muted small name-note" title={notes[x.text]}>
+                    {notes[x.text]}
+                  </div>
+                )}
                 {used && <div className="warn small">also: {used.join(', ')}</div>}
                 <div className="card-actions">
-                  <button
-                    className={liked ? 'on' : ''}
-                    data-act="like"
-                    title="Draw the next batch from this"
-                    onClick={() =>
-                      setRound(
-                        { liked: liked ? round.liked.filter((t) => t !== x.text) : [...round.liked, x.text] },
-                        liked ? 'unlike' : 'like',
-                        `${liked ? 'Un-liked' : 'Liked'} “${x.text}”.`
-                      )
-                    }
-                  >
-                    ♥ Like
-                  </button>
-                  <button
-                    className={locked ? 'on' : ''}
-                    data-act="lock"
-                    title="Keep this in every batch from now on"
-                    onClick={() =>
-                      setRound(
-                        { locked: locked ? round.locked.filter((t) => t !== x.text) : [...round.locked, x.text] },
-                        locked ? 'unlock' : 'lock',
-                        `${locked ? 'Unlocked' : 'Locked'} “${x.text}”.`
-                      )
-                    }
-                  >
-                    🔒 Lock
-                  </button>
-                  <button
-                    className={chosen ? 'on' : ''}
-                    data-act="choose"
-                    title="This is the name"
-                    onClick={() =>
-                      change({ chosen: chosen ? undefined : x.text }, 'choose', chosen ? `Un-chose “${x.text}”.` : `Chose “${x.text}”.`)
-                    }
-                  >
-                    ✓ Choose
-                  </button>
+                  {RATE_BUTTONS.map((b) => (
+                    <button
+                      key={b.rating}
+                      className={`rate-${b.rating}${x.rating === b.rating ? ' on' : ''}`}
+                      title={b.title}
+                      data-rate={b.rating}
+                      onClick={() => rate(i, x.rating === b.rating ? 'neutral' : b.rating)}
+                    >
+                      {b.label}
+                    </button>
+                  ))}
                 </div>
               </div>
             )
@@ -660,13 +586,13 @@ function Batch({ file, change, snapshot }: { file: NamingFile; change: Change; s
         </div>
       )}
       <div className="field-row batch-row">
-        <button className="primary" onClick={() => void next()} disabled={busy || !file.sources.length} id="nextBatch">
+        <button className="primary" onClick={() => void next()} disabled={busy} id="nextRound">
           {busy ? 'Drawing…' : round ? 'Next ten' : 'First ten'}
         </button>
         <span className="muted small">
           {round
-            ? `${round.liked.length} liked, ${round.locked.length} locked: the next batch keeps the locked ones and draws on both.`
-            : 'Set up where names come from above, then draw the first ten.'}
+            ? 'Every rating so far tips the next ten: love pulls hardest, hate pushes away, unrated names do nothing.'
+            : 'Set up where names come from, then draw the first ten.'}
         </span>
       </div>
       {error && <p className="error small">{error}</p>}
@@ -674,69 +600,97 @@ function Batch({ file, change, snapshot }: { file: NamingFile; change: Change; s
   )
 }
 
-function Rounds({ file }: { file: NamingFile }): React.JSX.Element | null {
-  const earlier = file.rounds.slice(0, -1)
-  if (!earlier.length) return null
+function Settle({ file, save }: { file: NamingFile; save: Save }): React.JSX.Element {
+  const loved = file.rounds.flatMap((r) => r.names.filter((x) => x.rating === 'love').map((x) => x.text))
+  const [text, setText] = useState('')
   return (
-    <details className="naming-rounds" id="namingRounds">
-      <summary>Earlier batches ({earlier.length})</summary>
+    <div className="naming-settle" id="settle">
+      <h3>Settle on a name</h3>
+      {file.chosen ? (
+        <p id="namingChosen">
+          Settled on <strong>{file.chosen.text}</strong> <span className="muted small">{new Date(file.chosen.at).toLocaleString()}</span>{' '}
+          <button className="link" onClick={() => save({ ...file, chosen: undefined })}>
+            unsettle
+          </button>
+        </p>
+      ) : (
+        <>
+          {loved.length > 0 && (
+            <div className="loved">
+              <span className="muted small">Loved:</span>
+              {loved.map((t) => (
+                <button key={t} className="link" onClick={() => setText(t)}>
+                  {t}
+                </button>
+              ))}
+            </div>
+          )}
+          <form
+            className="field-row tight"
+            onSubmit={(e) => {
+              e.preventDefault()
+              if (text.trim()) save({ ...file, chosen: { text: text.trim(), at: now() } })
+              setText('')
+            }}
+          >
+            <input value={text} onChange={(e) => setText(e.target.value)} placeholder="Any name, from the rounds or not…" id="chosenText" />
+            <button type="submit" disabled={!text.trim()} id="settleName">
+              Settle on it
+            </button>
+          </form>
+        </>
+      )}
+    </div>
+  )
+}
+
+const MARK: Record<string, string> = { neutral: '', hate: ' ✕', like: ' +', love: ' ♥' }
+
+/** The transcript as plain text: each round with its ratings, and the name settled on. */
+function transcriptText(file: NamingFile): string {
+  const lines = [`# ${file.name}`, '']
+  file.rounds.forEach((r, i) => {
+    lines.push(
+      `Round ${i + 1} (${r.mode === 'words' ? 'words' : 'people’s names'}, ${r.at}): ${r.names.map((x) => x.text + MARK[x.rating]).join(', ')}`
+    )
+  })
+  lines.push('', file.chosen ? `Settled on: ${file.chosen.text} (${file.chosen.at})` : 'Not settled yet.', '', '✕ hate · + like · ♥ love')
+  return lines.join('\n')
+}
+
+function Transcript({ file }: { file: NamingFile }): React.JSX.Element | null {
+  if (!file.rounds.length) return null
+  return (
+    <details className="naming-transcript" id="namingTranscript">
+      <summary>
+        Transcript ({file.rounds.length} round{file.rounds.length === 1 ? '' : 's'})
+      </summary>
       <ol>
-        {earlier.map((r, i) => (
+        {file.rounds.map((r, i) => (
           <li key={i}>
             <span className="muted small">{new Date(r.at).toLocaleString()}</span>{' '}
             {r.names.map((x, j) => (
-              <span key={x.text} className={r.locked.includes(x.text) ? 'locked' : r.liked.includes(x.text) ? 'liked' : ''}>
+              <span key={x.text} className={`rated-${x.rating}`}>
                 {j ? ', ' : ''}
                 {x.text}
-                {r.locked.includes(x.text) ? ' 🔒' : r.liked.includes(x.text) ? ' ♥' : ''}
+                {MARK[x.rating]}
               </span>
             ))}
           </li>
         ))}
       </ol>
-    </details>
-  )
-}
-
-function NoteField({
-  value,
-  onCommit,
-  placeholder
-}: {
-  value: string | undefined
-  onCommit(v: string | undefined): void
-  placeholder?: string
-}): React.JSX.Element {
-  const [draft, setDraft] = useState(value ?? '')
-  useEffect(() => setDraft(value ?? ''), [value])
-  return (
-    <input
-      className="note"
-      value={draft}
-      placeholder={placeholder ?? 'note…'}
-      onChange={(e) => setDraft(e.target.value)}
-      onBlur={() => draft.trim() !== (value ?? '') && onCommit(draft.trim() || undefined)}
-      onKeyDown={(e) => e.key === 'Enter' && (e.target as HTMLInputElement).blur()}
-    />
-  )
-}
-
-function Record({ file }: { file: NamingFile }): React.JSX.Element {
-  return (
-    <details className="naming-record" id="namingRecord">
-      <summary>
-        The record: {file.log.length} step{file.log.length === 1 ? '' : 's'}
-        {file.log.length
-          ? `, ${new Date(file.log[0].at).toLocaleDateString()} – ${new Date(file.log[file.log.length - 1].at).toLocaleDateString()}`
-          : ''}
-      </summary>
-      <ol>
-        {file.log.map((l, i) => (
-          <li key={i}>
-            <span className="muted small">{new Date(l.at).toLocaleString()}</span> {l.text}
-          </li>
-        ))}
-      </ol>
+      <p>
+        {file.chosen ? (
+          <>
+            Settled on <strong>{file.chosen.text}</strong>.
+          </>
+        ) : (
+          <span className="muted">Not settled yet.</span>
+        )}
+      </p>
+      <button onClick={() => void navigator.clipboard.writeText(transcriptText(file))} id="copyTranscript">
+        Copy transcript
+      </button>
     </details>
   )
 }
@@ -744,6 +698,6 @@ function Record({ file }: { file: NamingFile }): React.JSX.Element {
 export const namesTool: ToolDefinition = {
   id: 'names',
   title: 'Names',
-  description: 'Brainstorm a name from related words, and keep a record of how you got there',
+  description: 'Rounds of ten names, tipped by your ratings; a transcript of how you got to one',
   View: NamesView
 }

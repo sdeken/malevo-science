@@ -36,7 +36,7 @@ import type {
   WorldResult,
   WorldSnapshot
 } from '../shared/types'
-import type { BatchName, BatchRequest, ExploreQuery, ExploreResult, Sense } from '@malevo/model'
+import type { ExploreQuery, ExploreResult, RoundName, RoundRequest, Sense } from '@malevo/model'
 
 type Unsubscribe = () => void
 
@@ -162,8 +162,11 @@ const api = {
     senses: (word: string): Promise<{ source: string; senses: Sense[] } | { error: string }> => ipcRenderer.invoke(IPC.namesSenses, word),
     /** Words reached from the chosen senses by the ticked links, alphabetically, each with how it was reached. */
     explore: (q: ExploreQuery): Promise<ExploreResult | { error: string }> => ipcRenderer.invoke(IPC.namesExplore, q),
-    /** New names for the next batch, drawn from what was liked (see packages/model/src/namegen.ts). */
-    batch: (q: BatchRequest): Promise<BatchName[] | { error: string }> => ipcRenderer.invoke(IPC.namesBatch, q)
+    /** The next round of names, tipped by the ratings so far (see packages/model/src/namegen.ts). */
+    round: (q: RoundRequest): Promise<RoundName[] | { error: string }> => ipcRenderer.invoke(IPC.namesRound, q),
+    /** The languages people's names can be drawn from. */
+    locales: (): Promise<{ source: string; locales: { id: string; label: string; given: number; family: number }[] } | { error: string }> =>
+      ipcRenderer.invoke(IPC.namesLocales)
   },
   prose: {
     /** A prose or character file's current text (unsaved changes included), or null. */

@@ -1,306 +1,350 @@
 /**
- * Batches of names for the Names tool, driven by what the person liked.
+ * Rounds of names for the Names tool, tipped by the person's ratings.
  *
- * Mechanical throughout: nothing judges a name. Three sources, each a plain
- * procedure the person can see in each name's "from":
+ * No judgement anywhere: the tool looks things up, measures likeness and draws
+ * at random. Ratings only change the odds. Each rated name pulls the draw
+ * toward names like it (love 3, like 1) or pushes it away (hate −2); neutral
+ * does nothing. The tool never writes, combines or proposes a name of its own
+ * making beyond what is described here, and it never picks.
  *
- * - words: words from the word list. The first batch draws from the
- *   neighbourhood of the senses the person ticked. Later batches draw mostly
- *   (70%) from the neighbourhood of words the person liked or locked: one link
- *   out along the ticked kinds of link.
- * - sounds: invented names. Letter-pair statistics (an order-2 Markov chain)
- *   of the liked names and the person's example names, and small changes to
- *   the liked names (a vowel or consonant swapped, two names spliced).
- * - pairs: two liked names together ("Iron Patience", "Patience of Stone").
+ * Two modes:
  *
- * The same request and seed give the same batch.
+ * - words: words from the word list (WordNet). The pool is the neighbourhood
+ *   of the senses the person ticked, or, with none ticked, every word that
+ *   passes their filters (part of speech, kind of thing, letters). Likeness is
+ *   closeness in the word list: the same sense, or one or two links apart.
+ *   Optionally sound counts as well.
+ * - sounds: real given and family names from the languages the person picks,
+ *   and made-up names from an order-2 letter chain over those names and the
+ *   ones the person liked. Likeness is in the letters: pairs of letters,
+ *   beginnings and endings, the pattern of vowels and consonants, length.
+ *
+ * Every draw is weighted exp(focus × score), so focus 0 ignores the ratings
+ * and higher focus stays closer to what was liked. The same request and seed
+ * give the same round.
  */
-import { mulberry32, weightedIndex, type Random } from '@malevo/core'
-import type { Lexicon, LinkGroup, WordHit } from './lexicon'
+import { mulberry32, type Random } from '@malevo/core'
+import { LEX_FILES, type Lexicon, type LinkGroup } from './lexicon'
 
-export const NAME_SOURCES = ['words', 'sounds', 'pairs'] as const
-export type NameSource = (typeof NAME_SOURCES)[number]
+export const RATINGS = ['neutral', 'hate', 'like', 'love'] as const
+export type Rating = (typeof RATINGS)[number]
+export const RATING_WEIGHT: Record<Rating, number> = { neutral: 0, hate: -2, like: 1, love: 3 }
 
-export interface BatchName {
-  text: string
-  source: NameSource
-  /** How it was made, in people's terms. */
-  from: string
+export type PartOfSpeech = 'n' | 'v' | 'a' | 'r'
+
+export interface NamePools {
+  source: string
+  locales: { id: string; label: string; given: { female: string[]; male: string[]; any: string[] }; family: string[] }[]
 }
 
-export interface BatchNarrow {
-  pos?: ('n' | 'v' | 'a' | 'r')[]
-  categories?: string[]
-  maxLetters?: number
-  singleWords?: boolean
-}
-
-export interface BatchRequest {
-  /** New names wanted. */
-  count: number
-  sources: NameSource[]
-  seed: number
+export interface WordsSettings {
   concepts: { word: string; senses: string[] }[]
   links: LinkGroup[]
   depth: number
+  /** Also senses whose definition uses a looked-up word. */
   defined: boolean
-  narrow: BatchNarrow
-  /** Names that sound right, written by the person: they seed the sounds. */
-  examples: string[]
-  /** Liked or locked in the batch just seen: they drive the next. */
-  liked: string[]
-  /** Liked in earlier batches: they count for less. */
-  earlier: string[]
-  /** Every name already shown, never shown again as new. */
-  exclude: string[]
+  pos: PartOfSpeech[]
+  categories: string[]
+  minLetters?: number
+  maxLetters?: number
+  singleWords: boolean
+  /** How much sound counts beside meaning, 0 to 1. */
+  sound: number
 }
 
-const VOWELS = 'aeiouy'
-const isVowel = (c: string): boolean => VOWELS.includes(c)
-const titleCase = (s: string): string => s.replace(/(^|[\s-])(\p{L})/gu, (_, a: string, b: string) => a + b.toUpperCase())
+export interface SoundsSettings {
+  locales: string[]
+  given: boolean
+  family: boolean
+  gender: 'any' | 'female' | 'male'
+  /** Share of each round that is made up, 0 to 1. */
+  invented: number
+  minLetters?: number
+  maxLetters?: number
+}
+
+export interface RoundRequest {
+  mode: 'words' | 'sounds'
+  count: number
+  seed: number
+  /** 0: ratings ignored, wander freely; 1: stay close to what was liked. */
+  focus: number
+  words: WordsSettings
+  sounds: SoundsSettings
+  /** Every name shown so far, with the person's rating. */
+  rated: { text: string; rating: Rating }[]
+}
+
+export interface RoundName {
+  text: string
+  /** What it is, for the person's information: a definition, "given name · German", "made up". Not stored. */
+  note: string
+}
+
 const key = (s: string): string => s.trim().toLowerCase()
-
-/** Passes the person's narrowing: part of speech, category, letters, single words. */
-export function passesNarrow(w: WordHit, n: BatchNarrow): boolean {
-  const pos = (p: string): string => (p === 's' ? 'a' : p)
-  if (n.pos?.length && !w.senses.some((s) => n.pos!.includes(pos(s.pos) as 'n'))) return false
-  if (n.categories?.length && !w.senses.some((s) => n.categories!.includes(s.category))) return false
-  if (n.maxLetters && w.word.replace(/[^\p{L}]/gu, '').length > n.maxLetters) return false
-  if (n.singleWords && /[\s-]/.test(w.word)) return false
-  return true
-}
-
-/** Draws up to n items by weight, without replacement. */
-function draw<T>(r: Random, items: { item: T; weight: number }[], n: number): T[] {
-  const pool = items.filter((i) => i.weight > 0)
-  const out: T[] = []
-  while (out.length < n && pool.length) {
-    const i = weightedIndex(
-      r,
-      pool.map((p) => p.weight)
-    )
-    out.push(pool[i].item)
-    pool.splice(i, 1)
-  }
-  return out
-}
-
-function wordNames(lx: Lexicon, q: BatchRequest, r: Random, n: number, taken: Set<string>): BatchName[] {
-  const fresh = (w: string): boolean => !taken.has(key(w))
-  // The neighbourhood of the ticked senses.
-  const active = q.concepts.filter((c) => c.senses.length)
-  const base = active.length
-    ? lx
-        .explore({ concepts: active, links: q.links, depth: q.depth, defined: q.defined })
-        .words.filter((w) => passesNarrow(w, q.narrow) && fresh(w.word))
-    : []
-  // The neighbourhood of liked words: one link out from every sense of each that the word list knows as it is spelled.
-  const near = new Map<string, { word: string; weight: number; from: string }>()
-  const around = (liked: string[], weight: number): void => {
-    for (const word of liked) {
-      const senses = lx
-        .senses(word)
-        .filter((s) => s.words.some((w) => key(w) === key(word)))
-        .map((s) => s.id)
-      if (!senses.length) continue
-      const hits = lx.explore({ concepts: [{ word: titleCase(word), senses }], links: q.links, depth: 1, defined: false }).words
-      for (const h of hits) {
-        if (!passesNarrow(h, q.narrow) || !fresh(h.word)) continue
-        const k = key(h.word)
-        const prev = near.get(k)
-        if (prev) prev.weight += weight
-        else near.set(k, { word: h.word, weight, from: h.reached[0]?.path ?? word })
-      }
-    }
-  }
-  around(q.liked, 3)
-  around(q.earlier, 1)
-  const nNear = near.size ? Math.min(near.size, base.length ? Math.round(n * 0.7) : n) : 0
-  const fromNear = draw(
-    r,
-    [...near.values()].map((v) => ({ item: v, weight: v.weight })),
-    nNear
-  )
-  const used = new Set(fromNear.map((v) => key(v.word)))
-  const fromBase = draw(
-    r,
-    base.filter((w) => !used.has(key(w.word))).map((w) => ({ item: w, weight: 1 })),
-    n - fromNear.length
-  )
-  return [
-    ...fromNear.map((v) => ({ text: titleCase(v.word), source: 'words' as const, from: `near what you liked: ${v.from}` })),
-    ...fromBase.map((w) => ({ text: titleCase(w.word), source: 'words' as const, from: w.reached[0]?.path ?? w.word }))
-  ]
-}
-
-/** Letters only, lower case: the material sounds are built from. */
-const letters = (s: string): string =>
+const fold = (s: string): string =>
   s
     .toLowerCase()
     .normalize('NFD')
     .replace(/[̀-ͯ]/g, '')
     .replace(/[^a-z]/g, '')
+const titleCase = (s: string): string => s.replace(/(^|[\s-])(\p{L})/gu, (_, a: string, b: string) => a + b.toUpperCase())
+const lettersIn = (s: string): number => s.replace(/[^\p{L}]/gu, '').length
+const isVowel = (c: string): boolean => 'aeiouy'.includes(c)
 
-function soundNames(lx: Lexicon | null, q: BatchRequest, r: Random, n: number, taken: Set<string>): BatchName[] {
-  const training: { text: string; weight: number }[] = []
-  for (const s of q.liked) for (const w of s.split(/\s+/)) training.push({ text: letters(w), weight: 3 })
-  for (const s of q.earlier) for (const w of s.split(/\s+/)) training.push({ text: letters(w), weight: 1 })
-  for (const s of q.examples) for (const w of s.split(/\s+/)) training.push({ text: letters(w), weight: 2 })
-  const own = training.filter((t) => t.text.length >= 3)
-  const known = new Set(own.map((t) => t.text))
-  const parents = own.length ? own : []
-  // With too little to go on, the word list's own words fill in the letter statistics (lightly).
-  const stats = [...own]
-  if (own.length < 4 && lx) {
-    const words = lx.data.words
-    for (let i = 0; i < 400; i++) {
-      const w = words[Math.floor(r() * words.length)][0]
-      if (/^[a-z]{4,9}$/.test(w)) stats.push({ text: w, weight: 0.3 })
-    }
+// ---- likeness of sound ----
+
+/** A name's sound, as letter features: pairs of letters (with its edges), how it begins and ends, its vowel pattern, its length. */
+export function soundFeatures(name: string): Map<string, number> {
+  const f = new Map<string, number>()
+  const add = (k: string, v: number): void => void f.set(k, (f.get(k) ?? 0) + v)
+  for (const word of name.split(/[\s-]+/)) {
+    const w = fold(word)
+    if (!w) continue
+    const s = `^${w}$`
+    for (let i = 0; i + 1 < s.length; i++) add(`b:${s.slice(i, i + 2)}`, 1)
+    add(`start:${w.slice(0, 2)}`, 1.5)
+    add(`end:${w.slice(-2)}`, 1.5)
+    const shape = [...w].map((c) => (isVowel(c) ? 'V' : 'C')).join('')
+    add(`shape:${shape.replace(/(.)\1+/g, '$1$1')}`, 1)
+    add(`len:${Math.min(12, w.length)}`, 1)
+    add(`len:${Math.min(12, w.length + 1)}`, 0.5)
+    add(`len:${Math.max(1, w.length - 1)}`, 0.5)
   }
-  if (!stats.length) return []
-  // Order-2 letter chain: two letters of context, "^" pads the start, "$" ends.
-  const chain = new Map<string, Map<string, number>>()
-  for (const { text, weight } of stats) {
-    const s = `^^${text}$`
-    for (let i = 2; i < s.length; i++) {
-      const ctx = s.slice(i - 2, i)
-      const m = chain.get(ctx) ?? new Map<string, number>()
-      m.set(s[i], (m.get(s[i]) ?? 0) + weight)
-      chain.set(ctx, m)
-    }
-  }
-  const walk = (): string | null => {
-    let ctx = '^^'
-    let out = ''
-    while (out.length < 12) {
-      const m = chain.get(ctx)
-      if (!m) return null
-      const keys = [...m.keys()]
-      const c = keys[weightedIndex(r, [...m.values()])]
-      if (c === '$') break
-      out += c
-      ctx = ctx[1] + c
-    }
-    return out.length >= 3 && out.length <= 11 ? out : null
-  }
-  const consonants = [...new Set((own.length ? own : stats).flatMap((t) => [...t.text].filter((c) => !isVowel(c))))]
-  const mutate = (): { text: string; from: string } | null => {
-    if (!parents.length) return null
-    const a =
-      parents[
-        weightedIndex(
-          r,
-          parents.map((p) => p.weight)
-        )
-      ].text
-    const op = r()
-    if (op < 0.4 && parents.length > 1) {
-      const others = parents.filter((p) => p.text !== a)
-      if (!others.length) return null
-      const b = others[Math.floor(r() * others.length)].text
-      // Cut each after a vowel, keep the head of one and the tail of the other.
-      const cuts = (s: string): number[] =>
-        [...s].map((c, i) => (isVowel(c) && i > 0 && i < s.length - 1 ? i + 1 : -1)).filter((i) => i > 0)
-      const ca = cuts(a)
-      const cb = cuts(b)
-      if (!ca.length || !cb.length) return null
-      const head = a.slice(0, ca[Math.floor(r() * ca.length)])
-      const tail = b.slice(cb[Math.floor(r() * cb.length)] - 1)
-      return {
-        text: head + tail.slice(isVowel(head[head.length - 1]) && isVowel(tail[0]) ? 1 : 0),
-        from: `${titleCase(a)} × ${titleCase(b)}`
-      }
-    }
-    const idx = [...a].map((_, i) => i)
-    const vowelAt = idx.filter((i) => isVowel(a[i]))
-    const consAt = idx.filter((i) => !isVowel(a[i]))
-    if (op < 0.7 && vowelAt.length) {
-      const i = vowelAt[Math.floor(r() * vowelAt.length)]
-      const v = VOWELS.replace(a[i], '')[Math.floor(r() * (VOWELS.length - 1))]
-      return { text: a.slice(0, i) + v + a.slice(i + 1), from: `${titleCase(a)}, a vowel changed` }
-    }
-    if (consAt.length && consonants.length > 1) {
-      const i = consAt[Math.floor(r() * consAt.length)]
-      const others = consonants.filter((c) => c !== a[i])
-      const c = others[Math.floor(r() * others.length)]
-      return { text: a.slice(0, i) + c + a.slice(i + 1), from: `${titleCase(a)}, a consonant changed` }
-    }
-    return null
-  }
-  const sample = own
-    .slice()
-    .sort((x, y) => y.weight - x.weight)
-    .slice(0, 3)
-    .map((t) => titleCase(t.text))
-  const chainFrom = sample.length ? `the letter patterns of ${sample.join(', ')}` : 'the letter patterns of the word list'
-  const out: BatchName[] = []
-  const seen = new Set<string>()
-  for (let tries = 0; out.length < n && tries < n * 60; tries++) {
-    const m = parents.length && r() < 0.5 ? mutate() : null
-    const made = m ?? ((t) => (t ? { text: t, from: chainFrom } : null))(walk())
-    if (!made || made.text.length < 3) continue
-    if (known.has(made.text) || seen.has(made.text) || taken.has(made.text)) continue
-    seen.add(made.text)
-    out.push({ text: titleCase(made.text), source: 'sounds', from: made.from })
-  }
-  return out
+  return f
 }
 
-function pairNames(q: BatchRequest, r: Random, n: number, taken: Set<string>): BatchName[] {
-  const pool = [...q.liked.map((t) => ({ item: t, weight: 3 })), ...q.earlier.map((t) => ({ item: t, weight: 1 }))]
-  const distinct = new Map(pool.map((p) => [key(p.item), p]))
-  const items = [...distinct.values()]
-  if (items.length < 2) return []
-  const out: BatchName[] = []
-  const used = new Set<string>()
-  for (let tries = 0; out.length < n && tries < n * 30; tries++) {
-    const [a, b] = draw(r, items, 2)
-    const pattern = r()
-    const text = pattern < 0.6 ? `${a} ${b}` : pattern < 0.85 ? `${a} of ${b}` : `The ${a} ${b}`
-    const t = titleCase(text.replace(/\bOf\b/, 'of'))
-      .replace(/ Of /g, ' of ')
-      .trim()
-    // One name per two liked names, whichever way round: no batch of the same pair in three patterns.
-    const pairKey = [key(a), key(b)].sort().join('|')
-    if (taken.has(key(t)) || used.has(pairKey)) continue
-    used.add(pairKey)
-    out.push({ text: t, source: 'pairs', from: `${a} + ${b}` })
+/** Cosine likeness of two feature sets, 0 to 1. */
+export function soundLikeness(a: Map<string, number>, b: Map<string, number>): number {
+  let dot = 0
+  let na = 0
+  let nb = 0
+  for (const [k, v] of a) {
+    na += v * v
+    const w = b.get(k)
+    if (w) dot += v * w
   }
-  return out
+  for (const v of b.values()) nb += v * v
+  return na && nb ? dot / Math.sqrt(na * nb) : 0
 }
+
+// ---- drawing ----
 
 /**
- * The next batch of new names, shared out between the chosen sources in turn.
- * A source with nothing to go on (pairs with fewer than two liked names, words
- * without senses or a word list) gives its share to the others.
+ * Draws n distinct items, each with odds exp(k × score). k grows with the log of the pool's size, so the
+ * same lean tips a pool of fifty and a pool of fifty thousand alike: at full lean, a score of 1 outweighs
+ * the whole rest of the pool.
  */
-export function nextBatch(lx: Lexicon | null, q: BatchRequest): BatchName[] {
-  const r = mulberry32(q.seed)
-  const taken = new Set([...q.exclude, ...q.liked, ...q.earlier].map(key))
-  const want = Math.max(0, Math.round(q.count))
-  const sources = NAME_SOURCES.filter((s) => q.sources.includes(s))
-  const make = (s: NameSource, n: number): BatchName[] =>
-    s === 'words' ? (lx ? wordNames(lx, q, r, n, taken) : []) : s === 'sounds' ? soundNames(lx, q, r, n, taken) : pairNames(q, r, n, taken)
-  const out: BatchName[] = []
-  // First a fair share each; then whatever is short, from whichever sources still have names.
-  let remaining = sources.slice()
-  while (out.length < want && remaining.length) {
-    const share = Math.ceil((want - out.length) / remaining.length)
-    const next: NameSource[] = []
-    for (const s of remaining) {
-      const got = make(s, Math.min(share, want - out.length)).filter((b) => !taken.has(key(b.text)))
-      for (const b of got) taken.add(key(b.text))
-      out.push(...got)
-      if (got.length >= share) next.push(s)
-      if (out.length >= want) break
+function drawScored<T>(r: Random, items: { item: T; score: number }[], n: number, focus: number): T[] {
+  const k = Math.max(0, focus) * 1.5 * Math.log(Math.max(10, items.length))
+  const pool = items.map((x) => ({ item: x.item, w: Math.exp(k * x.score) }))
+  let total = pool.reduce((a, x) => a + x.w, 0)
+  const out: T[] = []
+  while (out.length < n && pool.length && total > 0) {
+    let t = r() * total
+    let i = 0
+    for (; i < pool.length - 1; i++) {
+      t -= pool[i].w
+      if (t <= 0) break
     }
-    if (next.length === remaining.length && out.length < want) continue
-    remaining = next
+    out.push(pool[i].item)
+    total -= pool[i].w
+    pool.splice(i, 1)
   }
-  // Interleave the sources, so a batch does not read as blocks.
-  const by = sources.map((s) => out.filter((b) => b.source === s))
-  const mixed: BatchName[] = []
-  for (let i = 0; mixed.length < out.length; i++) for (const list of by) if (list[i]) mixed.push(list[i])
-  return mixed.slice(0, want)
+  return out
+}
+
+function sample<T>(r: Random, items: T[], n: number): T[] {
+  if (items.length <= n) return items
+  const a = items.slice()
+  for (let i = 0; i < n; i++) {
+    const j = i + Math.floor(r() * (a.length - i))
+    ;[a[i], a[j]] = [a[j], a[i]]
+  }
+  return a.slice(0, n)
+}
+
+/** Ratings that count, with their weights, normalised so scores fall roughly in −1…1. */
+function weights(q: RoundRequest): { text: string; w: number }[] {
+  const rated = q.rated.filter((x) => RATING_WEIGHT[x.rating] !== 0).map((x) => ({ text: x.text, w: RATING_WEIGHT[x.rating] }))
+  const sum = rated.reduce((a, x) => a + Math.abs(x.w), 0)
+  return sum ? rated.map((x) => ({ text: x.text, w: (x.w / sum) * Math.min(3, rated.length) })) : []
+}
+
+function soundScorer(q: RoundRequest): (text: string) => number {
+  const rated = weights(q).map((x) => ({ f: soundFeatures(x.text), w: x.w }))
+  return (text) => {
+    if (!rated.length) return 0
+    const f = soundFeatures(text)
+    return rated.reduce((a, x) => a + x.w * soundLikeness(f, x.f), 0)
+  }
+}
+
+// ---- words ----
+
+function wordsRound(lx: Lexicon, q: RoundRequest, r: Random, shown: Set<string>): RoundName[] {
+  const s = q.words
+  const pos = (i: number): PartOfSpeech => (lx.data.pos[i] === 's' ? 'a' : (lx.data.pos[i] as PartOfSpeech))
+  const synsetOk = (i: number): boolean =>
+    (!s.pos.length || s.pos.includes(pos(i))) && (!s.categories.length || s.categories.includes(LEX_FILES[lx.data.lex[i]]))
+  const wordOk = (w: string): boolean =>
+    !shown.has(key(w)) &&
+    (!s.singleWords || !/[\s-]/.test(w)) &&
+    (!s.maxLetters || lettersIn(w) <= s.maxLetters) &&
+    (!s.minLetters || lettersIn(w) >= s.minLetters)
+  // word key -> its synsets that pass
+  const pool = new Map<string, { word: string; synsets: number[] }>()
+  const addSynset = (i: number): void => {
+    if (!synsetOk(i)) return
+    for (const w of lx.data.words[i]) {
+      if (!wordOk(w)) continue
+      const k = key(w)
+      const e = pool.get(k)
+      if (e) e.synsets.push(i)
+      else pool.set(k, { word: w, synsets: [i] })
+    }
+  }
+  const starts = s.concepts.flatMap((c) => c.senses.map((id) => lx.indexOf(id)).filter((i): i is number => i !== undefined))
+  if (starts.length) {
+    for (const i of lx.neighbourhood(starts, s.links, s.depth).keys()) addSynset(i)
+    if (s.defined)
+      for (const c of s.concepts) {
+        const own = c.senses.map((id) => lx.indexOf(id)).filter((i): i is number => i !== undefined)
+        if (own.length) for (const i of lx.definedUsing(c.word, own)) addSynset(i)
+      }
+  } else {
+    // No senses ticked: every word passing the filters, sampled so a round stays quick.
+    const all: number[] = []
+    for (let i = 0; i < lx.size; i++) if (synsetOk(i)) all.push(i)
+    for (const i of sample(r, all, 6000)) addSynset(i)
+  }
+  // Rated words pull in (or push away) their own neighbourhoods: closeness 1 for the same sense, 0.8 one link out,
+  // 0.6 two, times the rating's weight over 3 (love 1, like ⅓, hate −⅔).
+  // Broader and narrower always count as near, so a loved fish brings its sibling fish (up one, down one).
+  const nearLinks = [...new Set<LinkGroup>([...s.links, 'similar', 'derived', 'broader', 'narrower'])]
+  const near = new Map<number, number>()
+  for (const x of q.rated) {
+    const w = RATING_WEIGHT[x.rating] / 3
+    const synsets = w ? lx.synsetsOf(x.text) : []
+    if (!synsets.length) continue
+    for (const [i, steps] of lx.neighbourhood(synsets, nearLinks, 2)) {
+      near.set(i, (near.get(i) ?? 0) + w * (1 - 0.2 * steps))
+      if (w > 0) addSynset(i)
+    }
+  }
+  const bySound = s.sound > 0 ? soundScorer(q) : null
+  const items = [...pool.values()].map((e) => {
+    const meaning = Math.max(
+      -1.5,
+      Math.min(
+        1.5,
+        e.synsets.reduce((m, i) => (Math.abs(near.get(i) ?? 0) > Math.abs(m) ? (near.get(i) ?? 0) : m), 0)
+      )
+    )
+    const score = (1 - s.sound) * meaning + (bySound ? s.sound * bySound(e.word) : 0)
+    return { item: e, score }
+  })
+  return drawScored(r, items, q.count, q.focus).map((e) => {
+    const i = e.synsets[0]
+    const gloss = lx.data.gloss[i].split(/;\s*"/)[0]
+    const category = LEX_FILES[lx.data.lex[i]].split('.')
+    return { text: titleCase(e.word), note: `${category[1] === 'all' ? category[0] : `${category[1]} (${category[0]})`}: ${gloss}` }
+  })
+}
+
+// ---- sounds ----
+
+function soundsRound(names: NamePools | null, lx: Lexicon | null, q: RoundRequest, r: Random, shown: Set<string>): RoundName[] {
+  const s = q.sounds
+  const fits = (t: string): boolean =>
+    !shown.has(key(t)) && (!s.maxLetters || lettersIn(t) <= s.maxLetters) && (!s.minLetters || lettersIn(t) >= s.minLetters)
+  const real = new Map<string, { text: string; note: string }>()
+  for (const l of names?.locales ?? []) {
+    if (!s.locales.includes(l.id)) continue
+    if (s.given)
+      for (const t of l.given[s.gender]) if (fits(t) && !real.has(key(t))) real.set(key(t), { text: t, note: `given name · ${l.label}` })
+    if (s.family)
+      for (const t of l.family) if (fits(t) && !real.has(key(t))) real.set(key(t), { text: t, note: `family name · ${l.label}` })
+  }
+  const score = soundScorer(q)
+  const nInvented = real.size ? Math.round(q.count * Math.max(0, Math.min(1, s.invented))) : q.count
+
+  // Made-up names: an order-2 letter chain over the real names in play and the names the person liked.
+  const training: { text: string; w: number }[] = [...real.values()].map((x) => ({ text: fold(x.text), w: 1 }))
+  for (const x of q.rated)
+    if (x.rating === 'like' || x.rating === 'love') training.push({ text: fold(x.text), w: x.rating === 'love' ? 12 : 4 })
+  if (training.length < 20 && lx)
+    for (let i = 0; i < 400; i++) {
+      const w = lx.data.words[Math.floor(r() * lx.size)][0]
+      if (/^[a-z]{4,9}$/.test(w)) training.push({ text: w, w: 0.3 })
+    }
+  const invented: string[] = []
+  if (nInvented && training.length) {
+    const chain = new Map<string, Map<string, number>>()
+    for (const { text, w } of training) {
+      const t = `^^${text}$`
+      for (let i = 2; i < t.length; i++) {
+        const ctx = t.slice(i - 2, i)
+        const m = chain.get(ctx) ?? new Map<string, number>()
+        m.set(t[i], (m.get(t[i]) ?? 0) + w)
+        chain.set(ctx, m)
+      }
+    }
+    const known = new Set(training.map((t) => t.text))
+    const walk = (): string | null => {
+      let ctx = '^^'
+      let out = ''
+      while (out.length < 12) {
+        const m = chain.get(ctx)
+        if (!m) return null
+        let t = r() * [...m.values()].reduce((a, x) => a + x, 0)
+        let c = '$'
+        for (const [k, v] of m) {
+          t -= v
+          if (t <= 0) {
+            c = k
+            break
+          }
+        }
+        if (c === '$') break
+        out += c
+        ctx = ctx[1] + c
+      }
+      return out.length >= 3 ? out : null
+    }
+    const seen = new Set<string>()
+    for (let i = 0; i < 400 && seen.size < 200; i++) {
+      const w = walk()
+      if (!w || known.has(w) || seen.has(w)) continue
+      const t = titleCase(w)
+      if (!fits(t) || (!s.maxLetters && w.length > 10)) continue
+      seen.add(w)
+      invented.push(t)
+    }
+  }
+  const fromInvented = drawScored(
+    r,
+    invented.map((t) => ({ item: t, score: score(t) })),
+    nInvented,
+    q.focus
+  ).map((t) => ({ text: t, note: 'made up' }))
+  const realItems = sample(r, [...real.values()], 8000).map((x) => ({ item: x, score: score(x.text) }))
+  const fromReal = drawScored(r, realItems, q.count - fromInvented.length, q.focus)
+  // Mixed, so made-up names do not sit in a block.
+  const out: RoundName[] = []
+  const a = [...fromReal]
+  const b = [...fromInvented]
+  while (a.length || b.length) {
+    if (a.length && (!b.length || r() < a.length / (a.length + b.length))) out.push(a.shift()!)
+    else out.push(b.shift()!)
+  }
+  return out
+}
+
+/** The next round: up to `count` names never shown before, drawn as described above. */
+export function nextRound(lx: Lexicon | null, names: NamePools | null, q: RoundRequest): RoundName[] {
+  const r = mulberry32(q.seed >>> 0)
+  const shown = new Set(q.rated.map((x) => key(x.text)))
+  if (q.mode === 'words') return lx ? wordsRound(lx, q, r, shown) : []
+  return soundsRound(names, lx, q, r, shown)
 }

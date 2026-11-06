@@ -259,8 +259,20 @@ export class Lexicon {
   private readonly byLemma = new Map<string, number[]>()
   private readonly byId = new Map<string, number>()
   private glossIndex: Map<string, number[]> | null = null
+  /** Links WordNet keeps one way only, turned round: "pertains to" (an adverb to its adjective), found from the adjective. */
+  private readonly reverse = new Map<number, number[]>()
 
   constructor(readonly data: PackedLexicon) {
+    const pertains = LINK_INDEX.get('\\')!
+    for (let i = 0; i < data.links.length; i++) {
+      const l = data.links[i]
+      for (let k = 0; k < l.length; k += 2) {
+        if (l[k] !== pertains) continue
+        const list = this.reverse.get(l[k + 1]) ?? []
+        list.push(pertains, i)
+        this.reverse.set(l[k + 1], list)
+      }
+    }
     for (let i = 0; i < data.words.length; i++) {
       this.byId.set(this.idOf(i), i)
       for (const w of data.words[i]) {
@@ -270,6 +282,57 @@ export class Lexicon {
         else this.byLemma.set(key, [i])
       }
     }
+  }
+
+  /** A synset's links, as flat [link, target] pairs, including the turned-round ones. */
+  linksOf(i: number): number[] {
+    const extra = this.reverse.get(i)
+    return extra ? [...this.data.links[i], ...extra] : this.data.links[i]
+  }
+
+  get size(): number {
+    return this.data.words.length
+  }
+
+  /** Synsets holding exactly this word (no base forms). */
+  synsetsOf(word: string): number[] {
+    return this.byLemma.get(word.trim().toLowerCase()) ?? []
+  }
+
+  /** Synset index for a sense id, if the lexicon has it. */
+  indexOf(id: string): number | undefined {
+    return this.byId.get(id)
+  }
+
+  /** Synsets reachable from these within `depth` links of the given kinds, with the links walked to each. */
+  neighbourhood(start: number[], groups: readonly LinkGroup[], depth: number, cap = CAP): Map<number, number> {
+    const allowed = new Set(groups.flatMap((g) => LINK_GROUPS[g] ?? []).map((s) => LINK_INDEX.get(s)!))
+    const steps = new Map<number, number>()
+    for (const s of start) steps.set(s, 0)
+    let frontier = start
+    for (let step = 1; step <= depth && frontier.length && steps.size <= cap; step++) {
+      const next: number[] = []
+      for (const s of frontier) {
+        const links = this.linksOf(s)
+        for (let k = 0; k < links.length; k += 2) {
+          if (!allowed.has(links[k]) || steps.has(links[k + 1])) continue
+          steps.set(links[k + 1], step)
+          next.push(links[k + 1])
+        }
+      }
+      frontier = next
+    }
+    return steps
+  }
+
+  /**
+   * Synsets whose definition uses a looked-up word (or its base form) as it appears in the senses it was
+   * looked up for: "sloth: slow-moving arboreal mammals" for "slow".
+   */
+  definedUsing(word: string, start: number[]): number[] {
+    const inSenses = new Set(start.flatMap((s) => this.data.words[s].map((w) => w.toLowerCase())))
+    const forms = [word.toLowerCase(), ...this.lemmas(word).map((l) => l.lemma)].filter((w) => w && !w.includes(' ') && inSenses.has(w))
+    return [...new Set(forms.flatMap((f) => this.glossHits(f)))]
   }
 
   get source(): string {
@@ -372,7 +435,7 @@ export class Lexicon {
       for (let step = 1; step <= depth && frontier.length; step++) {
         const next: number[] = []
         for (const s of frontier) {
-          const links = this.data.links[s]
+          const links = this.linksOf(s)
           for (let k = 0; k < links.length; k += 2) {
             if (!allowed.has(links[k])) continue
             const t = links[k + 1]

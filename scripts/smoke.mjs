@@ -822,46 +822,42 @@ try {
   await page.screenshot({ path: path.join(shots, '21-trip.png') })
   await page.evaluate(() => window.malevo.world.discard())
 
-  // Names: ten at a time; like and lock, and the next ten keep the locked ones; every step is recorded.
+  // Names: rounds of ten, rated; ratings tip the next round; the file keeps only the transcript and the settled name.
   await tool('Names')
   await page.locator('#newNamingName').fill('The slow freighter')
   await page.locator('#newNaming').click()
   await page.waitForSelector('#naming')
-  await page.locator('#conceptWord').fill('lumbering')
-  await page.locator('#addConcept').click()
-  await page.waitForSelector('[data-concept="lumbering"] .senses input')
-  await page.locator('[data-concept="lumbering"] .senses label', { hasText: 'ponderous' }).locator('input').check()
-  await page.waitForFunction(() => /words in reach/.test(document.querySelector('#wordsInReach')?.textContent ?? ''), null, {
-    timeout: 30_000
-  })
-  await page.locator('#namingExamples').fill('Aldren, Corvane, Mirel')
-  await page.locator('#namingExamples').press('Enter')
-  await page.locator('#nextBatch').click()
+  await page.locator('#nextRound').click()
   await page.waitForFunction(() => document.querySelectorAll('#batch .name-card').length === 10, null, { timeout: 30_000 })
-  check(true, 'the first batch has ten names')
+  check(true, 'the first round of words has ten names')
   const first = await page.locator('#batch .name-card').evaluateAll((els) => els.map((e) => e.getAttribute('data-name')))
-  await page.locator(`#batch [data-name="${first[0]}"] [data-act="like"]`).click()
-  await page.waitForSelector(`#batch [data-name="${first[0]}"].liked`)
-  await page.locator(`#batch [data-name="${first[1]}"] [data-act="lock"]`).click()
-  await page.waitForSelector(`#batch [data-name="${first[1]}"].locked`)
-  await page.locator('#nextBatch').click()
-  await page.waitForFunction(() => document.querySelector('.naming-batch h3')?.textContent === 'Batch 2', null, { timeout: 30_000 })
+  await page.locator(`#batch [data-name="${first[0]}"] [data-rate="love"]`).click()
+  await page.waitForSelector(`#batch [data-name="${first[0]}"].love`)
+  await page.locator(`#batch [data-name="${first[1]}"] [data-rate="hate"]`).click()
+  await page.waitForSelector(`#batch [data-name="${first[1]}"].hate`)
+  await page.locator('#nextRound').click()
+  await page.waitForFunction(() => document.querySelector('.naming-round h3')?.textContent === 'Round 2', null, { timeout: 30_000 })
   const second = await page.locator('#batch .name-card').evaluateAll((els) => els.map((e) => e.getAttribute('data-name')))
+  check(second.length === 10 && !second.some((x) => first.includes(x)), 'the next round is ten new names')
+  await page.locator('#namingMode').selectOption('sounds')
+  await page.locator('#nextRound').click()
+  await page.waitForFunction(() => document.querySelector('.naming-round h3')?.textContent === 'Round 3', null, { timeout: 30_000 })
   check(
-    second.length === 10 && second[0] === first[1] && !second.slice(1).some((x) => first.includes(x)),
-    `the next batch keeps the locked name and the rest are new (${second.join(', ')})`
+    /given name|made up/.test((await page.locator('#batch').textContent()) ?? ''),
+    'people’s names come from name lists and made-up names'
   )
-  await page.locator(`#batch [data-name="${first[1]}"] [data-act="choose"]`).click()
+  await page.locator('#chosenText').fill('Something else entirely')
+  await page.locator('#settleName').click()
   await page.waitForSelector('#namingChosen')
-  const record = await page.evaluate(async () => {
-    const snap = await window.malevo.world.snapshot()
-    return snap.namings[0]?.value?.log?.map((l) => l.step)
-  })
+  const naming = await page.evaluate(async () => (await window.malevo.world.snapshot()).namings[0]?.value)
   check(
-    JSON.stringify(record) === JSON.stringify(['brief', 'look-up', 'sense', 'examples', 'batch', 'like', 'lock', 'batch', 'choose']),
-    `the naming records each step (${JSON.stringify(record)})`
+    naming?.rounds?.length === 3 &&
+      naming.rounds[0].names.filter((x) => x.rating !== 'neutral').length === 2 &&
+      naming.chosen?.text === 'Something else entirely' &&
+      !('log' in naming),
+    'the naming keeps each round with its ratings and the name settled on, and nothing else'
   )
-  await page.locator('#namingRecord summary').click()
+  await page.locator('#namingTranscript summary').click()
   await page.screenshot({ path: path.join(shots, '22-names.png') })
   await page.evaluate(() => window.malevo.world.discard())
 

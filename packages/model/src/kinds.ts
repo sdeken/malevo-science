@@ -955,94 +955,87 @@ export const historySettingsKind: KindDef<HistorySettings> = {
 
 // ---- naming ----
 
-/** What a naming record logs: one entry per thing the person did, in their order. */
-export const NAMING_STEPS = [
-  'brief',
-  'look-up',
-  'sense',
-  'unsense',
-  'remove-word',
-  'links',
-  'narrow',
-  'examples',
-  'sources',
-  'batch',
-  'like',
-  'unlike',
-  'lock',
-  'unlock',
-  'choose',
-  'note'
-] as const
-export type NamingStep = (typeof NAMING_STEPS)[number]
-
 const LINK_GROUP_IDS = ['similar', 'derived', 'broader', 'narrower', 'parts', 'topic', 'opposite', 'cause'] as const
-const NAME_SOURCE_IDS = ['words', 'sounds', 'pairs'] as const
+const POS_IDS = ['n', 'v', 'a', 'r'] as const
+export const NAMING_RATINGS = ['neutral', 'hate', 'like', 'love'] as const
+const LETTERS = (): Schema<number | undefined, true> => opt(num({ integer: true, min: 1, max: 100 }))
 
 /**
- * A brainstorm for a name, in batches of ten: the person likes some, locks
- * the ones they really like, and the next batch is drawn from those. The
- * tool never judges a name; every batch, like and lock is kept, with the
- * time, so the record shows how the name was reached.
+ * A naming session: the settings it draws with, and the transcript, which is
+ * every round of names the tool showed with the person's rating of each, and
+ * the name they settled on (one of those, or anything else).
  */
 export const namingSchema = obj({
-  /** What is being named, in the person's words: "The slow freighter". */
+  /** What is being named, in the person's words. */
   name: name(),
-  /** What the name should carry, in the person's words. */
-  brief: opt(str({ max: 4000 })),
-  /** The word list the senses come from: "WordNet 3.1". */
-  lexicon: opt(str({ max: 80 })),
-  /** Where new names come from: the word list, invented sounds, liked names paired. */
-  sources: arr(oneOf(NAME_SOURCE_IDS)),
-  /** Names that sound right, written by the person: they seed the invented sounds. */
-  examples: opt(arr(str({ min: 1, max: 80 }))),
-  /** Words looked up, and the senses the person meant (copied in full, so the record reads without the app). */
-  concepts: arr(
-    obj({
-      word: str({ min: 1, max: 80 }),
-      senses: arr(obj({ id: str({ min: 1, max: 40 }), words: arr(str({ max: 120 })), gloss: str({ max: 2000 }) }))
-    })
-  ),
-  /** Which links to follow from the chosen senses, and how far. */
-  links: obj({ groups: arr(oneOf(LINK_GROUP_IDS)), depth: num({ integer: true, min: 1, max: 3 }), defined: bool() }),
-  /** Which words from the word list may appear. */
-  narrow: obj({
-    pos: opt(arr(oneOf(['n', 'v', 'a', 'r']))),
-    categories: opt(arr(str({ max: 40 }))),
-    maxLetters: opt(num({ integer: true, min: 1, max: 100 })),
-    singleWords: opt(bool())
+  /** Words from the word list, or people's names and made-up names by sound. */
+  mode: oneOf(['words', 'sounds']),
+  /** 0: ratings ignored; 1: stay close to what was liked. */
+  focus: num({ min: 0, max: 1, sig: 3 }),
+  words: obj({
+    /** Words looked up, and the senses the person meant (copied in full, so the file reads without the app). */
+    concepts: arr(
+      obj({
+        word: str({ min: 1, max: 80 }),
+        senses: arr(obj({ id: str({ min: 1, max: 40 }), words: arr(str({ max: 120 })), gloss: str({ max: 2000 }) }))
+      })
+    ),
+    links: arr(oneOf(LINK_GROUP_IDS)),
+    depth: num({ integer: true, min: 1, max: 3 }),
+    /** Also words whose definition uses a looked-up word. */
+    defined: bool(),
+    pos: arr(oneOf(POS_IDS)),
+    categories: arr(str({ max: 40 })),
+    minLetters: LETTERS(),
+    maxLetters: LETTERS(),
+    singleWords: bool(),
+    /** How much sound counts beside meaning, 0 to 1. */
+    sound: num({ min: 0, max: 1, sig: 3 })
   }),
-  /** Every batch, in order. Locked names carry into the next batch; liked ones drive it. */
+  sounds: obj({
+    /** Languages whose given and family names are drawn on. */
+    locales: arr(str({ min: 1, max: 40 })),
+    given: bool(),
+    family: bool(),
+    gender: oneOf(['any', 'female', 'male']),
+    /** Share of each round that is made up, 0 to 1. */
+    invented: num({ min: 0, max: 1, sig: 3 }),
+    minLetters: LETTERS(),
+    maxLetters: LETTERS()
+  }),
+  /** The transcript: each round as shown, with the person's rating of each name. */
   rounds: arr(
     obj({
       at: str({ min: 1, max: 40 }),
-      /** The random seed the batch was drawn with. */
-      seed: num({ integer: true, min: 0 }),
-      names: arr(obj({ text: str({ min: 1, max: 200 }), source: oneOf([...NAME_SOURCE_IDS, 'locked']), from: str({ max: 400 }) })),
-      liked: arr(str({ min: 1, max: 200 })),
-      locked: arr(str({ min: 1, max: 200 }))
+      mode: oneOf(['words', 'sounds']),
+      names: arr(obj({ text: str({ min: 1, max: 200 }), rating: oneOf(NAMING_RATINGS) }))
     })
   ),
-  chosen: opt(str({ min: 1, max: 200 })),
-  note: opt(str({ max: 4000 })),
-  log: arr(obj({ at: str({ min: 1, max: 40 }), step: oneOf(NAMING_STEPS), text: str({ max: 4000 }) }))
+  /** The name the person settled on. */
+  chosen: opt(obj({ text: str({ min: 1, max: 200 }), at: str({ min: 1, max: 40 }) }))
 })
 export type NamingFile = Infer<typeof namingSchema>
 
 export const namingKind: KindDef<NamingFile> = { kind: 'naming', label: 'naming', folder: 'namings', schema: namingSchema }
 
-export function newNaming(name: string, lexicon: string | undefined, at: string): NamingFile {
-  const file: NamingFile = {
+export function newNaming(name: string, mode: 'words' | 'sounds'): NamingFile {
+  return {
     name,
-    sources: ['words', 'sounds', 'pairs'],
-    concepts: [],
-    links: { groups: ['similar', 'derived'], depth: 1, defined: true },
-    narrow: {},
-    rounds: [],
-    log: [{ at, step: 'brief', text: `Started naming “${name}”.` }]
+    mode,
+    focus: 0.6,
+    words: {
+      concepts: [],
+      links: ['similar', 'derived'],
+      depth: 1,
+      defined: true,
+      pos: ['n'],
+      categories: [],
+      singleWords: true,
+      sound: 0
+    },
+    sounds: { locales: ['en'], given: true, family: false, gender: 'any', invented: 0.3 },
+    rounds: []
   }
-  if (lexicon) file.lexicon = lexicon
-  return file
 }
 
 export const KINDS: readonly KindDef[] = [
