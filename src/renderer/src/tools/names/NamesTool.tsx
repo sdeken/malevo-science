@@ -6,7 +6,7 @@ import { slugId, useWorldPref } from '../../state'
 import type { ToolDefinition, ToolProps } from '../registry'
 
 /**
- * The Names tool: a brainstorm with no smarts. It shows ten names a round:
+ * The Names tool: a brainstorm with no smarts. It shows twelve names a round:
  * words from the word list, or people's names and made-up names by sound.
  * The person rates each (hate, neutral, like, love), and the ratings tip the
  * odds of the next round toward names like the liked ones and away from the
@@ -55,7 +55,7 @@ function NamesView({ world, snapshot }: ToolProps): React.JSX.Element {
           <>
             <h1>Names</h1>
             <p className="muted">
-              Ten names a round. Rate each one (hate it, like it, love it, or leave it be) and the next ten lean toward names like the ones
+              Twelve names a round. Rate each one (hate it, like it, love it, or leave it be) and the next twelve lean toward names like the ones
               you liked and away from the ones you hated. Words come from a dictionary, by meaning; people’s names come from lists of real
               given and family names and from made-up names, by sound. The tool never writes or picks a name; you settle on one, from the
               rounds or not, and the session keeps a transcript of every round and your ratings.
@@ -525,7 +525,7 @@ function Round({
     const w = file.words
     const made = await window.malevo.names.round({
       mode: file.mode,
-      count: 10,
+      count: 12,
       seed: Math.floor(Math.random() * 2 ** 31),
       focus: file.focus,
       words: { ...w, concepts: w.concepts.map((c) => ({ word: c.word, senses: c.senses.map((s) => s.id) })) },
@@ -587,12 +587,12 @@ function Round({
       )}
       <div className="field-row batch-row">
         <button className="primary" onClick={() => void next()} disabled={busy} id="nextRound">
-          {busy ? 'Drawing…' : round ? 'Next ten' : 'First ten'}
+          {busy ? 'Drawing…' : round ? 'Next twelve' : 'First twelve'}
         </button>
         <span className="muted small">
           {round
-            ? 'Every rating so far tips the next ten: love pulls hardest, hate pushes away, unrated names do nothing.'
-            : 'Set up where names come from, then draw the first ten.'}
+            ? 'Every rating so far tips the next twelve: love pulls hardest, hate pushes away, unrated names do nothing.'
+            : 'Set up where names come from, then draw the first twelve.'}
         </span>
       </div>
       {error && <p className="error small">{error}</p>}
@@ -698,6 +698,6 @@ function Transcript({ file }: { file: NamingFile }): React.JSX.Element | null {
 export const namesTool: ToolDefinition = {
   id: 'names',
   title: 'Names',
-  description: 'Rounds of ten names, tipped by your ratings; a transcript of how you got to one',
+  description: 'Rounds of twelve names, tipped by your ratings; a transcript of how you got to one',
   View: NamesView
 }

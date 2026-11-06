@@ -462,7 +462,7 @@ module.exports = {
   dictionary, name lists and a lot of time: look things up, measure how alike two names are, and
   draw at random. It never writes, combines, ranks or picks a name, and it never calls out to a
   language model. The person's ratings only change the odds of the next draw.
-- **Rounds of ten.** The person rates each name: hate it, neutral (the default), like it, or love
+- **Rounds of twelve.** The person rates each name: hate it, neutral (the default), like it, or love
   it. Every rating so far tips the next round (`packages/model/src/namegen.ts`):
   - love pulls with weight 3 and like with 1;
   - hate pushes with −2;

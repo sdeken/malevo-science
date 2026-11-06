@@ -2426,7 +2426,8 @@ fieldset.plain {
 
 .batch {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  /* Twelve names: even rows of 2, 3 or 4, by the width there is. */
+  grid-template-columns: repeat(2, 1fr);
   gap: 8px;
   margin: 8px 0 12px;
 }
@@ -2536,4 +2537,20 @@ fieldset.plain {
 .naming-transcript ol {
   font-size: 0.9em;
   padding-left: 1.6em;
+}
+
+.naming-round {
+  container-type: inline-size;
+}
+
+@container (min-width: 620px) {
+  .batch {
+    grid-template-columns: repeat(3, 1fr);
+  }
+}
+
+@container (min-width: 860px) {
+  .batch {
+    grid-template-columns: repeat(4, 1fr);
+  }
 }
