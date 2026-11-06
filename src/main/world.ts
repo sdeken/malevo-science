@@ -55,7 +55,6 @@ import {
   planTrip,
   sizeShipForTrip,
   shipKind,
-  namingKind,
   countProseWords,
   proseFiles,
   isProsePath,
@@ -175,8 +174,7 @@ const KIND_DEFS: Record<EditableKind, KindDef> = {
   terrain: terrainKind as KindDef,
   city: cityKind as KindDef,
   cityPlan: cityPlanKind as KindDef,
-  ship: shipKind as KindDef,
-  naming: namingKind as KindDef
+  ship: shipKind as KindDef
 }
 
 export class WorldSession extends EventEmitter {
@@ -323,7 +321,6 @@ export class WorldSession extends EventEmitter {
         })),
       cityPlans: entityDtos(world, cityPlanKind.kind),
       ships: entityDtos(world, shipKind.kind),
-      namings: entityDtos(world, namingKind.kind),
       prose: (() => {
         const files = this.editor.files()
         const dirty = new Set(this.editor.dirty)

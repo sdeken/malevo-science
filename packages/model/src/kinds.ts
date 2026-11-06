@@ -953,91 +953,6 @@ export const historySettingsKind: KindDef<HistorySettings> = {
   schema: historySettingsSchema
 }
 
-// ---- naming ----
-
-const LINK_GROUP_IDS = ['similar', 'derived', 'broader', 'narrower', 'parts', 'topic', 'opposite', 'cause'] as const
-const POS_IDS = ['n', 'v', 'a', 'r'] as const
-export const NAMING_RATINGS = ['neutral', 'hate', 'like', 'love'] as const
-const LETTERS = (): Schema<number | undefined, true> => opt(num({ integer: true, min: 1, max: 100 }))
-
-/**
- * A naming session: the settings it draws with, and the transcript, which is
- * every round of names the tool showed with the person's rating of each, and
- * the name they settled on (one of those, or anything else).
- */
-export const namingSchema = obj({
-  /** What is being named, in the person's words. */
-  name: name(),
-  /** Words from the word list, or people's names and made-up names by sound. */
-  mode: oneOf(['words', 'sounds']),
-  /** 0: ratings ignored; 1: stay close to what was liked. */
-  focus: num({ min: 0, max: 1, sig: 3 }),
-  words: obj({
-    /** Words looked up, and the senses the person meant (copied in full, so the file reads without the app). */
-    concepts: arr(
-      obj({
-        word: str({ min: 1, max: 80 }),
-        senses: arr(obj({ id: str({ min: 1, max: 40 }), words: arr(str({ max: 120 })), gloss: str({ max: 2000 }) }))
-      })
-    ),
-    links: arr(oneOf(LINK_GROUP_IDS)),
-    depth: num({ integer: true, min: 1, max: 3 }),
-    /** Also words whose definition uses a looked-up word. */
-    defined: bool(),
-    pos: arr(oneOf(POS_IDS)),
-    categories: arr(str({ max: 40 })),
-    minLetters: LETTERS(),
-    maxLetters: LETTERS(),
-    singleWords: bool(),
-    /** How much sound counts beside meaning, 0 to 1. */
-    sound: num({ min: 0, max: 1, sig: 3 })
-  }),
-  sounds: obj({
-    /** Languages whose given and family names are drawn on. */
-    locales: arr(str({ min: 1, max: 40 })),
-    given: bool(),
-    family: bool(),
-    gender: oneOf(['any', 'female', 'male']),
-    /** Share of each round that is made up, 0 to 1. */
-    invented: num({ min: 0, max: 1, sig: 3 }),
-    minLetters: LETTERS(),
-    maxLetters: LETTERS()
-  }),
-  /** The transcript: each round as shown, with the person's rating of each name. */
-  rounds: arr(
-    obj({
-      at: str({ min: 1, max: 40 }),
-      mode: oneOf(['words', 'sounds']),
-      names: arr(obj({ text: str({ min: 1, max: 200 }), rating: oneOf(NAMING_RATINGS) }))
-    })
-  ),
-  /** The name the person settled on. */
-  chosen: opt(obj({ text: str({ min: 1, max: 200 }), at: str({ min: 1, max: 40 }) }))
-})
-export type NamingFile = Infer<typeof namingSchema>
-
-export const namingKind: KindDef<NamingFile> = { kind: 'naming', label: 'naming', folder: 'namings', schema: namingSchema }
-
-export function newNaming(name: string, mode: 'words' | 'sounds'): NamingFile {
-  return {
-    name,
-    mode,
-    focus: 0.6,
-    words: {
-      concepts: [],
-      links: ['similar', 'derived'],
-      depth: 1,
-      defined: true,
-      pos: ['n'],
-      categories: [],
-      singleWords: true,
-      sound: 0
-    },
-    sounds: { locales: ['en'], given: true, family: false, gender: 'any', invented: 0.3 },
-    rounds: []
-  }
-}
-
 export const KINDS: readonly KindDef[] = [
   physicsKind as KindDef,
   starfieldKind as KindDef,
@@ -1057,6 +972,5 @@ export const KINDS: readonly KindDef[] = [
   terrainKind as KindDef,
   cityKind as KindDef,
   cityPlanKind as KindDef,
-  shipKind as KindDef,
-  namingKind as KindDef
+  shipKind as KindDef
 ]

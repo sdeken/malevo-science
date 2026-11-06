@@ -822,45 +822,6 @@ try {
   await page.screenshot({ path: path.join(shots, '21-trip.png') })
   await page.evaluate(() => window.malevo.world.discard())
 
-  // Names: rounds of ten, rated; ratings tip the next round; the file keeps only the transcript and the settled name.
-  await tool('Names')
-  await page.locator('#newNamingName').fill('The slow freighter')
-  await page.locator('#newNaming').click()
-  await page.waitForSelector('#naming')
-  await page.locator('#nextRound').click()
-  await page.waitForFunction(() => document.querySelectorAll('#batch .name-card').length === 12, null, { timeout: 30_000 })
-  check(true, 'the first round of words has twelve names')
-  const first = await page.locator('#batch .name-card').evaluateAll((els) => els.map((e) => e.getAttribute('data-name')))
-  await page.locator(`#batch [data-name="${first[0]}"] [data-rate="love"]`).click()
-  await page.waitForSelector(`#batch [data-name="${first[0]}"].love`)
-  await page.locator(`#batch [data-name="${first[1]}"] [data-rate="hate"]`).click()
-  await page.waitForSelector(`#batch [data-name="${first[1]}"].hate`)
-  await page.locator('#nextRound').click()
-  await page.waitForFunction(() => document.querySelector('.naming-round h3')?.textContent === 'Round 2', null, { timeout: 30_000 })
-  const second = await page.locator('#batch .name-card').evaluateAll((els) => els.map((e) => e.getAttribute('data-name')))
-  check(second.length === 12 && !second.some((x) => first.includes(x)), 'the next round is twelve new names')
-  await page.locator('#namingMode').selectOption('sounds')
-  await page.locator('#nextRound').click()
-  await page.waitForFunction(() => document.querySelector('.naming-round h3')?.textContent === 'Round 3', null, { timeout: 30_000 })
-  check(
-    /given name|made up/.test((await page.locator('#batch').textContent()) ?? ''),
-    'people’s names come from name lists and made-up names'
-  )
-  await page.locator('#chosenText').fill('Something else entirely')
-  await page.locator('#settleName').click()
-  await page.waitForSelector('#namingChosen')
-  const naming = await page.evaluate(async () => (await window.malevo.world.snapshot()).namings[0]?.value)
-  check(
-    naming?.rounds?.length === 3 &&
-      naming.rounds[0].names.filter((x) => x.rating !== 'neutral').length === 2 &&
-      naming.chosen?.text === 'Something else entirely' &&
-      !('log' in naming),
-    'the naming keeps each round with its ratings and the name settled on, and nothing else'
-  )
-  await page.locator('#namingTranscript summary').click()
-  await page.screenshot({ path: path.join(shots, '22-names.png') })
-  await page.evaluate(() => window.malevo.world.discard())
-
   // 10. The update status reports a dev build.
   const status = await page.evaluate(() => window.malevo.updates.status())
   check(status.state === 'unavailable', 'an unpackaged build reports updates as unavailable')

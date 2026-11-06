@@ -7,7 +7,6 @@ import type { AppInfo, ApproachQueryDto, EditableKind, Settings, ViewpointDto, W
 import type { SettingsStore } from './settings'
 import type { Updater } from './updates'
 import type { WorldSession } from './world'
-import { exploreWords, lookUpSenses, nameLocales, namesRound } from './lexicon'
 
 export interface IpcDeps {
   settings: SettingsStore
@@ -55,8 +54,7 @@ const EDITABLE: readonly EditableKind[] = [
   'terrain',
   'city',
   'cityPlan',
-  'ship',
-  'naming'
+  'ship'
 ]
 const asKind = (k: unknown): EditableKind => {
   if (!EDITABLE.includes(k as EditableKind)) throw new Error(`"${String(k)}" cannot be edited.`)
@@ -157,10 +155,6 @@ export function registerIpc(deps: IpcDeps): void {
   }
   ipcMain.handle(IPC.tripPlan, (_e, q: unknown) => world.planTrip(tripQuery(q)))
   ipcMain.handle(IPC.tripSize, (_e, q: unknown) => world.sizeShip(tripQuery(q)))
-  ipcMain.handle(IPC.namesSenses, (_e, w: unknown) => lookUpSenses(w))
-  ipcMain.handle(IPC.namesExplore, (_e, q: unknown) => exploreWords(q))
-  ipcMain.handle(IPC.namesRound, (_e, q: unknown) => namesRound(q))
-  ipcMain.handle(IPC.namesLocales, () => nameLocales())
   ipcMain.handle(IPC.proseRead, (_e, p: unknown) => world.proseText(String(p)))
   ipcMain.handle(IPC.proseWrite, (_e, p: unknown, text: unknown) => world.writeProse(String(p), text === null ? null : String(text)))
   ipcMain.handle(IPC.worldAddKnownPlanets, (_e, sys: unknown, candidates: unknown) =>

@@ -456,53 +456,6 @@ module.exports = {
   short pause. Save, or leaving the window, writes what is still pending first. The app re-reads
   the folder when its window regains focus, so files edited elsewhere show up.
 
-### Names
-
-- **No smarts, on purpose.** The Names tool does what a person could do with a thesaurus, a
-  dictionary, name lists and a lot of time: look things up, measure how alike two names are, and
-  draw at random. It never writes, combines, ranks or picks a name, and it never calls out to a
-  language model. The person's ratings only change the odds of the next draw.
-- **Rounds of twelve.** The person rates each name: hate it, neutral (the default), like it, or love
-  it. Every rating so far tips the next round (`packages/model/src/namegen.ts`):
-  - love pulls with weight 3 and like with 1;
-  - hate pushes with −2;
-  - neutral does nothing.
-
-  A name once shown is never shown again. Each candidate is drawn with odds exp(k × score). k is
-  the **lean** times 1.5 × the log of the pool's size, so the same lean tips fifty candidates and
-  fifty thousand alike. Lean 0 ignores the ratings.
-- **Words, by meaning** (ship names, or "an adverb that means dumb"):
-  - The pool is WordNet. Optionally, the person looks up words and ticks the senses they mean. The
-    pool is then those senses' neighbourhood, along the ticked kinds of link (1 to 3 links out),
-    plus "defined using" (senses whose definition uses the looked-up word).
-  - With nothing looked up, every word that passes the filters is in play: part of speech, kind
-    of thing (WordNet's categories: animal, artifact, person …), letters, single words.
-  - A rated word's neighbourhood is near it. The same sense counts 1, one link out 0.8 and two
-    links out 0.6, along similar, derived, broader and narrower links plus the ticked ones. That
-    is scaled by the rating (love 1, like ⅓, hate −⅔), so loving a fish brings in its sibling
-    fish.
-  - "Pertains to" links are also followed backwards, so an adjective leads to its adverbs.
-  - Optionally, sound counts as well (the "liked by: meaning ↔ sound" slider).
-- **People's names, by sound:**
-  - Real given and/or family names come from the languages the person picks. The lists are from
-    the faker package (MIT), packed by `scripts/build-names.mjs` into `out/names/names.json`:
-    45 languages written in Latin letters.
-  - Made-up names, a chosen share of each round, come from an order-2 letter chain over the
-    names in play and the liked ones. Loved names count 12 and liked ones 4.
-  - Likeness is in the letters: pairs of letters with the word's edges, how it begins and ends,
-    its vowel and consonant pattern, and its length, compared by cosine. So loving Dorrie and
-    hating Gertrude leans toward Dorine, Corrine, Carie.
-- **Each card says what the name is,** for information: a definition, "given name · German", or
-  "made up". This is not stored. A name already used in the world (a system, body, ship,
-  station, culture, polity, city, route or character) says so.
-- **Settling:** the person settles on a name, either a loved one or anything they type.
-- **The record** is `namings/<id>.json`: the settings it draws with, the **transcript** (each
-  round as shown, with the time, the mode and the person's rating of each name) and the name
-  settled on. Nothing else is stored. "Copy transcript" gives it as text.
-- **WordNet 3.1** (Princeton's licence, in `out/wordnet/LICENSE`) comes from the `wordnet-db`
-  package and is packed by `scripts/build-wordnet.mjs`. Main loads both lists on first use
-  (`src/main/lexicon.ts`).
-
 ### Cities and conditions
 
 - **A city** is `cities/<id>.json`. It holds:

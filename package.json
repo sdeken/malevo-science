@@ -12,7 +12,7 @@
   ],
   "scripts": {
     "dev": "electron-vite dev",
-    "build": "electron-vite build && node scripts/build-cli.mjs && node scripts/build-wordnet.mjs && node scripts/build-names.mjs",
+    "build": "electron-vite build && node scripts/build-cli.mjs",
     "preview": "electron-vite preview",
     "typecheck": "tsc --noEmit -p tsconfig.node.json && tsc --noEmit -p tsconfig.web.json",
     "lint": "eslint .",
@@ -42,7 +42,6 @@
   },
   "devDependencies": {
     "@eslint/js": "^9.39.5",
-    "@faker-js/faker": "^10.6.0",
     "@malevo/cli": "*",
     "@malevo/core": "*",
     "@malevo/gen": "*",
@@ -67,7 +66,6 @@
     "typescript": "^5.9.3",
     "typescript-eslint": "^8.72.1",
     "vite": "^7.0.0",
-    "vitest": "^5.0.1",
-    "wordnet-db": "^3.1.14"
+    "vitest": "^5.0.1"
   }
 }
