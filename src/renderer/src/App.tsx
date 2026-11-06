@@ -6,7 +6,7 @@ import { DateBar } from './components/DateBar'
 import { NewWorldDialog } from './components/NewWorldDialog'
 import { StatusBar } from './components/StatusBar'
 import { Welcome } from './components/Welcome'
-import { readPref, typingInto, useSnapshot, useWorldPref, writePref } from './state'
+import { readPref, typingInto, useSnapshot, useWorldPref, writePref, flushPendingWrites } from './state'
 import { TOOLS } from './tools'
 
 const TOOL_KEY = 'malevo.selectedTool'
@@ -77,6 +77,7 @@ export function App(): React.JSX.Element {
 
   const save = useCallback(async () => {
     commitFocusedField()
+    await flushPendingWrites()
     await window.malevo.world.save()
   }, [])
 

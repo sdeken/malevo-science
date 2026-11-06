@@ -147,6 +147,12 @@ const api = {
     export: (body: string, what: 'colour' | 'height' | 'clouds'): Promise<string | null> =>
       ipcRenderer.invoke(IPC.terrainExport, body, what)
   },
+  prose: {
+    /** A prose or character file's current text (unsaved changes included), or null. */
+    read: (path: string): Promise<string | null> => ipcRenderer.invoke(IPC.proseRead, path),
+    /** Write (null: delete) a prose or character file: unsaved and undoable, like any edit. */
+    write: (path: string, text: string | null): Promise<void> => ipcRenderer.invoke(IPC.proseWrite, path, text)
+  },
   approach: {
     info: (q: ApproachQueryDto): Promise<ApproachInfoDto | { error: string }> => ipcRenderer.invoke(IPC.approachInfo, q),
     map: (q: ApproachQueryDto, extent: number, n: number): Promise<ApproachMapDto | { error: string }> =>

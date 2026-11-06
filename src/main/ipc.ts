@@ -146,6 +146,8 @@ export function registerIpc(deps: IpcDeps): void {
   ipcMain.handle(IPC.worldCheck, () => world.check())
   ipcMain.handle(IPC.worldAddTemplate, () => world.addTemplate())
   ipcMain.handle(IPC.worldAddSolarSystem, () => world.addSolarSystem())
+  ipcMain.handle(IPC.proseRead, (_e, p: unknown) => world.proseText(String(p)))
+  ipcMain.handle(IPC.proseWrite, (_e, p: unknown, text: unknown) => world.writeProse(String(p), text === null ? null : String(text)))
   ipcMain.handle(IPC.worldAddKnownPlanets, (_e, sys: unknown, candidates: unknown) =>
     world.addKnownPlanets(String(sys), candidates === true)
   )

@@ -51,6 +51,10 @@ import {
   historySettingsKind,
   proposeHistory,
   solarSystemFor,
+  charactersOf,
+  proseFiles,
+  splitFrontMatter,
+  isProsePath,
   knownPlanetsFor,
   terrainKind,
   terrainRaster,
@@ -310,6 +314,17 @@ export class WorldSession extends EventEmitter {
           errors: c.errors
         })),
       cityPlans: entityDtos(world, cityPlanKind.kind),
+      prose: (() => {
+        const files = this.editor.files()
+        const dirty = new Set(this.editor.dirty)
+        const text = new Map(files.map((f) => [f.path, f.text]))
+        return proseFiles(files, KINDS).map((p) => ({
+          path: p,
+          words: countWords(splitFrontMatter(text.get(p) ?? '').body),
+          dirty: dirty.has(p)
+        }))
+      })(),
+      characters: charactersOf(this.editor.files()),
       physics: physicsFile
         ? {
             legLimit_ly: physicsFile.foam.legLimit_ly,
@@ -651,6 +666,18 @@ export class WorldSession extends EventEmitter {
     this.changed()
   }
 
+  /** The current text of a prose file (with unsaved changes), or null if there is none. */
+  proseText(p: string): string | null {
+    return this.editor!.files().find((f) => f.path === p)?.text ?? null
+  }
+
+  /** Write (or with null, delete) a prose or character file: unsaved, one undo step. */
+  writeProse(p: string, text: string | null): void {
+    if (!isProsePath(p, KINDS)) throw new WorldError('io', `"${p}" is not a prose file (a .md file outside the world format's folders).`)
+    this.editor!.edit([{ path: p, text }])
+    this.changed()
+  }
+
   /** Set (or with null, remove) a script calendar's code. */
   setScript(id: string, code: string | null): void {
     this.editor!.edit([{ path: `${calendarKind.folder}/${String(id)}.js`, text: code === null ? null : String(code) }])
@@ -952,4 +979,8 @@ function routesDto(
         }
       : null
   return { routes, nodes, traffic }
+}
+
+function countWords(text: string): number {
+  return (text.match(/[\p{L}\p{N}][\p{L}\p{N}'’-]*/gu) ?? []).length
 }

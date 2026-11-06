@@ -735,6 +735,15 @@ Built; see [DEVELOPMENT.md](DEVELOPMENT.md). Loading a prototype city file is le
   and the port capacity model.
 - Optional loading of a prototype city file as a starting sketch.
 
+### Writing — built
+
+Built; see [DEVELOPMENT.md](DEVELOPMENT.md). Chapters are plain Markdown in the world folder,
+edited on a novel page. Character files list the names each character goes by. `@` inserts a
+name as plain text, names are recognised by reading, and a report shows where each name
+appears. Not yet built: a check that guesses a speaker and notices when a line uses the wrong
+name for them. Also not yet built: placing chapters on the timeline from `when:`/`where:` front
+matter.
+
 ### Phase 11 onward
 
 - `malevo report` fact sheets (can come earlier if useful).

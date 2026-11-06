@@ -330,6 +330,47 @@ module.exports = {
   version; nothing is written to the world. **Export** saves a 2048×1024 PNG wherever you choose,
   for reference.
 
+### Writing
+
+- **Prose is any `.md` file in the world folder outside the folders the world format uses:**
+  chapters, scenes, notes, in any subfolders you like. The app reads and edits them as Markdown
+  and knows nothing else about them (`packages/model/src/prose.ts`).
+- **Characters** are `characters/<id>.md`: a short header, then free notes.
+
+  ```
+  ---
+  name: Div
+  names:
+    - T (Kasinov)
+    - Divvy (Mara; only when she's annoyed)
+  ---
+  Grew up on the docks.
+  ```
+
+  Each extra name may say who uses it (character ids or names, separated by commas) and give a
+  note after a semicolon. Header lines the app does not use are kept as written.
+- **The Writing tool** (`src/renderer/src/tools/writing/`) edits a file on a novel page:
+  - a serif book column, first-line indents, centred chapter heads, and `---` as a centred
+    scene break (⁂);
+  - Tiptap with Markdown, the same setup as devlog, with typographic quotes and dashes as you
+    type.
+- **Your header is kept:** a file's front matter (`---` … `---` at the top) is kept byte for
+  byte and never shown in the editor.
+- **Names stay plain text.** The prose never holds ids or hidden marks.
+  - **Typing `@`** offers every name and nickname and inserts the plain name.
+  - **Recognised names** are underlined faintly as you read; a name two characters share is
+    underlined in orange.
+  - **Clicking a name** opens that character.
+  - **"Where the names appear"** lists every use of each of a character's names by file and
+    line, so a change of nickname is made by hand.
+- **Untouched files stay untouched.** On opening, the tool checks whether the editor would
+  write the file differently, for example `_italic_` as `*italic*`. If it would, it shows an
+  example and stays read-only until you choose **Edit anyway**. A file you only read is never
+  rewritten.
+- **Saving works like every other edit:** typing becomes an unsaved, undoable change after a
+  short pause. Save, or leaving the window, writes what is still pending first. The app re-reads
+  the folder when its window regains focus, so files edited elsewhere show up.
+
 ### Cities and conditions
 
 - **A city** is `cities/<id>.json`. It holds:

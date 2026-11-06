@@ -163,6 +163,10 @@ export interface WorldSnapshot {
   viewpoints: EntityDto[]
   /** settings/history.json, if the world has it. */
   historySettings: Record<string, unknown> | null
+  /** Prose files (chapters, notes): any .md outside the format's own folders, by path. */
+  prose: { path: string; words: number; dirty: boolean }[]
+  /** characters/<id>.md, read. */
+  characters: CharacterDto[]
   /** settings/physics.json as written, if the world has it (for editing). */
   physicsSettings: Record<string, unknown> | null
   terrains: EntityDto[]
@@ -569,6 +573,18 @@ export interface NewsDto {
   from: string
   t0: number
   arrivals: { system: string; t: number; via: 'here' | 'radio' | 'ships'; path: string[] }[]
+}
+
+// ---- Writing ----
+
+export interface CharacterDto {
+  id: string
+  path: string
+  name: string
+  names: { name: string; usedBy: string[]; note?: string }[]
+  notes: string
+  extra: string[]
+  problems: string[]
 }
 
 // ---- Phase 8: terrain ----
