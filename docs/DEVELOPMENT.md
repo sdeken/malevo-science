@@ -363,6 +363,16 @@ module.exports = {
   - **Clicking a name** opens that character.
   - **"Where the names appear"** lists every use of each of a character's names by file and
     line, so a change of nickname is made by hand.
+- **Italics are written `_like this_`**, bold `**like this**`.
+- **Text is saved the way it was typed.** The Markdown writer is made to escape only what would
+  read back as formatting (`escapeProse`): `\`, backticks, `*` and `_`, `~~`, `](` and `[^`,
+  entity-like `&name;`, and tag-like `<em>`. Ampersands, angle brackets, lone tildes and
+  brackets stay as they are.
+- **Editor's marks** are notes to yourself written as `[[double brackets]]`. They stay plain text
+  in the file. The editor draws them highlighted with faint brackets, and typing `[[` closes the
+  pair. Ctrl+Alt+M (or **[[ add ]]**) wraps the selection or inserts an empty pair. The bar
+  counts the marks in the file, and **next** jumps from one to the next. Word counts leave them
+  out.
 - **Untouched files stay untouched.** On opening, the tool checks whether the editor would
   write the file differently, for example `_italic_` as `*italic*`. If it would, it shows an
   example and stays read-only until you choose **Edit anyway**. A file you only read is never

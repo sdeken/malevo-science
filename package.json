@@ -31,6 +31,7 @@
   },
   "dependencies": {
     "@tiptap/core": "^3.31.3",
+    "@tiptap/extension-italic": "^3.31.3",
     "@tiptap/extension-typography": "^3.31.3",
     "@tiptap/markdown": "^3.31.3",
     "@tiptap/pm": "^3.31.3",

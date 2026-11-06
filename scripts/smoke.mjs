@@ -773,7 +773,8 @@ try {
   await page.keyboard.type('It rained. @T')
   await page.waitForSelector('.name-suggest')
   await page.keyboard.press('Enter')
-  await page.keyboard.type(' waited.')
+  await page.keyboard.type(' waited. [[check & fix')
+  await page.waitForSelector('.prose-page .editor-mark')
   await page.waitForSelector('.prose-page .name-mark')
   check(
     (await page.locator('.prose-page .name-mark').innerText()) === 'T',
@@ -783,7 +784,10 @@ try {
   await page.locator('.status-save').click()
   await page.waitForFunction(() => document.querySelector('.status-saved') !== null)
   const chapter = await fs.readFile(path.join(worldDir, 'Chapter One.md'), 'utf8')
-  check(chapter === '# Chapter One\n\nIt rained. T waited.\n', `saving writes the chapter as plain Markdown (${JSON.stringify(chapter)})`)
+  check(
+    chapter === '# Chapter One\n\nIt rained. T waited. [[check & fix]]\n',
+    `saving writes the chapter as plain Markdown, editor's marks and all (${JSON.stringify(chapter)})`
+  )
   const div = await fs.readFile(path.join(worldDir, 'characters', 'div.md'), 'utf8')
   check(div === '---\nname: Div\nnames:\n  - T\n---\n', `and the character as a short header (${JSON.stringify(div)})`)
 

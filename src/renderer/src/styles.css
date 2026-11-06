@@ -2047,3 +2047,24 @@ fieldset.plain {
 .names-form h3 {
   margin: 10px 0 2px;
 }
+
+.prose-bar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.prose-page .editor-mark {
+  background: color-mix(in srgb, #e0b03c 28%, transparent);
+  border-radius: 2px;
+  font-family: system-ui, sans-serif;
+  font-size: 0.86em;
+  font-style: normal;
+  padding: 0 2px;
+}
+
+.prose-page .editor-mark-bracket {
+  opacity: 0.35;
+  font-family: system-ui, sans-serif;
+  font-size: 0.86em;
+}

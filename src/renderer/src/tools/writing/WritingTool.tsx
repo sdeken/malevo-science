@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { EditorContent, useEditor } from '@tiptap/react'
+import { EditorContent, useEditor, type Editor } from '@tiptap/react'
 import StarterKit from '@tiptap/starter-kit'
 import { Markdown } from '@tiptap/markdown'
 import Typography from '@tiptap/extension-typography'
@@ -18,6 +18,7 @@ import type { CharacterDto, WorldSnapshot } from '../../../../shared/types'
 import { TextField } from '../../components/fields'
 import { holdPendingWrite, slugId, useWorldPref } from '../../state'
 import type { ToolDefinition, ToolProps } from '../registry'
+import { EditorMarks, MARK_RE, PlainProse, UnderscoreItalic, findEditorMarks } from './marks'
 import { Names } from './names'
 
 function WritingView({ world, snapshot }: ToolProps): React.JSX.Element {
@@ -140,6 +141,7 @@ function ProseEditor({
   const [rewrite, setRewrite] = useState<{ lines: number; before: string; after: string } | null>(null)
   const [accepted, setAccepted] = useState(false)
   const [loaded, setLoaded] = useState(false)
+  const [stats, setStats] = useState({ words: 0, marks: 0 })
 
   const flush = async (): Promise<void> => {
     if (!timer.current || !editor || !ready.current) return
@@ -165,11 +167,20 @@ function ProseEditor({
   }, [])
 
   const editor = useEditor({
-    extensions: [StarterKit.configure({ link: false }), Markdown, Typography, Names.configure({ forms })],
+    extensions: [
+      StarterKit.configure({ link: false, italic: false }),
+      UnderscoreItalic,
+      Markdown,
+      Typography,
+      Names.configure({ forms }),
+      EditorMarks,
+      PlainProse
+    ],
     contentType: 'markdown',
     content: '',
     editorProps: { attributes: { class: 'prose-page', spellcheck: 'true' } },
-    onUpdate: ({ transaction }) => {
+    onUpdate: ({ transaction, editor: e }) => {
+      setStats(statsOf(e))
       if (!ready.current || !transaction.docChanged) return
       if (timer.current) clearTimeout(timer.current)
       timer.current = setTimeout(() => void flushRef.current(), WRITE_DELAY)
@@ -201,6 +212,7 @@ function ProseEditor({
         setRewrite({ lines: differ, before: a[first] ?? '', after: b[first] ?? '' })
       } else setRewrite(null)
       ready.current = true
+      setStats(statsOf(editor))
       setLoaded(true)
     })
     return () => {
@@ -216,12 +228,30 @@ function ProseEditor({
     editor?.commands.setNameForms(forms)
   }, [editor, forms])
 
-  const words = editor ? (editor.getText().match(/[\p{L}\p{N}][\p{L}\p{N}'’-]*/gu) ?? []).length : 0
   return (
     <div className="prose-shell">
       <div className="prose-bar small muted">
-        <code>{path}</code> · {words.toLocaleString()} words
+        <code>{path}</code> · {stats.words.toLocaleString()} words
         {parts.current.front && <span> · keeps its header as written</span>}
+        <span className="spacer" />
+        <button
+          className="link"
+          onClick={() => editor?.chain().focus().nextEditorMark().run()}
+          disabled={!stats.marks}
+          title="Jump to the next [[editor’s mark]]"
+          id="nextMark"
+        >
+          {stats.marks === 1 ? '1 editor’s mark' : `${stats.marks} editor’s marks`}
+          {stats.marks > 0 && ' → next'}
+        </button>
+        <button
+          className="link"
+          onClick={() => editor?.chain().focus().insertEditorMark().run()}
+          title="Wrap the selection in [[ ]] (Ctrl+Alt+M), or type [["
+          id="addMark"
+        >
+          [[ add ]]
+        </button>
       </div>
       {rewrite && !accepted && (
         <div className="notice" id="rewriteNotice">
@@ -245,6 +275,14 @@ function ProseEditor({
       </div>
     </div>
   )
+}
+
+function statsOf(editor: Editor): { words: number; marks: number } {
+  const text = editor.getText()
+  return {
+    words: (text.replace(MARK_RE, ' ').match(/[\p{L}\p{N}][\p{L}\p{N}'’-]*/gu) ?? []).length,
+    marks: findEditorMarks(editor.state.doc).length
+  }
 }
 
 // ---- making files ----

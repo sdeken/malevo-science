@@ -240,3 +240,24 @@ export function proseFileName(title: string): string {
     .replace(/^\.+/, '')
   return t || 'Untitled'
 }
+
+/**
+ * Plain text as Markdown, escaped only where it would otherwise be read back
+ * as formatting, so prose saves the way it was typed: `&`, `<`, brackets and
+ * lone tildes stay as they are; [[editor's marks]] are never escaped.
+ *
+ * - `\`, `` ` ``, `*` and `_` always (they open code and emphasis);
+ * - `~~` (strikethrough);
+ * - `]` just before `(` or `[`, and `[` just before `^` (links and footnotes);
+ * - `&` only where it would read as an entity (`&amp;`, `&#38;`);
+ * - `<` only where it would read as a tag (`<em>`, `</p>`, `<!--`).
+ */
+export function escapeProse(text: string): string {
+  return text
+    .replace(/([\\`*_])/g, '\\$1')
+    .replace(/~~/g, '\\~\\~')
+    .replace(/\](?=[([])/g, '\\]')
+    .replace(/\[(?=\^)/g, '\\[')
+    .replace(/&(?=#?\w+;)/g, '\\&')
+    .replace(/<(?=[A-Za-z/!?])/g, '\\<')
+}

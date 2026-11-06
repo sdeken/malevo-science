@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { KINDS, characterText, isProsePath, nameForms, nameUses, parseCharacter, splitFrontMatter } from '@malevo/model'
+import { KINDS, characterText, escapeProse, isProsePath, nameForms, nameUses, parseCharacter, splitFrontMatter } from '@malevo/model'
 import { WorldEditor } from '@malevo/model/node'
 
 const DIV = `---
@@ -67,5 +67,12 @@ describe('prose and characters', () => {
     ed.undo()
     expect(ed.dirty).toEqual([])
     expect(() => ed.edit([{ path: 'systems/x.txt', text: '' }])).toThrow()
+  })
+
+  it('escapes prose only where it would read back as formatting', () => {
+    expect(escapeProse('Smith & Sons <3, [[check]], [aside] ~ fine')).toBe('Smith & Sons <3, [[check]], [aside] ~ fine')
+    expect(escapeProse('a *star* and snake_case')).toBe('a \\*star\\* and snake\\_case')
+    expect(escapeProse('[text](not a link) &amp; <em>')).toBe('[text\\](not a link) \\&amp; \\<em>')
+    expect(escapeProse('~~gone~~')).toBe('\\~\\~gone\\~\\~')
   })
 })
