@@ -86,7 +86,10 @@ function ShipEditor({ id, ship, snapshot }: { id: string; ship: ShipFile; snapsh
   const exhaust = (ship.exhaustSpeed_c ?? torch?.exhaustSpeed_c ?? 0.05) * C
   const dry = ship.dryMass_t * 1000
   const full = dry + ship.propellant_t * 1000
-  const thrust = ship.thrust_MN * 1e6
+  const engines = ship.engines ?? 1
+  const thrust = ship.thrust_MN * 1e6 * engines
+  /** Jet power at full thrust: ½ · thrust · exhaust speed. */
+  const powerPer = (ship.thrust_MN * 1e6 * exhaust) / 2
   const comfort = (ship.comfort_g ?? torch?.cruiseAccel_g ?? 1) * G0
   const dv = exhaust * Math.log(full / dry)
   const reserveKg = Math.max(
@@ -108,7 +111,13 @@ function ShipEditor({ id, ship, snapshot }: { id: string; ship: ShipFile; snapsh
           onCommit={pos((x) => save({ propellant_t: x }))}
           id="shipProp"
         />
-        <NumberField label="Thrust, MN" value={ship.thrust_MN} onCommit={pos((x) => save({ thrust_MN: x }))} id="shipThrust" />
+        <NumberField
+          label="Engines"
+          value={engines}
+          onCommit={(x) => x !== undefined && x >= 1 && save({ engines: Math.round(x) === 1 ? undefined : Math.round(x) })}
+          id="shipEngines"
+        />
+        <NumberField label="Thrust per engine, MN" value={ship.thrust_MN} onCommit={pos((x) => save({ thrust_MN: x }))} id="shipThrust" />
         <NumberField
           label="Comfort cap, g"
           value={ship.comfort_g}
@@ -163,7 +172,10 @@ function ShipEditor({ id, ship, snapshot }: { id: string; ship: ShipFile; snapsh
         />
       </div>
       <p className="muted small" id="shipFacts">
-        Full: {sig(full / 1000, 4)} t, {sig(Math.min(thrust / full, comfort) / G0, 3)} g · dry:{' '}
+        {engines > 1
+          ? `${engines} torches of ${sig(powerPer / 1e12, 3)} TW, ${sig((powerPer * engines) / 1e12, 3)} TW in all`
+          : `A torch of ${sig(powerPer / 1e12, 3)} TW`}{' '}
+        ({sig(thrust / 1e6, 4)} MN) · full: {sig(full / 1000, 4)} t, {sig(Math.min(thrust / full, comfort) / G0, 3)} g · dry:{' '}
         {sig(Math.min(thrust / dry, comfort) / G0, 3)} g{thrust / full < comfort && ' (thrust-limited when full)'} · Δv {sig(dv / 1000, 4)}{' '}
         km/s full, {sig(usable / 1000, 4)} km/s above the reserve · about {duration(burnFull)} of burning on a full tank
       </p>
@@ -189,6 +201,7 @@ function Trip({
   const from = Math.min(ends[0], Math.max(0, n - 1))
   const to = Math.min(ends[1], Math.max(0, n - 1))
   const [plan, setPlan] = useState<TripPlanDto | { error: string } | null>(null)
+  const [sized, setSized] = useState<string | null>(null)
   useEffect(() => {
     if (!route || from === to) {
       setPlan(null)
@@ -241,7 +254,26 @@ function Trip({
           </select>
         </label>
         <span className="muted small">Leaving at the current date.</span>
+        <button
+          onClick={() =>
+            void window.malevo.trips.size({ ship: shipId, route: route.id, from, to, t: now }).then((r) => {
+              if ('error' in r) return setSized(r.error)
+              const ship = snapshot.ships.find((s) => s.id === shipId)?.value
+              if (!ship) return
+              void window.malevo.world.setEntity('ship', shipId, { ...ship, propellant_t: r.propellant_t, thrust_MN: r.thrust_MN })
+              setSized(
+                `Sized to this trip: ${sig(r.propellant_t, 4)} t of propellant and ${sig(r.thrust_MN, 4)} MN per engine, just enough to hold the comfort acceleration through ${r.hardest} with the reserve (Ctrl+Z to undo).`
+              )
+            })
+          }
+          disabled={from === to}
+          title="The least tanks and thrust that hold the comfort acceleration on every burn of this trip, arriving with the reserve"
+          id="sizeShip"
+        >
+          Size the ship to this trip
+        </button>
       </div>
+      {sized && <p className="ok small">{sized}</p>}
       {from === to && <p className="muted">Pick two different waypoints.</p>}
       {plan && 'error' in plan && <p className="error">{plan.error}</p>}
       {plan && !('error' in plan) && <TripResult plan={plan} />}
@@ -403,7 +435,7 @@ function TripChart({ plan }: { plan: TripPlanDto }): React.JSX.Element | null {
   if (!phases.length || plan.total <= 0) return null
   const W = 900
   const PAD = 46
-  const STRIP = 78
+  const STRIP = 104
   const H = 170
   const AXIS = 22
   const x = (t: number): number => PAD + (t / plan.total) * (W - 2 * PAD)
@@ -422,7 +454,7 @@ function TripChart({ plan }: { plan: TripPlanDto }): React.JSX.Element | null {
   const fuelPath = phases
     .map((p, k) => `${k ? 'L' : 'M'} ${x(p.t0).toFixed(1)} ${yp(p.p0).toFixed(1)} L ${x(p.t1).toFixed(1)} ${yp(p.p1).toFixed(1)}`)
     .join(' ')
-  const yMid = STRIP / 2 + 6
+  const yMid = STRIP / 2 + 12
   return (
     <div className="trip-chart-box">
       <svg className="trip-chart" viewBox={`0 0 ${W} ${STRIP + H + AXIS + 8}`} role="img" aria-label="The trip, in time" id="tripChart">
@@ -435,8 +467,13 @@ function TripChart({ plan }: { plan: TripPlanDto }): React.JSX.Element | null {
               </title>
             </rect>
             {x(p.t1) - x(p.t0) > 64 && (
-              <text className="trip-phase-label" x={(x(p.t0) + x(p.t1)) / 2} y={STRIP + H - 7} textAnchor="middle">
+              <text className="trip-phase-label" x={(x(p.t0) + x(p.t1)) / 2} y={STRIP + H - 20} textAnchor="middle">
                 {PHASE[p.kind].label}
+              </text>
+            )}
+            {x(p.t1) - x(p.t0) > 34 && (
+              <text className="trip-phase-label strong" x={(x(p.t0) + x(p.t1)) / 2} y={STRIP + H - 7} textAnchor="middle">
+                {duration(p.t1 - p.t0)}
               </text>
             )}
           </g>
@@ -450,6 +487,19 @@ function TripChart({ plan }: { plan: TripPlanDto }): React.JSX.Element | null {
           return (
             <g key={`leg-${k}`} className="trip-strip">
               <line x1={x(t0)} y1={yMid} x2={x(lift)} y2={yMid} className="crawl" />
+              {x(lift) - x(t0) > 60 && (
+                <text x={(x(t0) + x(lift)) / 2} y={yMid - 6} textAnchor="middle" className="small-label crawl-label">
+                  out {duration(lift - t0)}
+                </text>
+              )}
+              {x(end) - x(drop) > 60 && (
+                <text x={(x(drop) + x(end)) / 2} y={yMid - 6} textAnchor="middle" className="small-label crawl-label">
+                  in {duration(end - drop)}
+                </text>
+              )}
+              <text x={(x(t0) + x(end)) / 2} y={16} textAnchor="middle" className="small-label leg-total">
+                leg {k + 1}: {duration(end - t0)}
+              </text>
               <line x1={x(lift)} y1={yMid} x2={x(drop)} y2={yMid} className="foam" />
               <line x1={x(drop)} y1={yMid} x2={x(end)} y2={yMid} className="crawl" />
               <line x1={x(lift)} y1={yMid - 9} x2={x(lift)} y2={yMid + 9} className="edge" />
@@ -469,7 +519,7 @@ function TripChart({ plan }: { plan: TripPlanDto }): React.JSX.Element | null {
                 </text>
               )}
               <text x={(x(lift) + x(drop)) / 2} y={yMid - 13} textAnchor="middle" className="small-label foam-label">
-                {duration(l.foam.time)} in the foam
+                foam {duration(l.foam.time)}
               </text>
               {k === 0 && <System x={x(t0)} y={yMid} name={l.fromName} />}
               <System x={x(end)} y={yMid} name={l.toName} />

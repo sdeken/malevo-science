@@ -210,8 +210,8 @@ module.exports = {
   particular ship along a charted route, between any two of its waypoints, in either direction.
 - **A ship** is `ships/<id>.json`:
   - masses: dry mass and propellant capacity, in tonnes;
-  - engine: exhaust speed (default the world's), total thrust in MN, and a comfort cap in g
-    (default the world's cruise acceleration);
+  - engine: how many torches (default 1), the thrust of each in MN, exhaust speed (default the
+    world's), and a comfort cap in g (default the world's cruise acceleration);
   - a reserve kept at arrival: a share of the tanks, or the Δv for an orbital insertion, the
     larger if both;
   - foam power in GW (fusion fuel burned to make and hold the foam, at `FUSION_ENERGY` =
@@ -238,6 +238,17 @@ module.exports = {
   stopover and the time to pump the tanks full. A bare star is a pass-through: the ship drops
   and lifts again, with no crawl and no fuel. Each leg also shows the route planner's idealized
   time.
+- **Size the ship to this trip** (`sizeShipForTrip`) finds the smallest tanks, and the thrust
+  per torch, that hold the comfort acceleration on every burn of the trip with nothing to
+  spare: no leg crawls under a speed cap and every leg keeps its reserve. Each candidate tank
+  size gets exactly the thrust that holds the comfort acceleration with full tanks; the size is
+  found by doubling and then bisection, and rounded up to three significant figures. It writes
+  propellant and thrust per torch into the ship as one undoable edit, and names the hardest leg.
+- **The chart labels every part of the trip with its length:** each phase (speeding up,
+  coasting, braking, foam, refuelling), each crawl out and in, and each leg's total.
+- **Durations everywhere** go through `formatSpan` (`packages/core/src/strings.ts`): years
+  (365.25 days), weeks, days, hours, minutes and seconds, at most three units, zeros left out,
+  and tenths of a second under an hour ("1w 1d 13h", "14m 56.4s").
 
 ### Physics settings
 

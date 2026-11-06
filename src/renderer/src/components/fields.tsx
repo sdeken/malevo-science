@@ -1,3 +1,4 @@
+import { formatSpan } from '@malevo/core'
 import { useEffect, useState } from 'react'
 
 /** A text field that commits on Enter or when it loses focus. */
@@ -94,15 +95,10 @@ export function sig(v: number | null | undefined, digits = 3): string {
   return Number(v.toPrecision(digits)).toLocaleString('en-US', { maximumFractionDigits: 10 })
 }
 
-/** A duration in the most readable unit: hours, days or years (standard days, Julian years). */
+/** A duration for people: years, weeks, days, hours, minutes and seconds, zeros left out ("1w 1d 13h", "14m 56.4s"). */
 export function duration(s: number | null | undefined): string {
   if (s === null || s === undefined) return '—'
-  if (!Number.isFinite(s)) return 'never'
-  const a = Math.abs(s)
-  const sign = s < 0 ? '−' : ''
-  if (a < 2 * 86400) return `${sign}${sig(a / 3600, 4)} h`
-  if (a < 2 * 31_557_600) return `${sign}${sig(a / 86400, 4)} d`
-  return `${sign}${sig(a / 31_557_600, 4)} yr`
+  return formatSpan(s)
 }
 
 /** A star's colour from its B−V index (black-body approximation of its temperature). */

@@ -3,7 +3,7 @@ import { app, dialog, ipcMain, nativeImage, shell, BrowserWindow } from 'electro
 import { promises as fs } from 'node:fs'
 import { WORLD_FORMAT } from '@malevo/model'
 import { IPC } from '../shared/ipc'
-import type { AppInfo, ApproachQueryDto, EditableKind, Settings, ViewpointDto, WorldResult } from '../shared/types'
+import type { AppInfo, ApproachQueryDto, EditableKind, Settings, ViewpointDto, WorldResult, TripQueryDto } from '../shared/types'
 import type { SettingsStore } from './settings'
 import type { Updater } from './updates'
 import type { WorldSession } from './world'
@@ -149,10 +149,12 @@ export function registerIpc(deps: IpcDeps): void {
   ipcMain.handle(IPC.worldCheck, () => world.check())
   ipcMain.handle(IPC.worldAddTemplate, () => world.addTemplate())
   ipcMain.handle(IPC.worldAddSolarSystem, () => world.addSolarSystem())
-  ipcMain.handle(IPC.tripPlan, (_e, q: unknown) => {
+  const tripQuery = (q: unknown): TripQueryDto => {
     const v = (q ?? {}) as Record<string, unknown>
-    return world.planTrip({ ship: String(v.ship), route: String(v.route), from: Number(v.from), to: Number(v.to), t: Number(v.t) })
-  })
+    return { ship: String(v.ship), route: String(v.route), from: Number(v.from), to: Number(v.to), t: Number(v.t) }
+  }
+  ipcMain.handle(IPC.tripPlan, (_e, q: unknown) => world.planTrip(tripQuery(q)))
+  ipcMain.handle(IPC.tripSize, (_e, q: unknown) => world.sizeShip(tripQuery(q)))
   ipcMain.handle(IPC.proseRead, (_e, p: unknown) => world.proseText(String(p)))
   ipcMain.handle(IPC.proseWrite, (_e, p: unknown, text: unknown) => world.writeProse(String(p), text === null ? null : String(text)))
   ipcMain.handle(IPC.worldAddKnownPlanets, (_e, sys: unknown, candidates: unknown) =>

@@ -9,10 +9,6 @@ import { CityPlan3D } from './CityPlan3D'
 
 type XY = [number, number]
 
-/** A city-scale span: minutes under a few hours, else hours and days. */
-function minutes(s: number): string {
-  return s < 3 * 3600 ? `${Math.max(1, Math.round(s / 60))} min` : duration(s)
-}
 type ListKey = 'ground' | 'water' | 'lines' | 'regions' | 'buildings' | 'points'
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type Obj = Record<string, any> & { id: string }
@@ -390,7 +386,8 @@ function PlanEditor({
               {travel && (
                 <>
                   <p>
-                    <strong>{minutes(travel.total)}</strong>, leaving at {fmtHour(hour)}, arriving {fmtHour((travel.arrive / hourLen) % 24)}
+                    <strong>{duration(travel.total)}</strong>, leaving at {fmtHour(hour)}, arriving{' '}
+                    {fmtHour((travel.arrive / hourLen) % 24)}
                   </p>
                   <ol className="small">
                     {travel.legs.map((l, k) => (
@@ -402,7 +399,7 @@ function PlanEditor({
                             : l.mode === 'ride'
                               ? `ride the ${l.line}`
                               : 'wait for a window, then the lighter up'}{' '}
-                        · {minutes(l.duration)}
+                        · {duration(l.duration)}
                       </li>
                     ))}
                   </ol>

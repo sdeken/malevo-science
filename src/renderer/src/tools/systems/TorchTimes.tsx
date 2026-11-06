@@ -17,13 +17,6 @@ interface Props {
   setPoints(p: MeasurePoint[]): void
 }
 
-/** Minutes under three hours, hours under three days, then days and years. */
-function span(s: number): string {
-  if (s < 3 * 3600) return `${sig(s / 60, 3)} min`
-  if (s < 3 * 86400) return `${sig(s / 3600, 3)} h`
-  return duration(s)
-}
-
 interface Leg {
   label: string
   distance: number
@@ -133,12 +126,12 @@ export function TorchTimes({ system, physics, now, measuring, setMeasuring, poin
               <tr key={l.label}>
                 <td>{l.label}</td>
                 <td>{sig(l.distance / AU, 3)} AU</td>
-                <td>{span(light)}</td>
-                <td title={stop.limit}>{span(stop.time)}</td>
-                <td title={by.limit}>{span(by.time)}</td>
+                <td>{duration(light)}</td>
+                <td title={stop.limit}>{duration(stop.time)}</td>
+                <td title={by.limit}>{duration(by.time)}</td>
                 <td>{sig(by.peakSpeed / 1000, 3)} km/s</td>
                 <td>
-                  <strong>{span(by.time - light)}</strong>
+                  <strong>{duration(by.time - light)}</strong>
                 </td>
               </tr>
             )

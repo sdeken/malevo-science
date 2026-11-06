@@ -151,7 +151,10 @@ const api = {
   },
   trips: {
     /** A ship flying a charted route between two of its waypoints. */
-    plan: (q: TripQueryDto): Promise<TripPlanDto | { error: string }> => ipcRenderer.invoke(IPC.tripPlan, q)
+    plan: (q: TripQueryDto): Promise<TripPlanDto | { error: string }> => ipcRenderer.invoke(IPC.tripPlan, q),
+    /** The least tanks, and thrust per engine, that hold the comfort acceleration through a trip with the reserve. */
+    size: (q: TripQueryDto): Promise<{ propellant_t: number; thrust_MN: number; hardest: string } | { error: string }> =>
+      ipcRenderer.invoke(IPC.tripSize, q)
   },
   prose: {
     /** A prose or character file's current text (unsaved changes included), or null. */

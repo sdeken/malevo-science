@@ -13,6 +13,7 @@ import {
   systemFrame,
   systemInfo,
   planTrip,
+  sizeShipForTrip,
   allRoutes,
   approachInfo,
   bodyPosition,
@@ -231,5 +232,26 @@ describe('the trip planner', () => {
     expect(plan({ ...base, thrust_MN: 10 }).total).toBeGreaterThan(plan(base).total * 1.5)
     const hopeless = plan({ ...base, propellant_t: 600, foamPower_GW: 1e8 })
     expect(hopeless.legs[0].problems.join(' ')).toMatch(/cannot cover this leg/)
+  })
+
+  it('sizes a five-engine ship to barely hold 1 g through the trip with its reserve', () => {
+    const w = tripWorld({ ...base, dryMass_t: 6800, propellant_t: 100, thrust_MN: 1, engines: 5, comfort_g: 1, foamThrottle: 0.75 })
+    const size = sizeShipForTrip(w, env, { ship: 's', route: 'r', from: 0, to: 1, t: 0 })
+    if ('error' in size) throw new Error(size.error)
+    // About a third of the ship's mass in reaction mass; five engines share 1 g at full tanks.
+    expect(size.propellant_t).toBeGreaterThan(2500)
+    expect(size.propellant_t).toBeLessThan(4500)
+    expect(size.thrust_MN * 5 * 1e6).toBeGreaterThanOrEqual(9.80665 * (6800 + size.propellant_t) * 1000 * 0.999)
+    const sized = plan({
+      ...base,
+      dryMass_t: 6800,
+      propellant_t: size.propellant_t,
+      thrust_MN: size.thrust_MN,
+      engines: 5,
+      comfort_g: 1,
+      foamThrottle: 0.75
+    })
+    expect(sized.legs[0].speedCap).toBeNull()
+    expect(sized.legs[0].problems).toEqual([])
   })
 })

@@ -23,6 +23,7 @@ export const IPC = {
   worldAddKnownPlanets: 'world:addKnownPlanets',
   proseRead: 'prose:read',
   tripPlan: 'trip:plan',
+  tripSize: 'trip:size',
   proseWrite: 'prose:write',
   worldSnapshot: 'world:snapshot',
   worldSetEntity: 'world:setEntity',

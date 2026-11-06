@@ -2306,3 +2306,16 @@ fieldset.plain {
 .trip-legend .line.fuel {
   border-top: 2px dashed #d9893c;
 }
+
+.trip-chart .trip-phase-label.strong {
+  fill: var(--text);
+}
+
+.trip-chart .crawl-label {
+  fill: #2f7462;
+}
+
+.trip-chart .leg-total {
+  fill: var(--text);
+  font-weight: 600;
+}

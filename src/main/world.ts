@@ -53,6 +53,7 @@ import {
   solarSystemFor,
   charactersOf,
   planTrip,
+  sizeShipForTrip,
   shipKind,
   countProseWords,
   proseFiles,
@@ -590,6 +591,10 @@ export class WorldSession extends EventEmitter {
 
   planTrip(q: TripQueryDto): TripPlanDto | { error: string } {
     return planTrip(this.world(), this.env, q)
+  }
+
+  sizeShip(q: TripQueryDto): { propellant_t: number; thrust_MN: number; hardest: string } | { error: string } {
+    return sizeShipForTrip(this.world(), this.env, q)
   }
 
   planPort(planId: string): PortCapacityDto | null {

@@ -562,7 +562,9 @@ export const shipSchema = obj({
   propellant_t: num({ above: 0, sig: 9 }),
   /** Exhaust speed; absent: the world's torch setting. */
   exhaustSpeed_c: opt(num({ above: 0, max: 1, sig: 9 })),
-  /** Total thrust at full power, meganewtons. */
+  /** How many torches (alike); absent: one. */
+  engines: opt(num({ integer: true, min: 1, max: 100 })),
+  /** Thrust of each torch at full power, meganewtons. */
   thrust_MN: num({ above: 0, sig: 9 }),
   /** The most acceleration the crew will take, g; thrust is throttled to it. Absent: the world's cruise acceleration. */
   comfort_g: opt(num({ above: 0, sig: 9 })),

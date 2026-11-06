@@ -79,7 +79,7 @@ const T = 1000
 export function shipEngine(ship: ShipFile, physics: PhysicsSettings): Engine & { dry: number; capacity: number } {
   return {
     exhaust: (ship.exhaustSpeed_c ?? physics.torch.exhaustSpeed_c) * C,
-    thrust: ship.thrust_MN * 1e6,
+    thrust: ship.thrust_MN * 1e6 * (ship.engines ?? 1),
     maxAccel: (ship.comfort_g ?? physics.torch.cruiseAccel_g) * G0,
     dry: ship.dryMass_t * T,
     capacity: ship.propellant_t * T
@@ -102,7 +102,69 @@ export function newShip(name: string): ShipFile {
 export function planTrip(world: WorldData, env: WorldEnv, q: TripQuery): TripPlan | { error: string } {
   const shipEntity = entitiesOf(world, shipKind).find((e) => e.id === q.ship)
   if (!shipEntity) return { error: `There is no ship "${q.ship}".` }
+  return planTripFor(world, env, q, shipEntity.value)
+}
+
+export interface ShipSizing {
+  /** Propellant the tanks must hold, t. */
+  propellant_t: number
+  /** Thrust of each engine, MN. */
+  thrust_MN: number
+  /** The leg that sets them. */
+  hardest: string
+}
+
+/**
+ * The smallest tanks and engines for a trip: tanks that let every leg fly
+ * flip-and-burn at the comfort acceleration and still arrive with the reserve,
+ * and just enough thrust to hold that acceleration at the heaviest moment (full
+ * tanks, the start of a leg). Masses, exhaust, reserve and engine count are
+ * the ship's own.
+ */
+export function sizeShipForTrip(world: WorldData, env: WorldEnv, q: TripQuery): ShipSizing | { error: string } {
+  const shipEntity = entitiesOf(world, shipKind).find((e) => e.id === q.ship)
+  if (!shipEntity) return { error: `There is no ship "${q.ship}".` }
   const ship = shipEntity.value
+  const physics = entitiesOf(world, physicsKind)[0]?.value as PhysicsSettings | undefined
+  if (!physics) return { error: 'Sizing needs settings/physics.json.' }
+  const engines = ship.engines ?? 1
+  const comfort = (ship.comfort_g ?? physics.torch.cruiseAccel_g) * G0
+  /** Just enough thrust to hold the comfort acceleration with the tanks full (the heaviest moment). */
+  const thrustFor = (prop_t: number): number => comfort * (ship.dryMass_t + prop_t) * T * 1.0001
+  // Each tank size flown with just enough thrust for it (the foam's heat dump scales with the engines); find the least that never forces a coast.
+  const fits = (prop_t: number): TripPlan | null => {
+    const p = planTripFor(world, env, q, { ...ship, propellant_t: prop_t, thrust_MN: thrustFor(prop_t) / 1e6 / engines })
+    if ('error' in p) return null
+    return p.problems.length || p.legs.some((l) => l.speedCap !== null || l.problems.length) ? null : p
+  }
+  let hi = Math.max(1, ship.dryMass_t)
+  while (!fits(hi)) {
+    hi *= 2
+    if (hi > ship.dryMass_t * 1e4) return { error: 'No tank size lets this trip be flown at the comfort acceleration.' }
+  }
+  let lo = 0
+  for (let i = 0; i < 40; i++) {
+    const mid = (lo + hi) / 2
+    if (fits(mid)) hi = mid
+    else lo = mid
+  }
+  const plan = fits(hi)!
+  const up3 = (x: number): number => {
+    const e = Math.pow(10, Math.floor(Math.log10(x)) - 2)
+    return Math.ceil(x / e) * e
+  }
+  const propellant = up3(hi)
+  const thrust = thrustFor(propellant)
+  // The hardest leg: the one that burns the most.
+  const hardest = [...plan.legs].sort((a, b) => b.propellantStart - b.propellantEnd - (a.propellantStart - a.propellantEnd))[0]
+  return {
+    propellant_t: propellant,
+    thrust_MN: up3(thrust / 1e6 / engines),
+    hardest: hardest ? `${hardest.fromName} → ${hardest.toName}` : ''
+  }
+}
+
+function planTripFor(world: WorldData, env: WorldEnv, q: TripQuery, ship: ShipFile): TripPlan | { error: string } {
   const physics = entitiesOf(world, physicsKind)[0]?.value as PhysicsSettings | undefined
   if (!physics) return { error: 'The trip planner needs settings/physics.json.' }
   const route = routeInfo(world, env, q.route)
