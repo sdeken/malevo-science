@@ -456,6 +456,47 @@ module.exports = {
   short pause. Save, or leaving the window, writes what is still pending first. The app re-reads
   the folder when its window regains focus, so files edited elsewhere show up.
 
+### Names
+
+- **A brainstorm, not an oracle.** The Names tool looks words up and follows links between them;
+  it never ranks, scores or suggests a name. Every choice is the person's, and each one is
+  recorded.
+- **The word list** is WordNet 3.1 (Princeton's licence, in `out/wordnet/LICENSE`), from the
+  `wordnet-db` package. `scripts/build-wordnet.mjs` packs it into `out/wordnet/wordnet.json`
+  during `npm run build`. Main loads it the first time the tool asks (`src/main/lexicon.ts`).
+  The parsing and exploring are in `packages/model/src/lexicon.ts`.
+- **Senses:** looking up a word finds its base form ("lumbering" → lumber, as well as
+  lumbering), and lists every sense with its definition. The person ticks the senses they mean.
+- **Exploring** walks out from the ticked senses along the links the person ticks:
+  - similar (similar to, see also, attribute, pertains to, ...);
+  - derived forms, broader, narrower;
+  - parts and wholes, topic and region, opposites, causes and entails.
+
+  It walks 1 to 3 links out, and synonyms always come along. **Defined using** adds senses
+  whose definition uses the looked-up word or its base form ("sloth: slow-moving arboreal
+  mammals"). Each word carries the shortest path from each word looked up, shown on hover
+  ("slow → similar → sluggish").
+- **Narrowing** keeps words reached from every word looked up, or from any. It can also
+  filter by part of speech, by WordNet's category ("animal (noun)", "artifact (noun)"),
+  letters, single words and a substring. Order is alphabetical, or fewest links first.
+- **Shuffle** drops kept words at random into a pattern the person writes ("{word} {word}",
+  "The {word}"). Candidates are written by the person, and each is marked maybe, no or chosen.
+  A candidate that is already a name in the world (a system, body, ship, station, culture,
+  polity, city, route or character) says so.
+- **The record** is `namings/<id>.json`. It holds the brief, the senses ticked (copied with
+  their definitions, so the file reads without the app), the links and narrowing used, the
+  words kept and dropped, and the candidates. `log` lists each step with the wall-clock time:
+  - looked up;
+  - meant this sense;
+  - followed these links;
+  - narrowed;
+  - kept, dropped and restored words;
+  - shuffled, and what came out;
+  - wrote down, chose and ruled out candidates;
+  - notes.
+
+  Undo takes a step back out of the log along with the change.
+
 ### Cities and conditions
 
 - **A city** is `cities/<id>.json`. It holds:

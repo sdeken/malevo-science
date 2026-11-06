@@ -953,6 +953,86 @@ export const historySettingsKind: KindDef<HistorySettings> = {
   schema: historySettingsSchema
 }
 
+// ---- naming ----
+
+/** What a naming record logs: one entry per thing the person did, in their order. */
+export const NAMING_STEPS = [
+  'brief',
+  'look-up',
+  'sense',
+  'unsense',
+  'remove-word',
+  'links',
+  'narrow',
+  'keep',
+  'drop',
+  'restore',
+  'unkeep',
+  'shuffle',
+  'candidate',
+  'status',
+  'note'
+] as const
+export type NamingStep = (typeof NAMING_STEPS)[number]
+
+const LINK_GROUP_IDS = ['similar', 'derived', 'broader', 'narrower', 'parts', 'topic', 'opposite', 'cause'] as const
+
+/**
+ * A brainstorm for a name, and how the person got there. The tool only looks
+ * words up and shuffles what the person kept; every choice is theirs, and the
+ * log records each one with the time it was made.
+ */
+export const namingSchema = obj({
+  /** What is being named, in the person's words: "The slow freighter". */
+  name: name(),
+  /** What the name should carry, in the person's words. */
+  brief: opt(str({ max: 4000 })),
+  /** The word list the senses come from: "WordNet 3.1". */
+  lexicon: opt(str({ max: 80 })),
+  /** Words looked up, and the senses the person meant (copied in full, so the record reads without the app). */
+  concepts: arr(
+    obj({
+      word: str({ min: 1, max: 80 }),
+      senses: arr(obj({ id: str({ min: 1, max: 40 }), words: arr(str({ max: 120 })), gloss: str({ max: 2000 }) }))
+    })
+  ),
+  /** Which links to follow from the chosen senses, and how far. */
+  links: obj({ groups: arr(oneOf(LINK_GROUP_IDS)), depth: num({ integer: true, min: 1, max: 3 }), defined: bool() }),
+  /** How the person narrowed the words found. */
+  narrow: obj({
+    /** Reached from every concept, or from any. */
+    match: oneOf(['all', 'any']),
+    pos: opt(arr(oneOf(['n', 'v', 'a', 'r']))),
+    categories: opt(arr(str({ max: 40 }))),
+    maxLetters: opt(num({ integer: true, min: 1, max: 100 })),
+    singleWords: opt(bool()),
+    contains: opt(str({ max: 80 }))
+  }),
+  kept: arr(obj({ word: str({ min: 1, max: 120 }), note: opt(str({ max: 400 })) })),
+  dropped: arr(str({ min: 1, max: 120 })),
+  /** Patterns for shuffling kept words together: "{word} {word}", "The {word}". */
+  pattern: opt(str({ max: 120 })),
+  candidates: arr(obj({ text: str({ min: 1, max: 200 }), status: oneOf(['maybe', 'no', 'chosen']), note: opt(str({ max: 400 })) })),
+  log: arr(obj({ at: str({ min: 1, max: 40 }), step: oneOf(NAMING_STEPS), text: str({ max: 2000 }) }))
+})
+export type NamingFile = Infer<typeof namingSchema>
+
+export const namingKind: KindDef<NamingFile> = { kind: 'naming', label: 'naming', folder: 'namings', schema: namingSchema }
+
+export function newNaming(name: string, lexicon: string | undefined, at: string): NamingFile {
+  return {
+    name,
+    lexicon,
+    concepts: [],
+    links: { groups: ['similar', 'derived'], depth: 1, defined: true },
+    narrow: { match: 'any' },
+    kept: [],
+    dropped: [],
+    candidates: [],
+    log: [{ at, step: 'brief', text: `Started naming “${name}”.` }]
+  }
+}
+
 export const KINDS: readonly KindDef[] = [
   physicsKind as KindDef,
   starfieldKind as KindDef,
@@ -972,5 +1052,6 @@ export const KINDS: readonly KindDef[] = [
   terrainKind as KindDef,
   cityKind as KindDef,
   cityPlanKind as KindDef,
-  shipKind as KindDef
+  shipKind as KindDef,
+  namingKind as KindDef
 ]

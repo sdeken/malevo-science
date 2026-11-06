@@ -24,6 +24,8 @@ export const IPC = {
   proseRead: 'prose:read',
   tripPlan: 'trip:plan',
   tripSize: 'trip:size',
+  namesSenses: 'names:senses',
+  namesExplore: 'names:explore',
   proseWrite: 'prose:write',
   worldSnapshot: 'world:snapshot',
   worldSetEntity: 'world:setEntity',

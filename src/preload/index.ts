@@ -36,6 +36,7 @@ import type {
   WorldResult,
   WorldSnapshot
 } from '../shared/types'
+import type { ExploreQuery, ExploreResult, Sense } from '@malevo/model'
 
 type Unsubscribe = () => void
 
@@ -155,6 +156,12 @@ const api = {
     /** The least tanks, and thrust per engine, that hold the comfort acceleration through a trip with the reserve. */
     size: (q: TripQueryDto): Promise<{ propellant_t: number; thrust_MN: number; hardest: string } | { error: string }> =>
       ipcRenderer.invoke(IPC.tripSize, q)
+  },
+  names: {
+    /** Every sense of a word in the word list (WordNet), with its base form found if inflected. */
+    senses: (word: string): Promise<{ source: string; senses: Sense[] } | { error: string }> => ipcRenderer.invoke(IPC.namesSenses, word),
+    /** Words reached from the chosen senses by the ticked links, alphabetically, each with how it was reached. */
+    explore: (q: ExploreQuery): Promise<ExploreResult | { error: string }> => ipcRenderer.invoke(IPC.namesExplore, q)
   },
   prose: {
     /** A prose or character file's current text (unsaved changes included), or null. */

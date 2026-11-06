@@ -181,6 +181,7 @@ export interface WorldSnapshot {
   /** settings/history.json, if the world has it. */
   historySettings: Record<string, unknown> | null
   ships: EntityDto[]
+  namings: EntityDto[]
   /** Prose files (chapters, notes): any .md outside the format's own folders, by path. */
   prose: { path: string; words: number; dirty: boolean }[]
   /** characters/<id>.md, read. */
@@ -258,6 +259,7 @@ export type EditableKind =
   | 'city'
   | 'cityPlan'
   | 'ship'
+  | 'naming'
 
 // ---- Phase 3: stars, systems, bodies ----
 

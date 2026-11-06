@@ -2319,3 +2319,156 @@ fieldset.plain {
   fill: var(--text);
   font-weight: 600;
 }
+
+/* ---- Names ---- */
+
+.naming h3 {
+  margin: 20px 0 6px;
+}
+
+.naming textarea {
+  width: 100%;
+  font: inherit;
+}
+
+.naming .checks {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 14px;
+  align-items: center;
+}
+
+.naming .checks label {
+  display: inline-flex;
+  gap: 4px;
+  align-items: center;
+}
+
+.naming .concept {
+  border: 1px solid var(--border);
+  padding: 6px 10px;
+  margin: 6px 0;
+}
+
+.naming .concept-head {
+  display: flex;
+  gap: 10px;
+  align-items: baseline;
+}
+
+.naming .concept-head > :last-child {
+  margin-left: auto;
+}
+
+.naming .senses {
+  list-style: none;
+  margin: 6px 0 0;
+  padding: 0;
+  max-height: 260px;
+  overflow: auto;
+}
+
+.naming .senses li {
+  margin: 3px 0;
+}
+
+.naming .narrow-row {
+  align-items: end;
+  flex-wrap: wrap;
+}
+
+.naming .categories {
+  margin: 6px 0;
+}
+
+.word-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin: 6px 0;
+}
+
+.word-chip {
+  display: inline-flex;
+  border: 1px solid var(--border);
+  border-radius: 3px;
+  background: var(--bg-raised);
+}
+
+.word-chip button {
+  background: none;
+  border: none;
+  padding: 2px 6px;
+  cursor: pointer;
+}
+
+.word-chip .x {
+  padding: 2px 5px;
+  color: var(--muted, #888);
+  border-left: 1px solid var(--border);
+}
+
+.word-chip.kept {
+  border-color: var(--accent, #3a7);
+  font-weight: 600;
+}
+
+.word-chip.dropped {
+  opacity: 0.45;
+  text-decoration: line-through;
+}
+
+.naming .kept-list {
+  list-style: none;
+  padding: 0;
+  margin: 4px 0 8px;
+  display: grid;
+  gap: 2px;
+}
+
+.naming .kept-list li {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+.naming input.note {
+  flex: 1;
+  min-width: 120px;
+  font-size: 0.9em;
+}
+
+.naming .x {
+  background: none;
+  border: none;
+  cursor: pointer;
+}
+
+.naming tr.candidate.no strong {
+  text-decoration: line-through;
+  opacity: 0.6;
+}
+
+.naming tr.candidate.chosen strong {
+  color: var(--accent, #3a7);
+}
+
+.naming-record {
+  margin: 20px 0;
+}
+
+.naming-record ol {
+  font-size: 0.9em;
+  padding-left: 1.6em;
+}
+
+.naming .field-row.tight input:not([type='checkbox']) {
+  width: auto;
+  flex: 1;
+  min-width: 200px;
+  max-width: 420px;
+}
+
+.naming .naming-kept .field-row.tight {
+  align-items: end;
+}

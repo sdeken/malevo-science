@@ -822,6 +822,35 @@ try {
   await page.screenshot({ path: path.join(shots, '21-trip.png') })
   await page.evaluate(() => window.malevo.world.discard())
 
+  // Names: look a word up, tick a sense, keep a word reached from it, write a candidate; every step is recorded.
+  await tool('Names')
+  await page.locator('#newNamingName').fill('The slow freighter')
+  await page.locator('#newNaming').click()
+  await page.waitForSelector('#naming')
+  await page.locator('#conceptWord').fill('lumbering')
+  await page.locator('#addConcept').click()
+  await page.waitForSelector('[data-concept="lumbering"] .senses input')
+  await page.locator('[data-concept="lumbering"] .senses label', { hasText: 'ponderous' }).locator('input').check()
+  await page.waitForSelector('#wordChips [data-word="ponderous"]', { timeout: 30_000 })
+  check(true, 'a ticked sense leads to related words')
+  await page.locator('#wordChips [data-word="ponderous"] button.word').click()
+  await page.waitForSelector('[data-kept="ponderous"]')
+  await page.locator('#candidateText').fill('Ponderous')
+  await page.locator('#addCandidate').click()
+  await page.locator('[data-status-of="Ponderous"]').selectOption('chosen')
+  await page.waitForFunction(() => /Chose “Ponderous”/.test(document.querySelector('#namingRecord')?.textContent ?? ''))
+  const record = await page.evaluate(async () => {
+    const snap = await window.malevo.world.snapshot()
+    return snap.namings[0]?.value?.log?.map((l) => l.step)
+  })
+  check(
+    JSON.stringify(record) === JSON.stringify(['brief', 'look-up', 'sense', 'keep', 'candidate', 'status']),
+    `the naming records each step (${JSON.stringify(record)})`
+  )
+  await page.locator('#namingRecord summary').click()
+  await page.screenshot({ path: path.join(shots, '22-names.png') })
+  await page.evaluate(() => window.malevo.world.discard())
+
   // 10. The update status reports a dev build.
   const status = await page.evaluate(() => window.malevo.updates.status())
   check(status.state === 'unavailable', 'an unpackaged build reports updates as unavailable')
