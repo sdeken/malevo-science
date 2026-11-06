@@ -6,7 +6,8 @@
  * Each leg between waypoints is flown on what is in the tanks at its start:
  *
  * 1. the departure burn, from the port out to where the ship enters the foam
- *    (the approach model's crawl distance toward the next waypoint);
+ *    (the approach model's crawl distance toward the next waypoint), burning
+ *    the whole way without braking: the drop at the far end stops it anyway;
  * 2. the foam, at the world's top speed, burning fuel to hold the foam and
  *    idling the torch to dump heat, as the ship's settings say;
  * 3. the arrival burn, from the drop to the port (worked out at the time of
@@ -19,7 +20,7 @@
  * burns. Every port and station sells fuel; a bare star is a pass-through
  * (drop and lift again, no crawl, no fuel).
  */
-import { C, DAY, FUSION_ENERGY, G0, crawl, flipAndBurnTime, type Burn, type Engine } from '@malevo/core'
+import { C, DAY, FUSION_ENERGY, G0, burnAllTheWayTime, crawl, flipAndBurnTime, outbound, type Burn, type Engine } from '@malevo/core'
 import type { WorldEnv } from './env'
 import { physicsKind, shipKind, type PhysicsSettings, type ShipFile } from './kinds'
 import { entitiesOf, type WorldData } from './load'
@@ -125,7 +126,8 @@ export function planTrip(world: WorldData, env: WorldEnv, q: TripQuery): TripPla
     const r = approachInfo(world, env, { system: node.slice('system:'.length), from: toward, t })
     return 'error' in r ? null : (r.crawlDistance ?? 0)
   }
-  const idealCrawl = (d: number): number => (d > 0 ? flipAndBurnTime(d, physics.torch.cruiseAccel_g * G0) : 0)
+  const idealIn = (d: number): number => (d > 0 ? flipAndBurnTime(d, physics.torch.cruiseAccel_g * G0) : 0)
+  const idealOut = (d: number): number => (d > 0 ? burnAllTheWayTime(d, physics.torch.cruiseAccel_g * G0) : 0)
 
   const legs: TripLeg[] = []
   let t = q.t
@@ -151,7 +153,8 @@ export function planTrip(world: WorldData, env: WorldEnv, q: TripQuery): TripPla
       Math.min(m - e.dry, (foamPower * time) / FUSION_ENERGY + (foamThrottle * e.thrust * time) / e.exhaust)
     // The arrival crawl is worked out at the drop, which depends on how long the departure burn takes; two passes settle it.
     const flyAt = (cap: number, d2: number): { dep: Burn | null; arr: Burn | null; left: number; foam: number } => {
-      const dep = d1 ? crawl(d1, m0, e, cap) : null
+      // Out without stopping: the drop at the far end leaves the ship at rest anyway.
+      const dep = d1 ? outbound(d1, m0, e, cap) : null
       const m1 = dep ? dep.massEnd : m0
       const foam = foamUse(foamTime, m1)
       const m2 = m1 - foam
@@ -203,7 +206,7 @@ export function planTrip(world: WorldData, env: WorldEnv, q: TripQuery): TripPla
       propellantStart: propellant,
       propellantEnd: left,
       speedCap: speedCap !== null && speedCap > 0 ? speedCap : speedCap === 0 ? 0 : null,
-      ideal: d1 === null ? null : idealCrawl(d1) + foamTime + idealCrawl(d2),
+      ideal: d1 === null ? null : idealOut(d1) + foamTime + idealIn(d2),
       problems: legProblems
     })
     propellant = refuel ? e.capacity : left

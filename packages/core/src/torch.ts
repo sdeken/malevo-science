@@ -122,6 +122,8 @@ export interface Burn {
   peakSpeed: number
   /** Propellant used, kg. */
   propellant: number
+  /** Of which speeding up, kg. */
+  accelPropellant: number
   /** Mass at the end, kg. */
   massEnd: number
 }
@@ -181,6 +183,35 @@ export function crawl(distance: number, m0: number, e: Engine, speedCap = Infini
     decel: { time: down.time, distance: down.distance },
     peakSpeed: peak,
     propellant: m0 - down.massEnd,
+    accelPropellant: m0 - up.massEnd,
     massEnd: down.massEnd
+  }
+}
+
+/**
+ * Out from rest over `distance` without stopping (a departure: the ship
+ * enters the foam moving, since the drop at the far end leaves it at rest
+ * anyway): burn the whole way, or up to `speedCap` and coast the rest.
+ */
+export function outbound(distance: number, m0: number, e: Engine, speedCap = Infinity): Burn {
+  let hi = Math.sqrt(2 * distance * e.maxAccel) * 1.2 + 1
+  while (speedChange(m0, 0, hi, e).distance < distance) hi *= 2
+  let lo = 0
+  for (let i = 0; i < 50; i++) {
+    const mid = (lo + hi) / 2
+    if (speedChange(m0, 0, mid, e).distance < distance) lo = mid
+    else hi = mid
+  }
+  const peak = Math.min((lo + hi) / 2, speedCap)
+  const up = speedChange(m0, 0, peak, e)
+  const coastDistance = Math.max(0, distance - up.distance)
+  return {
+    accel: { time: up.time, distance: up.distance },
+    coast: { time: peak > 0 ? coastDistance / peak : 0, distance: coastDistance },
+    decel: { time: 0, distance: 0 },
+    peakSpeed: peak,
+    propellant: m0 - up.massEnd,
+    accelPropellant: m0 - up.massEnd,
+    massEnd: up.massEnd
   }
 }

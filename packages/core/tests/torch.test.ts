@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { AU, crawl, flipAndBurnTime } from '@malevo/core'
+import { AU, burnAllTheWayTime, crawl, flipAndBurnTime, outbound } from '@malevo/core'
 
 describe('a ship’s crawl', () => {
   const e = { exhaust: 0.05 * 299_792_458, thrust: 1e7 * 9.80665, maxAccel: 9.80665 }
@@ -23,5 +23,24 @@ describe('a ship’s crawl', () => {
     expect(capped.coast.time).toBeGreaterThan(0)
     expect(capped.propellant).toBeLessThan(full.propellant / 3)
     expect(capped.accel.distance + capped.coast.distance + capped.decel.distance).toBeCloseTo(2 * AU, -3)
+  })
+})
+
+describe('a departure', () => {
+  const e = { exhaust: 0.05 * 299_792_458, thrust: 1e7 * 9.80665, maxAccel: 9.80665 }
+  it('burns the whole way out without braking, as burn-all-the-way at 1 g', () => {
+    const o = outbound(1.85 * AU, 5e6, e)
+    expect(o.accel.time / burnAllTheWayTime(1.85 * AU, 9.80665)).toBeCloseTo(1, 3)
+    expect(o.decel.time).toBe(0)
+    // About 2¾ days and about 2,400 km/s for 1.85 AU.
+    expect(o.accel.time / 86400).toBeCloseTo(2.75, 1)
+    expect(o.peakSpeed / 1000).toBeGreaterThan(2300)
+    expect(o.peakSpeed / 1000).toBeLessThan(2500)
+  })
+  it('coasts the rest at a speed cap', () => {
+    const o = outbound(1.85 * AU, 5e6, e, 1e6)
+    expect(o.peakSpeed).toBe(1e6)
+    expect(o.coast.time).toBeGreaterThan(0)
+    expect(o.accel.distance + o.coast.distance).toBeCloseTo(1.85 * AU, -3)
   })
 })

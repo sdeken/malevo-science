@@ -277,6 +277,7 @@ function TripResult({ plan }: { plan: TripPlanDto }): React.JSX.Element {
           </span>
         )}
       </p>
+      <TripChart plan={plan} />
       {plan.problems.map((p) => (
         <p key={p} className="error">
           {p}
@@ -336,6 +337,201 @@ function TripResult({ plan }: { plan: TripPlanDto }): React.JSX.Element {
         a lower cruise speed and coasts. Hover a burn for its parts.
       </p>
     </div>
+  )
+}
+
+// ---- the trip as a picture ----
+
+type PhaseKind = 'accel' | 'coast' | 'decel' | 'foam' | 'refuel'
+
+interface Phase {
+  kind: PhaseKind
+  t0: number
+  t1: number
+  /** Speed at each end, m/s (null in the foam: off this chart). */
+  v0: number | null
+  v1: number | null
+  /** Propellant at each end, kg. */
+  p0: number
+  p1: number
+}
+
+const PHASE: Record<PhaseKind, { label: string; color: string }> = {
+  accel: { label: 'speeding up', color: '#4fa38a' },
+  coast: { label: 'coasting', color: '#9fc2b6' },
+  decel: { label: 'braking', color: '#2f7462' },
+  foam: { label: 'in the foam', color: '#6a7fd6' },
+  refuel: { label: 'refuelling', color: '#b3a68c' }
+}
+
+/** The trip's events in time order, from the plan. */
+function phasesOf(plan: TripPlanDto): Phase[] {
+  const out: Phase[] = []
+  const push = (kind: PhaseKind, t0: number, dt: number, v0: number | null, v1: number | null, p0: number, p1: number): number => {
+    if (dt > 0) out.push({ kind, t0, t1: t0 + dt, v0, v1, p0, p1 })
+    return t0 + dt
+  }
+  plan.legs.forEach((l, k) => {
+    let t = l.departs - plan.departs
+    let p = l.propellantStart
+    const burn = (b: TripBurnDto | null): void => {
+      if (!b) return
+      t = push('accel', t, b.accel.time, 0, b.peakSpeed, p, p - b.accelPropellant)
+      p -= b.accelPropellant
+      t = push('coast', t, b.coast.time, b.peakSpeed, b.peakSpeed, p, p)
+      const dec = b.propellant - b.accelPropellant
+      t = push('decel', t, b.decel.time, b.peakSpeed, 0, p, p - dec)
+      p -= dec
+    }
+    burn(l.depart)
+    t = push('foam', t, l.foam.time, null, null, p, p - l.foam.propellant)
+    p -= l.foam.propellant
+    burn(l.arrive)
+    if (l.refuel) push('refuel', t, l.refuel.time, 0, 0, p, plan.legs[k + 1]?.propellantStart ?? p + l.refuel.propellant)
+  })
+  return out
+}
+
+/**
+ * The trip in one picture, on one time axis: above, the route (each system,
+ * the crawl out to where the ship lifts into the foam, the foam, the drop and
+ * the crawl in); below, what the ship is doing (shaded), its speed (solid)
+ * and the propellant left (dashed).
+ */
+function TripChart({ plan }: { plan: TripPlanDto }): React.JSX.Element | null {
+  const phases = phasesOf(plan)
+  if (!phases.length || plan.total <= 0) return null
+  const W = 900
+  const PAD = 46
+  const STRIP = 78
+  const H = 170
+  const AXIS = 22
+  const x = (t: number): number => PAD + (t / plan.total) * (W - 2 * PAD)
+  const vMax = Math.max(...phases.flatMap((p) => [p.v0 ?? 0, p.v1 ?? 0]), 1) * 1.12
+  const pMax = Math.max(...phases.flatMap((p) => [p.p0, p.p1]), 1) * 1.05
+  const yv = (v: number): number => STRIP + H - (v / vMax) * H
+  const yp = (p: number): number => STRIP + H - (p / pMax) * H
+  const days = plan.total / 86400
+  const step = days <= 4 ? 0.5 : days <= 12 ? 1 : days <= 40 ? 5 : days <= 120 ? 10 : 30
+  const ticks: number[] = []
+  for (let d = 0; d <= days + 1e-9; d += step) ticks.push(d)
+  const speedPath = phases
+    .filter((p) => p.v0 !== null)
+    .map((p) => `M ${x(p.t0).toFixed(1)} ${yv(p.v0!).toFixed(1)} L ${x(p.t1).toFixed(1)} ${yv(p.v1!).toFixed(1)}`)
+    .join(' ')
+  const fuelPath = phases
+    .map((p, k) => `${k ? 'L' : 'M'} ${x(p.t0).toFixed(1)} ${yp(p.p0).toFixed(1)} L ${x(p.t1).toFixed(1)} ${yp(p.p1).toFixed(1)}`)
+    .join(' ')
+  const yMid = STRIP / 2 + 6
+  return (
+    <div className="trip-chart-box">
+      <svg className="trip-chart" viewBox={`0 0 ${W} ${STRIP + H + AXIS + 8}`} role="img" aria-label="The trip, in time" id="tripChart">
+        {/* What the ship is doing, shaded across the chart. */}
+        {phases.map((p, k) => (
+          <g key={k}>
+            <rect x={x(p.t0)} y={STRIP} width={Math.max(0.8, x(p.t1) - x(p.t0))} height={H} fill={PHASE[p.kind].color} opacity={0.22}>
+              <title>
+                {PHASE[p.kind].label}: {duration(p.t1 - p.t0)}
+              </title>
+            </rect>
+            {x(p.t1) - x(p.t0) > 64 && (
+              <text className="trip-phase-label" x={(x(p.t0) + x(p.t1)) / 2} y={STRIP + H - 7} textAnchor="middle">
+                {PHASE[p.kind].label}
+              </text>
+            )}
+          </g>
+        ))}
+        {/* The route above, on the same time axis. */}
+        {plan.legs.map((l, k) => {
+          const t0 = l.departs - plan.departs
+          const lift = t0 + (l.depart ? l.depart.accel.time + l.depart.coast.time : 0)
+          const drop = lift + l.foam.time
+          const end = l.arrives - plan.departs
+          return (
+            <g key={`leg-${k}`} className="trip-strip">
+              <line x1={x(t0)} y1={yMid} x2={x(lift)} y2={yMid} className="crawl" />
+              <line x1={x(lift)} y1={yMid} x2={x(drop)} y2={yMid} className="foam" />
+              <line x1={x(drop)} y1={yMid} x2={x(end)} y2={yMid} className="crawl" />
+              <line x1={x(lift)} y1={yMid - 9} x2={x(lift)} y2={yMid + 9} className="edge" />
+              <line x1={x(drop)} y1={yMid - 9} x2={x(drop)} y2={yMid + 9} className="edge" />
+              {x(drop) - x(lift) > 34 ? (
+                <>
+                  <text x={x(lift)} y={yMid + 22} textAnchor="middle" className="small-label">
+                    lift
+                  </text>
+                  <text x={x(drop)} y={yMid + 22} textAnchor="middle" className="small-label">
+                    drop
+                  </text>
+                </>
+              ) : (
+                <text x={(x(lift) + x(drop)) / 2} y={yMid + 22} textAnchor="middle" className="small-label">
+                  lift · drop
+                </text>
+              )}
+              <text x={(x(lift) + x(drop)) / 2} y={yMid - 13} textAnchor="middle" className="small-label foam-label">
+                {duration(l.foam.time)} in the foam
+              </text>
+              {k === 0 && <System x={x(t0)} y={yMid} name={l.fromName} />}
+              <System x={x(end)} y={yMid} name={l.toName} />
+              {l.refuel && (
+                <line x1={x(end)} y1={yMid + 30} x2={x(end + l.refuel.time)} y2={yMid + 30} className="refuel">
+                  <title>
+                    Refuelling at {l.toName}: {duration(l.refuel.time)}
+                  </title>
+                </line>
+              )}
+            </g>
+          )
+        })}
+        {/* Speed (solid) and propellant (dashed). */}
+        <path d={fuelPath} className="trip-fuel" />
+        <path d={speedPath} className="trip-speed" />
+        <line x1={PAD} y1={STRIP + H} x2={W - PAD} y2={STRIP + H} className="trip-axis" />
+        {ticks.map((d) => (
+          <g key={d}>
+            <line x1={x(d * 86400)} y1={STRIP + H} x2={x(d * 86400)} y2={STRIP + H + 4} className="trip-axis" />
+            <text x={x(d * 86400)} y={STRIP + H + 16} textAnchor="middle" className="small-label">
+              {d === 0 ? 'day 0' : sig(d, 3)}
+            </text>
+          </g>
+        ))}
+        <line x1={PAD} y1={yv(vMax / 1.12)} x2={PAD + 6} y2={yv(vMax / 1.12)} className="trip-axis" />
+        <text x={PAD + 9} y={yv(vMax / 1.12) + 4} className="small-label speed-label">
+          {sig(vMax / 1.12 / 1000, 3)} km/s
+        </text>
+        <text x={W - PAD - 4} y={yp(pMax / 1.05) - 5} textAnchor="end" className="small-label fuel-label">
+          {sig(pMax / 1.05 / 1000, 3)} t propellant
+        </text>
+        <text x={W - PAD} y={STRIP + H + 16} textAnchor="end" className="small-label">
+          days
+        </text>
+      </svg>
+      <div className="trip-legend small">
+        {(Object.keys(PHASE) as PhaseKind[]).map((k) => (
+          <span key={k}>
+            <span className="swatch" style={{ background: PHASE[k].color }} /> {PHASE[k].label}
+          </span>
+        ))}
+        <span>
+          <span className="line speed" /> speed
+        </span>
+        <span>
+          <span className="line fuel" /> propellant left
+        </span>
+      </div>
+    </div>
+  )
+}
+
+function System({ x, y, name }: { x: number; y: number; name: string }): React.JSX.Element {
+  return (
+    <g className="trip-system">
+      <circle cx={x} cy={y} r={15} className="ring" />
+      <circle cx={x} cy={y} r={4.5} className="star" />
+      <text x={x} y={y - 22} textAnchor="middle">
+        {name}
+      </text>
+    </g>
   )
 }
 

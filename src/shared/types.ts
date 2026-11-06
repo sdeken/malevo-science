@@ -610,6 +610,7 @@ export interface TripBurnDto {
   decel: { time: number; distance: number }
   peakSpeed: number
   propellant: number
+  accelPropellant: number
   massEnd: number
 }
 

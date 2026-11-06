@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
-import { AU, DEG, contourGrid, foamLoad, stateAt, type Vec3 } from '@malevo/core'
+import { AU, DEG, G0, burnAllTheWayTime, contourGrid, foamLoad, stateAt, type Vec3 } from '@malevo/core'
 import { systemFrame } from '@malevo/model'
 import type { ApproachInfoDto, RouteInfoDto, SystemInfoDto, WorldSnapshot } from '../../../../shared/types'
 import { duration, sig } from '../../components/fields'
@@ -67,7 +67,11 @@ export function LegView({ route, snapshot, now }: Props): React.JSX.Element | nu
   const foam = legInfo?.foam ?? null
   const [apA, setApA] = useState<ApproachInfoDto | { error: string } | null>(null)
   const [apB, setApB] = useState<ApproachInfoDto | { error: string } | null>(null)
-  const depart = apA && !('error' in apA) ? apA.crawl : null
+  // Out without stopping: burn the whole way to the foam (the drop at the far end leaves the ship at rest anyway).
+  const depart =
+    apA && !('error' in apA) && apA.crawlDistance !== null
+      ? burnAllTheWayTime(apA.crawlDistance, (snapshot.physics?.torch.cruiseAccel_g ?? 1) * G0)
+      : null
   const tDrop = now + (depart ?? 0) + (foam ?? 0)
   useEffect(() => {
     let live = true
@@ -156,7 +160,7 @@ export function LegView({ route, snapshot, now }: Props): React.JSX.Element | nu
 /** The four stages of the trip, as a bar to scale and their times. */
 function Stages({ depart, foam, arrive }: { depart: number | null; foam: number | null; arrive: number | null }): React.JSX.Element {
   const stages = [
-    { key: 'depart', label: 'Departure burn', t: depart, note: 'from the port out to where the ship enters the foam' },
+    { key: 'depart', label: 'Departure burn', t: depart, note: 'from the port out to the foam, burning the whole way (no braking)' },
     { key: 'foam', label: 'Foam', t: foam, note: 'between the stars' },
     { key: 'accel', label: 'Acceleration burn', t: arrive === null ? null : arrive / 2, note: 'from the drop to the flip' },
     { key: 'decel', label: 'Deceleration burn', t: arrive === null ? null : arrive / 2, note: 'from the flip to insertion at the port' }

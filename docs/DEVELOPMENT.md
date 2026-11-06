@@ -222,13 +222,18 @@ module.exports = {
   go, so a heavy ship is thrust-limited until it burns off propellant.
 - **Each leg** is flown on what is in the tanks at its start:
   - the departure burn from the port out to the foam, using the approach model's crawl
-    distance toward the next waypoint;
+    distance toward the next waypoint. It burns the whole way without braking (`outbound`):
+    the drop at the far end leaves the ship at rest anyway;
   - the foam, at the world's top speed, burning fuel for the foam and the torch;
   - the arrival burn from the drop to the port, worked out at the time of the drop.
 
   If flip-and-burn on both crawls would leave less than the reserve, the planner finds the
   highest cruise speed (one cap for both crawls) that leaves it, and the ship coasts between its
   burns. A leg that cannot be flown even crawling slowly says so.
+- **The trip in one picture:** one time axis. Above it, the route: each system, the crawl out,
+  where the ship lifts into the foam, the foam, the drop, the crawl in, and refuelling. Below
+  it, what the ship is doing (speeding up, coasting, braking, in the foam, refuelling), its speed,
+  and the propellant left.
 - **Refuelling:** every port (a system) and station sells fuel, taking the longer of the
   stopover and the time to pump the tanks full. A bare star is a pass-through: the ship drops
   and lifts again, with no crawl and no fuel. Each leg also shows the route planner's idealized
