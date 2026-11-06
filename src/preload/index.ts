@@ -36,7 +36,7 @@ import type {
   WorldResult,
   WorldSnapshot
 } from '../shared/types'
-import type { ExploreQuery, ExploreResult, Sense } from '@malevo/model'
+import type { BatchName, BatchRequest, ExploreQuery, ExploreResult, Sense } from '@malevo/model'
 
 type Unsubscribe = () => void
 
@@ -161,7 +161,9 @@ const api = {
     /** Every sense of a word in the word list (WordNet), with its base form found if inflected. */
     senses: (word: string): Promise<{ source: string; senses: Sense[] } | { error: string }> => ipcRenderer.invoke(IPC.namesSenses, word),
     /** Words reached from the chosen senses by the ticked links, alphabetically, each with how it was reached. */
-    explore: (q: ExploreQuery): Promise<ExploreResult | { error: string }> => ipcRenderer.invoke(IPC.namesExplore, q)
+    explore: (q: ExploreQuery): Promise<ExploreResult | { error: string }> => ipcRenderer.invoke(IPC.namesExplore, q),
+    /** New names for the next batch, drawn from what was liked (see packages/model/src/namegen.ts). */
+    batch: (q: BatchRequest): Promise<BatchName[] | { error: string }> => ipcRenderer.invoke(IPC.namesBatch, q)
   },
   prose: {
     /** A prose or character file's current text (unsaved changes included), or null. */

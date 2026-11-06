@@ -2323,7 +2323,7 @@ fieldset.plain {
 /* ---- Names ---- */
 
 .naming h3 {
-  margin: 20px 0 6px;
+  margin: 18px 0 6px;
 }
 
 .naming textarea {
@@ -2342,6 +2342,22 @@ fieldset.plain {
   display: inline-flex;
   gap: 4px;
   align-items: center;
+}
+
+.naming-setup {
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 8px 12px;
+  margin: 12px 0;
+}
+
+.naming-setup > summary {
+  cursor: pointer;
+  font-weight: 600;
+}
+
+.naming-sources {
+  margin: 10px 0 4px;
 }
 
 .naming .concept {
@@ -2381,87 +2397,6 @@ fieldset.plain {
   margin: 6px 0;
 }
 
-.word-chips {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 4px;
-  margin: 6px 0;
-}
-
-.word-chip {
-  display: inline-flex;
-  border: 1px solid var(--border);
-  border-radius: 3px;
-  background: var(--bg-raised);
-}
-
-.word-chip button {
-  background: none;
-  border: none;
-  padding: 2px 6px;
-  cursor: pointer;
-}
-
-.word-chip .x {
-  padding: 2px 5px;
-  color: var(--muted, #888);
-  border-left: 1px solid var(--border);
-}
-
-.word-chip.kept {
-  border-color: var(--accent, #3a7);
-  font-weight: 600;
-}
-
-.word-chip.dropped {
-  opacity: 0.45;
-  text-decoration: line-through;
-}
-
-.naming .kept-list {
-  list-style: none;
-  padding: 0;
-  margin: 4px 0 8px;
-  display: grid;
-  gap: 2px;
-}
-
-.naming .kept-list li {
-  display: flex;
-  gap: 8px;
-  align-items: center;
-}
-
-.naming input.note {
-  flex: 1;
-  min-width: 120px;
-  font-size: 0.9em;
-}
-
-.naming .x {
-  background: none;
-  border: none;
-  cursor: pointer;
-}
-
-.naming tr.candidate.no strong {
-  text-decoration: line-through;
-  opacity: 0.6;
-}
-
-.naming tr.candidate.chosen strong {
-  color: var(--accent, #3a7);
-}
-
-.naming-record {
-  margin: 20px 0;
-}
-
-.naming-record ol {
-  font-size: 0.9em;
-  padding-left: 1.6em;
-}
-
 .naming .field-row.tight input:not([type='checkbox']) {
   width: auto;
   flex: 1;
@@ -2469,6 +2404,103 @@ fieldset.plain {
   max-width: 420px;
 }
 
-.naming .naming-kept .field-row.tight {
-  align-items: end;
+.naming input.note {
+  flex: 1;
+  min-width: 160px;
+}
+
+.batch {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  gap: 8px;
+  margin: 8px 0 12px;
+}
+
+.name-card {
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--bg-raised);
+  padding: 10px 10px 8px;
+  display: grid;
+  gap: 4px;
+  align-content: start;
+}
+
+.name-card .name-text {
+  font-size: 1.25em;
+  font-weight: 600;
+}
+
+.name-card .name-from {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.name-card .card-actions {
+  display: flex;
+  gap: 4px;
+  margin-top: 4px;
+}
+
+.name-card .card-actions button {
+  font-size: 12px;
+  padding: 2px 6px;
+}
+
+.name-card .card-actions button.on {
+  background: var(--accent);
+  color: var(--accent-text);
+  border-color: var(--accent);
+}
+
+.name-card.liked {
+  border-color: var(--accent);
+}
+
+.name-card.locked {
+  border-color: var(--warn, #e0a43c);
+  box-shadow: inset 0 0 0 1px var(--warn, #e0a43c);
+}
+
+.name-card.chosen {
+  border-color: var(--ok);
+  box-shadow: inset 0 0 0 2px var(--ok);
+}
+
+.name-card .warn {
+  color: var(--warn, #e0a43c);
+}
+
+.batch-row {
+  align-items: center;
+  gap: 12px;
+}
+
+.naming-chosen {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  margin: 6px 0;
+  font-size: 1.1em;
+}
+
+.naming-rounds li .liked {
+  font-weight: 600;
+}
+
+.naming-rounds li .locked {
+  font-weight: 700;
+  color: var(--warn, #e0a43c);
+}
+
+.naming-rounds,
+.naming-record {
+  margin: 16px 0;
+}
+
+.naming-rounds ol,
+.naming-record ol {
+  font-size: 0.9em;
+  padding-left: 1.6em;
 }

@@ -458,42 +458,51 @@ module.exports = {
 
 ### Names
 
-- **A brainstorm, not an oracle.** The Names tool looks words up and follows links between them;
-  it never ranks, scores or suggests a name. Every choice is the person's, and each one is
-  recorded.
+- **Ten at a time, steered by the person.** The Names tool shows a batch of ten names. The
+  person likes the ones that are close, locks the ones they really like, and draws the next
+  ten. Locked names carry into every later batch. Liked and locked names drive the next batch
+  (weight 3), and names liked in earlier batches still count, for less (weight 1). A name once
+  shown is never shown again as new. A few rounds in, something should fit; the person marks
+  it chosen.
+- **A brainstorm, not an oracle.** Nothing ranks, scores or suggests. Each batch is a plain
+  procedure (`packages/model/src/namegen.ts`), drawn with a recorded seed, and each name says how
+  it was made. A batch is shared out between the sources the person ticks:
+  - **Words:** from the word list. The first batch draws from the neighbourhood of the senses
+    ticked for the words looked up. Later batches draw 70% from one link around each liked
+    word, with the same kinds of link, and the rest from that first neighbourhood ("near what
+    you liked: Ponderous → derived → heft").
+  - **Invented:** an order-2 letter chain over the liked names and the person's example names.
+    The word list's own words fill in, lightly, when there is too little to go on. Half are
+    small changes to a liked name instead: a vowel or consonant swapped, or two liked names
+    spliced after a vowel ("Tobrin × Mirel").
+  - **Pairs:** two liked names together ("A B", "A of B", "The A B"), one per pair of names.
+
+  A source with nothing to go on gives its share to the others.
 - **The word list** is WordNet 3.1 (Princeton's licence, in `out/wordnet/LICENSE`), from the
   `wordnet-db` package. `scripts/build-wordnet.mjs` packs it into `out/wordnet/wordnet.json`
   during `npm run build`. Main loads it the first time the tool asks (`src/main/lexicon.ts`).
-  The parsing and exploring are in `packages/model/src/lexicon.ts`.
-- **Senses:** looking up a word finds its base form ("lumbering" → lumber, as well as
-  lumbering), and lists every sense with its definition. The person ticks the senses they mean.
-- **Exploring** walks out from the ticked senses along the links the person ticks:
+  Parsing and exploring are in `packages/model/src/lexicon.ts`.
+- **Setting up the words:** looking up a word finds its base form ("lumbering" → lumber, as
+  well as lumbering) and lists every sense with its definition. The person ticks the senses
+  they mean, the links to follow, and how far (1 to 3 links):
   - similar (similar to, see also, attribute, pertains to, ...);
   - derived forms, broader, narrower;
   - parts and wholes, topic and region, opposites, causes and entails.
 
-  It walks 1 to 3 links out, and synonyms always come along. **Defined using** adds senses
-  whose definition uses the looked-up word or its base form ("sloth: slow-moving arboreal
-  mammals"). Each word carries the shortest path from each word looked up, shown on hover
-  ("slow → similar → sluggish").
-- **Narrowing** keeps words reached from every word looked up, or from any. It can also
-  filter by part of speech, by WordNet's category ("animal (noun)", "artifact (noun)"),
-  letters, single words and a substring. Order is alphabetical, or fewest links first.
-- **Shuffle** drops kept words at random into a pattern the person writes ("{word} {word}",
-  "The {word}"). Candidates are written by the person, and each is marked maybe, no or chosen.
-  A candidate that is already a name in the world (a system, body, ship, station, culture,
-  polity, city, route or character) says so.
-- **The record** is `namings/<id>.json`. It holds the brief, the senses ticked (copied with
-  their definitions, so the file reads without the app), the links and narrowing used, the
-  words kept and dropped, and the candidates. `log` lists each step with the wall-clock time:
-  - looked up;
-  - meant this sense;
-  - followed these links;
-  - narrowed;
-  - kept, dropped and restored words;
-  - shuffled, and what came out;
-  - wrote down, chose and ruled out candidates;
-  - notes.
+  Synonyms always come along. **Defined using** adds senses whose definition uses the
+  looked-up word as it appears in the ticked senses ("sloth: slow-moving arboreal mammals").
+  Words can be narrowed by part of speech, by WordNet's category ("animal (noun)"), by number
+  of letters, and to single words.
+- **A name already in the world** (a system, body, ship, station, culture, polity, city, route or
+  character) says so on its card.
+- **The record** is `namings/<id>.json`. It holds the brief, the sources, the example names, and
+  the ticked senses, copied with their definitions so the file reads without the app. It also
+  holds the links and narrowing, every batch (time, seed, names with how each was made, liked,
+  locked) and the chosen name with a note. `log` lists each step with the wall-clock time:
+  - looked up, meant this sense;
+  - followed these links, narrowed;
+  - drew batch N (and from what);
+  - liked, locked, chose.
 
   Undo takes a step back out of the log along with the change.
 

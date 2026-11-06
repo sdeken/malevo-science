@@ -7,7 +7,7 @@ import type { AppInfo, ApproachQueryDto, EditableKind, Settings, ViewpointDto, W
 import type { SettingsStore } from './settings'
 import type { Updater } from './updates'
 import type { WorldSession } from './world'
-import { exploreWords, lookUpSenses } from './lexicon'
+import { exploreWords, lookUpSenses, nameBatch } from './lexicon'
 
 export interface IpcDeps {
   settings: SettingsStore
@@ -159,6 +159,7 @@ export function registerIpc(deps: IpcDeps): void {
   ipcMain.handle(IPC.tripSize, (_e, q: unknown) => world.sizeShip(tripQuery(q)))
   ipcMain.handle(IPC.namesSenses, (_e, w: unknown) => lookUpSenses(w))
   ipcMain.handle(IPC.namesExplore, (_e, q: unknown) => exploreWords(q))
+  ipcMain.handle(IPC.namesBatch, (_e, q: unknown) => nameBatch(q))
   ipcMain.handle(IPC.proseRead, (_e, p: unknown) => world.proseText(String(p)))
   ipcMain.handle(IPC.proseWrite, (_e, p: unknown, text: unknown) => world.writeProse(String(p), text === null ? null : String(text)))
   ipcMain.handle(IPC.worldAddKnownPlanets, (_e, sys: unknown, candidates: unknown) =>

@@ -1,13 +1,15 @@
 import { useEffect, useMemo, useState } from 'react'
 import {
   LINK_GROUP_NAMES,
+  NAME_SOURCES,
   newNaming,
+  passesNarrow,
   type ExploreResult,
   type LinkGroup,
+  type NameSource,
   type NamingFile,
   type NamingStep,
-  type Sense,
-  type WordHit
+  type Sense
 } from '@malevo/model'
 import type { WorldSnapshot } from '../../../../shared/types'
 import { NumberField, TextField } from '../../components/fields'
@@ -15,11 +17,11 @@ import { slugId, useWorldPref } from '../../state'
 import type { ToolDefinition, ToolProps } from '../registry'
 
 /**
- * The Names tool: a brainstorm, not an oracle. The person looks up words,
- * ticks the senses they mean, chooses which links to follow, narrows what
- * comes back, keeps and drops words, shuffles kept words together and writes
- * candidates. The tool never ranks or suggests; it records every step, with
- * the time, in namings/<id>.json.
+ * The Names tool: a brainstorm, not an oracle. It shows ten names at a time;
+ * the person likes some and locks the ones they really like, and the next ten
+ * are drawn from those (packages/model/src/namegen.ts), until something fits.
+ * The tool never ranks or suggests; every batch, like, lock and choice is
+ * recorded with the time in namings/<id>.json.
  */
 function NamesView({ world, snapshot }: ToolProps): React.JSX.Element {
   const [namingId, setNamingId] = useWorldPref<string | null>(world.root, 'naming', null)
@@ -30,7 +32,8 @@ function NamesView({ world, snapshot }: ToolProps): React.JSX.Element {
         <h2>Names</h2>
         <ul>
           {snapshot.namings.map((n) => {
-            const chosen = (n.value?.candidates as NamingFile['candidates'] | undefined)?.find((c) => c.status === 'chosen')
+            const chosen = n.value?.chosen as string | undefined
+            const rounds = (n.value?.rounds as unknown[] | undefined)?.length ?? 0
             return (
               <li key={n.id}>
                 <button
@@ -39,7 +42,15 @@ function NamesView({ world, snapshot }: ToolProps): React.JSX.Element {
                   data-naming={n.id}
                 >
                   <span>{String(n.value?.name ?? n.id)}</span>
-                  <span className="muted small">{n.value ? (chosen ? `→ ${chosen.text}` : 'open') : 'has errors'}</span>
+                  <span className="muted small">
+                    {n.value
+                      ? chosen
+                        ? `→ ${chosen}`
+                        : rounds
+                          ? `${rounds} batch${rounds === 1 ? '' : 'es'}`
+                          : 'not started'
+                      : 'has errors'}
+                  </span>
                 </button>
               </li>
             )
@@ -52,10 +63,9 @@ function NamesView({ world, snapshot }: ToolProps): React.JSX.Element {
           <>
             <h1>Names</h1>
             <p className="muted">
-              A brainstorm for a name. Look up words that say what the thing is like, tick the senses you mean, and follow the word list’s
-              links (similar, derived, broader, narrower …) to related words. Keep the ones that catch your ear, shuffle them together,
-              write candidates. Nothing here is ranked or suggested; every step you take is recorded with the name. Start one for whatever
-              needs naming.
+              A brainstorm for a name, ten at a time. Like the ones that are close, lock the ones you love, and the next ten are drawn from
+              them: words near the ones you liked, new names built from their sounds, and pairs of them. A few rounds in, something should
+              fit. Nothing is ranked or suggested, and every round is recorded with the name. Start one for whatever needs naming.
             </p>
           </>
         ) : (
@@ -149,24 +159,25 @@ function Naming({ id, file, snapshot }: { id: string; file: NamingFile; snapshot
     for (const k of Object.keys(next)) if (next[k] === undefined) delete next[k]
     void window.malevo.world.setEntity('naming', id, next)
   }
-  const [result, setResult] = useState<ExploreResult | { error: string } | null>(null)
+  const [explored, setExplored] = useState<ExploreResult | { error: string } | null>(null)
   const active = file.concepts.filter((c) => c.senses.length)
   const query = JSON.stringify({ concepts: active.map((c) => ({ word: c.word, senses: c.senses.map((s) => s.id) })), ...file.links })
   useEffect(() => {
     if (!active.length) {
-      setResult(null)
+      setExplored(null)
       return
     }
     let live = true
     const q = JSON.parse(query) as { concepts: { word: string; senses: string[] }[]; groups: LinkGroup[]; depth: number; defined: boolean }
     void window.malevo.names
       .explore({ concepts: q.concepts, links: q.groups, depth: q.depth, defined: q.defined })
-      .then((r) => live && setResult(r))
+      .then((r) => live && setExplored(r))
     return () => {
       live = false
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [query])
+  const [setupOpen, setSetupOpen] = useState(!file.rounds.length)
 
   return (
     <section className="naming" id="naming">
@@ -179,11 +190,20 @@ function Naming({ id, file, snapshot }: { id: string; file: NamingFile; snapshot
         />
       </div>
       <Brief file={file} change={change} />
-      <Concepts file={file} change={change} />
-      <Links file={file} change={change} />
-      <Words file={file} change={change} result={result} activeCount={active.length} />
-      <Kept file={file} change={change} />
-      <Candidates file={file} change={change} snapshot={snapshot} />
+      <details className="naming-setup" open={setupOpen} onToggle={(e) => setSetupOpen((e.target as HTMLDetailsElement).open)}>
+        <summary>Where names come from</summary>
+        <Sources file={file} change={change} />
+        {file.sources.includes('words') && (
+          <>
+            <Concepts file={file} change={change} />
+            <Links file={file} change={change} />
+            <Narrow file={file} change={change} explored={explored} />
+          </>
+        )}
+        {file.sources.includes('sounds') && <Examples file={file} change={change} />}
+      </details>
+      <Batch file={file} change={change} snapshot={snapshot} />
+      <Rounds file={file} />
       <Record file={file} />
     </section>
   )
@@ -347,64 +367,63 @@ function Links({ file, change }: { file: NamingFile; change: Change }): React.JS
   )
 }
 
-function Words({
+const SOURCE_LABELS: Record<NameSource, { label: string; hint: string }> = {
+  words: { label: 'Words', hint: 'Words from the word list, near the senses you tick and near the names you like' },
+  sounds: { label: 'Invented', hint: 'New names built from the letters of names you like and your example names' },
+  pairs: { label: 'Pairs', hint: 'Two names you liked together: “A B”, “A of B”, “The A B”' }
+}
+
+function Sources({ file, change }: { file: NamingFile; change: Change }): React.JSX.Element {
+  return (
+    <div className="checks naming-sources">
+      <span>Draw from:</span>
+      {NAME_SOURCES.map((src) => (
+        <label key={src} title={SOURCE_LABELS[src].hint}>
+          <input
+            type="checkbox"
+            checked={file.sources.includes(src)}
+            onChange={(e) => {
+              const sources = e.target.checked
+                ? NAME_SOURCES.filter((x) => x === src || file.sources.includes(x))
+                : file.sources.filter((x) => x !== src)
+              change(
+                { sources },
+                'sources',
+                `Drawing from: ${sources.map((x) => SOURCE_LABELS[x].label.toLowerCase()).join(', ') || 'nothing'}.`
+              )
+            }}
+            data-source={src}
+          />
+          {SOURCE_LABELS[src].label}
+        </label>
+      ))}
+    </div>
+  )
+}
+
+function Narrow({
   file,
   change,
-  result,
-  activeCount
+  explored
 }: {
   file: NamingFile
   change: Change
-  result: ExploreResult | { error: string } | null
-  activeCount: number
+  explored: ExploreResult | { error: string } | null
 }): React.JSX.Element {
-  const [order, setOrder] = useState<'alpha' | 'steps'>('alpha')
-  const [showDropped, setShowDropped] = useState(false)
-  const [limit, setLimit] = useState(400)
   const n = file.narrow
-  const kept = new Set(file.kept.map((k) => k.word.toLowerCase()))
-  const dropped = new Set(file.dropped.map((d) => d.toLowerCase()))
-  const words = useMemo(() => (result && !('error' in result) ? result.words : []), [result])
+  const words = useMemo(() => (explored && !('error' in explored) ? explored.words : []), [explored])
   const categories = useMemo(() => [...new Set(words.flatMap((w) => w.senses.map((s) => s.category)))].sort(), [words])
+  const inReach = words.filter((w) => passesNarrow(w, n)).length
   const setNarrow = (x: NamingFile['narrow'], text: string): void => {
     const clean = { ...x } as Record<string, unknown>
     for (const k of Object.keys(clean))
-      if (clean[k] === undefined || (Array.isArray(clean[k]) && !(clean[k] as unknown[]).length)) delete clean[k]
+      if (clean[k] === undefined || clean[k] === false || (Array.isArray(clean[k]) && !(clean[k] as unknown[]).length)) delete clean[k]
     change({ narrow: clean as NamingFile['narrow'] }, 'narrow', text)
   }
-  const shown = words.filter((w) => {
-    const key = w.word.toLowerCase()
-    if (!showDropped && dropped.has(key)) return false
-    if (n.match === 'all' && w.reached.length < activeCount) return false
-    if (n.pos?.length && !w.senses.some((s) => n.pos!.includes(posOf(s)))) return false
-    if (n.categories?.length && !w.senses.some((s) => n.categories!.includes(s.category))) return false
-    if (n.maxLetters && w.word.replace(/[^A-Za-z]/g, '').length > n.maxLetters) return false
-    if (n.singleWords && /[\s-]/.test(w.word)) return false
-    if (n.contains && !key.includes(n.contains.toLowerCase())) return false
-    return true
-  })
-  const steps = (w: WordHit): number => w.reached.reduce((a, r) => a + r.steps, 0) + (activeCount - w.reached.length) * 10
-  if (order === 'steps') shown.sort((a, b) => steps(a) - steps(b))
   return (
-    <div className="naming-words">
-      <h3>Words reached</h3>
+    <div className="naming-narrow">
+      <h3>Which words</h3>
       <div className="field-row narrow-row">
-        <label className="field">
-          Reached from
-          <select
-            value={n.match}
-            onChange={(e) =>
-              setNarrow(
-                { ...n, match: e.target.value as 'all' | 'any' },
-                `Narrowed to words reached from ${e.target.value === 'all' ? 'every word' : 'any word'}.`
-              )
-            }
-            id="narrowMatch"
-          >
-            <option value="any">any word</option>
-            <option value="all">every word</option>
-          </select>
-        </label>
         <div className="checks">
           {(Object.keys(POS_LABELS) as Pos[]).map((p) => (
             <label key={p}>
@@ -413,7 +432,7 @@ function Words({
                 checked={n.pos?.includes(p) ?? false}
                 onChange={(e) => {
                   const pos = e.target.checked ? [...(n.pos ?? []), p] : (n.pos ?? []).filter((x) => x !== p)
-                  setNarrow({ ...n, pos }, pos.length ? `Narrowed to ${pos.map((x) => POS_LABELS[x]).join(', ')}.` : 'Any part of speech.')
+                  setNarrow({ ...n, pos }, pos.length ? `Only ${pos.map((x) => POS_LABELS[x]).join(', ')}.` : 'Any part of speech.')
                 }}
                 data-pos={p}
               />
@@ -424,9 +443,7 @@ function Words({
             <input
               type="checkbox"
               checked={n.singleWords ?? false}
-              onChange={(e) =>
-                setNarrow({ ...n, singleWords: e.target.checked || undefined }, e.target.checked ? 'Single words only.' : 'Phrases too.')
-              }
+              onChange={(e) => setNarrow({ ...n, singleWords: e.target.checked }, e.target.checked ? 'Single words only.' : 'Phrases too.')}
             />
             single words
           </label>
@@ -439,14 +456,6 @@ function Words({
             setNarrow({ ...n, maxLetters: x && x > 0 ? Math.round(x) : undefined }, x ? `At most ${Math.round(x)} letters.` : 'Any length.')
           }
           id="narrowLetters"
-        />
-        <TextField
-          label="Contains"
-          value={n.contains ?? ''}
-          onCommit={(v) =>
-            setNarrow({ ...n, contains: v.trim() || undefined }, v.trim() ? `Containing “${v.trim()}”.` : 'Containing anything.')
-          }
-          id="narrowContains"
         />
       </div>
       {categories.length > 1 && (
@@ -462,7 +471,7 @@ function Words({
                     const categories = e.target.checked ? [...(n.categories ?? []), c] : (n.categories ?? []).filter((x) => x !== c)
                     setNarrow(
                       { ...n, categories },
-                      categories.length ? `Narrowed to kinds: ${categories.map(categoryLabel).join(', ')}.` : 'Any kind of thing.'
+                      categories.length ? `Only kinds: ${categories.map(categoryLabel).join(', ')}.` : 'Any kind of thing.'
                     )
                   }}
                   data-category={c}
@@ -473,269 +482,242 @@ function Words({
           </div>
         </details>
       )}
-      {!activeCount ? (
-        <p className="muted small">Tick a sense of a word above to see the words it leads to.</p>
-      ) : !result ? (
-        <p className="muted small">Exploring… (the first time takes a few seconds)</p>
-      ) : 'error' in result ? (
-        <p className="error">{result.error}</p>
-      ) : (
-        <>
-          <p className="muted small" id="wordCount">
-            {shown.length} of {words.length} words
-            {result.capped.length ? ' (some neighbourhoods were too big and were cut short: fewer links out?)' : ''}. Click a word to keep
-            it, × to drop it. Order:{' '}
-            <button className="link" onClick={() => setOrder(order === 'alpha' ? 'steps' : 'alpha')} id="wordOrder">
-              {order === 'alpha' ? 'alphabetical' : 'fewest links first'}
-            </button>
-            {' · '}
-            <button className="link" onClick={() => setShowDropped(!showDropped)}>
-              {showDropped ? 'hide dropped' : `show dropped (${file.dropped.length})`}
-            </button>
-          </p>
-          <div className="word-chips" id="wordChips">
-            {shown.slice(0, limit).map((w) => {
-              const key = w.word.toLowerCase()
-              const how = w.reached.map((r) => r.path).join('\n')
-              const means = w.senses.map((s) => `${s.words.join(', ')} (${categoryLabel(s.category)}): ${s.gloss}`).join('\n')
-              const cls = kept.has(key) ? 'word-chip kept' : dropped.has(key) ? 'word-chip dropped' : 'word-chip'
-              return (
-                <span className={cls} key={key} title={`${how}\n\n${means}`} data-word={w.word}>
-                  <button
-                    className="word"
-                    onClick={() =>
-                      kept.has(key)
-                        ? undefined
-                        : change(
-                            { kept: [...file.kept, { word: w.word }], dropped: file.dropped.filter((d) => d.toLowerCase() !== key) },
-                            'keep',
-                            `Kept “${w.word}” (${w.reached[0]?.path ?? ''}).`
-                          )
-                    }
-                  >
-                    {w.word}
-                  </button>
-                  {!kept.has(key) &&
-                    (dropped.has(key) ? (
-                      <button
-                        className="x"
-                        title="Bring back"
-                        onClick={() =>
-                          change({ dropped: file.dropped.filter((d) => d.toLowerCase() !== key) }, 'restore', `Brought back “${w.word}”.`)
-                        }
-                      >
-                        ↺
-                      </button>
-                    ) : (
-                      <button
-                        className="x"
-                        title="Drop"
-                        onClick={() => change({ dropped: [...file.dropped, w.word] }, 'drop', `Dropped “${w.word}”.`)}
-                      >
-                        ×
-                      </button>
-                    ))}
-                </span>
-              )
-            })}
-            {shown.length > limit && (
-              <button className="link" onClick={() => setLimit(limit + 400)}>
-                {shown.length - limit} more…
-              </button>
-            )}
-          </div>
-        </>
-      )}
+      <p className="muted small" id="wordsInReach">
+        {!file.concepts.some((c) => c.senses.length)
+          ? 'Tick a sense of a word above for words to draw on.'
+          : !explored
+            ? 'Looking… (the first time takes a few seconds)'
+            : 'error' in explored
+              ? explored.error
+              : `${inReach} of ${words.length} words in reach${explored.capped.length ? ' (some neighbourhoods were cut short: fewer links out?)' : ''}.`}
+      </p>
     </div>
   )
 }
 
-function Kept({ file, change }: { file: NamingFile; change: Change }): React.JSX.Element {
-  const [shuffled, setShuffled] = useState<string[]>([])
-  const pattern = file.pattern ?? '{word} {word}'
-  const [draft, setDraft] = useState(pattern)
-  useEffect(() => setDraft(pattern), [pattern])
-  const shuffle = (): void => {
-    const words = file.kept.map((k) => k.word)
-    const slots = (pattern.match(/\{word\}/g) ?? []).length
-    if (!words.length || !slots) return setShuffled([])
-    const out = new Set<string>()
-    for (let tries = 0; out.size < 12 && tries < 200; tries++) {
-      const pool = [...words]
-      const text = pattern.replace(/\{word\}/g, () => {
-        const i = Math.floor(Math.random() * pool.length)
-        const w = pool.length ? pool.splice(i, 1)[0] : words[Math.floor(Math.random() * words.length)]
-        return w.replace(/^./, (c) => c.toUpperCase())
-      })
-      out.add(text)
-    }
-    setShuffled([...out])
-    change({}, 'shuffle', `Shuffled kept words into “${pattern}”: ${[...out].join(' · ')}`)
-  }
-  const addCandidate = (text: string, how: string): void => {
-    if (file.candidates.some((c) => c.text.toLowerCase() === text.toLowerCase())) return
-    change({ candidates: [...file.candidates, { text, status: 'maybe' }] }, 'candidate', `Wrote down “${text}” ${how}.`)
-  }
+function Examples({ file, change }: { file: NamingFile; change: Change }): React.JSX.Element {
+  const shown = (file.examples ?? []).join(', ')
+  const [draft, setDraft] = useState(shown)
+  useEffect(() => setDraft(shown), [shown])
   return (
-    <div className="naming-kept" id="keptWords">
-      <h3>Kept</h3>
-      {!file.kept.length ? (
-        <p className="muted small">Nothing kept yet.</p>
-      ) : (
-        <ul className="kept-list">
-          {file.kept.map((k, i) => (
-            <li key={k.word} data-kept={k.word}>
-              <button
-                className="link"
-                title="Write down as a candidate"
-                onClick={() =>
-                  addCandidate(
-                    k.word.replace(/^./, (c) => c.toUpperCase()),
-                    'from a kept word'
-                  )
-                }
-              >
-                {k.word}
-              </button>
-              <NoteField
-                value={k.note}
-                onCommit={(note) =>
-                  change(
-                    { kept: file.kept.map((x, j) => (j === i ? { ...x, note } : x)) },
-                    'note',
-                    `Note on “${k.word}”: ${note ?? '(removed)'}`
-                  )
-                }
-              />
-              <button
-                className="x"
-                title="Un-keep"
-                onClick={() => change({ kept: file.kept.filter((_, j) => j !== i) }, 'unkeep', `Un-kept “${k.word}”.`)}
-              >
-                ×
-              </button>
-            </li>
-          ))}
-        </ul>
-      )}
-      <div className="field-row tight">
-        <label className="field">
-          Pattern
-          <input
-            value={draft}
-            onChange={(e) => setDraft(e.target.value)}
-            onBlur={() => draft.trim() && draft !== pattern && change({ pattern: draft.trim() }, 'shuffle', `Pattern “${draft.trim()}”.`)}
-            id="shufflePattern"
+    <label className="field">
+      Names that sound right, for invented names (optional, comma-separated)
+      <input
+        id="namingExamples"
+        value={draft}
+        placeholder="Aldren, Corvane, Mirel…"
+        onChange={(e) => setDraft(e.target.value)}
+        onBlur={() => {
+          const list = draft
+            .split(/[,\n]/)
+            .map((x) => x.trim())
+            .filter(Boolean)
+          if (list.join(', ') === shown) return
+          change(
+            { examples: list.length ? list : undefined },
+            'examples',
+            list.length ? `Example names: ${list.join(', ')}.` : 'No example names.'
+          )
+        }}
+        onKeyDown={(e) => e.key === 'Enter' && (e.target as HTMLInputElement).blur()}
+      />
+    </label>
+  )
+}
+
+const sourceTag = (s: string): string => (s === 'locked' ? 'locked' : (SOURCE_LABELS[s as NameSource]?.label.toLowerCase() ?? s))
+
+function Batch({ file, change, snapshot }: { file: NamingFile; change: Change; snapshot: WorldSnapshot }): React.JSX.Element {
+  const round = file.rounds[file.rounds.length - 1] ?? null
+  const [busy, setBusy] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+  const inUse = useMemo(() => namesInUse(snapshot), [snapshot])
+
+  const next = async (): Promise<void> => {
+    setError(null)
+    const locked = round?.locked ?? []
+    const liked = round ? [...new Set([...round.locked, ...round.liked])] : []
+    const earlier = [...new Set(file.rounds.slice(0, -1).flatMap((r) => [...r.locked, ...r.liked]))].filter((x) => !liked.includes(x))
+    const seed = Math.floor(Math.random() * 2 ** 31)
+    setBusy(true)
+    const made = await window.malevo.names.batch({
+      count: Math.max(5, 10 - locked.length),
+      sources: file.sources,
+      seed,
+      concepts: file.concepts.filter((c) => c.senses.length).map((c) => ({ word: c.word, senses: c.senses.map((s) => s.id) })),
+      links: file.links.groups,
+      depth: file.links.depth,
+      defined: file.links.defined,
+      narrow: file.narrow,
+      examples: file.examples ?? [],
+      liked,
+      earlier,
+      exclude: file.rounds.flatMap((r) => r.names.map((x) => x.text))
+    })
+    setBusy(false)
+    if ('error' in made) return setError(made.error)
+    if (!made.length)
+      return setError(
+        'Nothing to draw from yet: tick a sense of a word (for words), write a few example names (for invented names), or like a couple of names (for pairs).'
+      )
+    const carried = locked.map((text) => {
+      const prev = round?.names.find((x) => x.text === text)
+      return {
+        text,
+        source: 'locked' as const,
+        from: prev ? (prev.source === 'locked' ? prev.from : `${sourceTag(prev.source)}: ${prev.from}`) : ''
+      }
+    })
+    const k = file.rounds.length + 1
+    change(
+      { rounds: [...file.rounds, { at: now(), seed, names: [...carried, ...made], liked: [], locked }] },
+      'batch',
+      `Batch ${k}: ${made.map((x) => x.text).join(', ')}.` +
+        (liked.length ? ` Drawn from ${liked.join(', ')}.` : '') +
+        (locked.length ? ` Locked: ${locked.join(', ')}.` : '')
+    )
+  }
+
+  const setRound = (patch: Partial<NamingFile['rounds'][number]>, step: NamingStep, text: string): void =>
+    change({ rounds: [...file.rounds.slice(0, -1), { ...round!, ...patch }] }, step, text)
+
+  return (
+    <div className="naming-batch">
+      <h3>{round ? `Batch ${file.rounds.length}` : 'Names'}</h3>
+      {file.chosen && (
+        <div className="naming-chosen" id="namingChosen">
+          <span>
+            Chosen: <strong>{file.chosen}</strong>
+          </span>
+          <NoteField
+            value={file.note}
+            placeholder="why…"
+            onCommit={(note) => change({ note }, 'note', note ? `Note: ${note}` : 'Note removed.')}
           />
-        </label>
-        <button onClick={shuffle} disabled={!file.kept.length} id="shuffle" title="Kept words dropped into the pattern at random">
-          Shuffle
-        </button>
-      </div>
-      {shuffled.length > 0 && (
-        <div className="word-chips" id="shuffled">
-          {shuffled.map((s) => (
-            <span className="word-chip" key={s}>
-              <button className="word" onClick={() => addCandidate(s, 'from a shuffle')}>
-                {s}
-              </button>
-            </span>
-          ))}
         </div>
       )}
+      {round && (
+        <div className="batch" id="batch">
+          {round.names.map((x) => {
+            const liked = round.liked.includes(x.text)
+            const locked = round.locked.includes(x.text)
+            const chosen = file.chosen === x.text
+            const used = inUse.get(x.text.toLowerCase())
+            return (
+              <div
+                className={`name-card${liked ? ' liked' : ''}${locked ? ' locked' : ''}${chosen ? ' chosen' : ''}`}
+                key={x.text}
+                data-name={x.text}
+              >
+                <div className="name-text">{x.text}</div>
+                <div className="muted small name-from" title={x.from}>
+                  {sourceTag(x.source)}: {x.from}
+                </div>
+                {used && <div className="warn small">also: {used.join(', ')}</div>}
+                <div className="card-actions">
+                  <button
+                    className={liked ? 'on' : ''}
+                    data-act="like"
+                    title="Draw the next batch from this"
+                    onClick={() =>
+                      setRound(
+                        { liked: liked ? round.liked.filter((t) => t !== x.text) : [...round.liked, x.text] },
+                        liked ? 'unlike' : 'like',
+                        `${liked ? 'Un-liked' : 'Liked'} “${x.text}”.`
+                      )
+                    }
+                  >
+                    ♥ Like
+                  </button>
+                  <button
+                    className={locked ? 'on' : ''}
+                    data-act="lock"
+                    title="Keep this in every batch from now on"
+                    onClick={() =>
+                      setRound(
+                        { locked: locked ? round.locked.filter((t) => t !== x.text) : [...round.locked, x.text] },
+                        locked ? 'unlock' : 'lock',
+                        `${locked ? 'Unlocked' : 'Locked'} “${x.text}”.`
+                      )
+                    }
+                  >
+                    🔒 Lock
+                  </button>
+                  <button
+                    className={chosen ? 'on' : ''}
+                    data-act="choose"
+                    title="This is the name"
+                    onClick={() =>
+                      change({ chosen: chosen ? undefined : x.text }, 'choose', chosen ? `Un-chose “${x.text}”.` : `Chose “${x.text}”.`)
+                    }
+                  >
+                    ✓ Choose
+                  </button>
+                </div>
+              </div>
+            )
+          })}
+        </div>
+      )}
+      <div className="field-row batch-row">
+        <button className="primary" onClick={() => void next()} disabled={busy || !file.sources.length} id="nextBatch">
+          {busy ? 'Drawing…' : round ? 'Next ten' : 'First ten'}
+        </button>
+        <span className="muted small">
+          {round
+            ? `${round.liked.length} liked, ${round.locked.length} locked: the next batch keeps the locked ones and draws on both.`
+            : 'Set up where names come from above, then draw the first ten.'}
+        </span>
+      </div>
+      {error && <p className="error small">{error}</p>}
     </div>
   )
 }
 
-function NoteField({ value, onCommit }: { value: string | undefined; onCommit(v: string | undefined): void }): React.JSX.Element {
+function Rounds({ file }: { file: NamingFile }): React.JSX.Element | null {
+  const earlier = file.rounds.slice(0, -1)
+  if (!earlier.length) return null
+  return (
+    <details className="naming-rounds" id="namingRounds">
+      <summary>Earlier batches ({earlier.length})</summary>
+      <ol>
+        {earlier.map((r, i) => (
+          <li key={i}>
+            <span className="muted small">{new Date(r.at).toLocaleString()}</span>{' '}
+            {r.names.map((x, j) => (
+              <span key={x.text} className={r.locked.includes(x.text) ? 'locked' : r.liked.includes(x.text) ? 'liked' : ''}>
+                {j ? ', ' : ''}
+                {x.text}
+                {r.locked.includes(x.text) ? ' 🔒' : r.liked.includes(x.text) ? ' ♥' : ''}
+              </span>
+            ))}
+          </li>
+        ))}
+      </ol>
+    </details>
+  )
+}
+
+function NoteField({
+  value,
+  onCommit,
+  placeholder
+}: {
+  value: string | undefined
+  onCommit(v: string | undefined): void
+  placeholder?: string
+}): React.JSX.Element {
   const [draft, setDraft] = useState(value ?? '')
   useEffect(() => setDraft(value ?? ''), [value])
   return (
     <input
       className="note"
       value={draft}
-      placeholder="note…"
+      placeholder={placeholder ?? 'note…'}
       onChange={(e) => setDraft(e.target.value)}
       onBlur={() => draft.trim() !== (value ?? '') && onCommit(draft.trim() || undefined)}
       onKeyDown={(e) => e.key === 'Enter' && (e.target as HTMLInputElement).blur()}
     />
-  )
-}
-
-function Candidates({ file, change, snapshot }: { file: NamingFile; change: Change; snapshot: WorldSnapshot }): React.JSX.Element {
-  const [text, setText] = useState('')
-  const inUse = useMemo(() => namesInUse(snapshot), [snapshot])
-  return (
-    <div className="naming-candidates" id="candidates">
-      <h3>Candidates</h3>
-      <form
-        className="field-row tight"
-        onSubmit={(e) => {
-          e.preventDefault()
-          const t = text.trim()
-          if (t && !file.candidates.some((c) => c.text.toLowerCase() === t.toLowerCase()))
-            change({ candidates: [...file.candidates, { text: t, status: 'maybe' }] }, 'candidate', `Wrote down “${t}”.`)
-          setText('')
-        }}
-      >
-        <input value={text} onChange={(e) => setText(e.target.value)} placeholder="Write one down…" id="candidateText" />
-        <button type="submit" disabled={!text.trim()} id="addCandidate">
-          Add
-        </button>
-      </form>
-      <table className="data small">
-        <tbody>
-          {file.candidates.map((c, i) => {
-            const used = inUse.get(c.text.toLowerCase())
-            return (
-              <tr key={c.text} className={`candidate ${c.status}`} data-candidate={c.text}>
-                <td>
-                  <strong>{c.text}</strong>
-                  {used && <div className="muted small">also: {used.join(', ')}</div>}
-                </td>
-                <td>
-                  <select
-                    value={c.status}
-                    onChange={(e) => {
-                      const status = e.target.value as 'maybe' | 'no' | 'chosen'
-                      const candidates = file.candidates.map((x, j) =>
-                        j === i ? { ...x, status } : status === 'chosen' && x.status === 'chosen' ? { ...x, status: 'maybe' as const } : x
-                      )
-                      change(
-                        { candidates },
-                        'status',
-                        status === 'chosen'
-                          ? `Chose “${c.text}”.`
-                          : status === 'no'
-                            ? `Ruled out “${c.text}”.`
-                            : `“${c.text}” back to maybe.`
-                      )
-                    }}
-                    data-status-of={c.text}
-                  >
-                    <option value="maybe">maybe</option>
-                    <option value="no">no</option>
-                    <option value="chosen">chosen</option>
-                  </select>
-                </td>
-                <td>
-                  <NoteField
-                    value={c.note}
-                    onCommit={(note) =>
-                      change(
-                        { candidates: file.candidates.map((x, j) => (j === i ? { ...x, note } : x)) },
-                        'note',
-                        `Note on “${c.text}”: ${note ?? '(removed)'}`
-                      )
-                    }
-                  />
-                </td>
-              </tr>
-            )
-          })}
-        </tbody>
-      </table>
-    </div>
   )
 }
 

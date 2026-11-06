@@ -1,6 +1,17 @@
 import { readFileSync, existsSync } from 'node:fs'
 import path from 'node:path'
-import { LINK_GROUP_NAMES, Lexicon, type ExploreQuery, type ExploreResult, type LinkGroup, type Sense } from '@malevo/model'
+import {
+  LINK_GROUP_NAMES,
+  Lexicon,
+  NAME_SOURCES,
+  nextBatch,
+  type BatchName,
+  type ExploreQuery,
+  type ExploreResult,
+  type LinkGroup,
+  type NameSource,
+  type Sense
+} from '@malevo/model'
 
 /**
  * The Names tool's word list: WordNet, packed by scripts/build-wordnet.mjs
@@ -46,4 +57,33 @@ export function exploreWords(q: unknown): ExploreResult | { error: string } {
     defined: Boolean(v.defined)
   }
   return lx.explore(query)
+}
+
+export function nameBatch(q: unknown): BatchName[] | { error: string } {
+  const v = (q ?? {}) as Record<string, unknown>
+  const strings = (x: unknown): string[] => (Array.isArray(x) ? x.map(String) : [])
+  const narrow = (v.narrow ?? {}) as Record<string, unknown>
+  const lx = load()
+  return nextBatch(lx, {
+    count: Math.min(50, Math.max(0, Number(v.count) || 0)),
+    sources: strings(v.sources).filter((s): s is NameSource => (NAME_SOURCES as readonly string[]).includes(s)),
+    seed: Number(v.seed) >>> 0,
+    concepts: (Array.isArray(v.concepts) ? v.concepts : []).map((c: { word?: unknown; senses?: unknown }) => ({
+      word: String(c?.word ?? ''),
+      senses: strings(c?.senses)
+    })),
+    links: strings(v.links).filter((g): g is LinkGroup => LINK_GROUP_NAMES.includes(g as LinkGroup)),
+    depth: Number(v.depth) || 1,
+    defined: Boolean(v.defined),
+    narrow: {
+      pos: strings(narrow.pos) as ('n' | 'v' | 'a' | 'r')[],
+      categories: strings(narrow.categories),
+      maxLetters: Number(narrow.maxLetters) || undefined,
+      singleWords: Boolean(narrow.singleWords)
+    },
+    examples: strings(v.examples),
+    liked: strings(v.liked),
+    earlier: strings(v.earlier),
+    exclude: strings(v.exclude)
+  })
 }

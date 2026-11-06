@@ -822,7 +822,7 @@ try {
   await page.screenshot({ path: path.join(shots, '21-trip.png') })
   await page.evaluate(() => window.malevo.world.discard())
 
-  // Names: look a word up, tick a sense, keep a word reached from it, write a candidate; every step is recorded.
+  // Names: ten at a time; like and lock, and the next ten keep the locked ones; every step is recorded.
   await tool('Names')
   await page.locator('#newNamingName').fill('The slow freighter')
   await page.locator('#newNaming').click()
@@ -831,20 +831,34 @@ try {
   await page.locator('#addConcept').click()
   await page.waitForSelector('[data-concept="lumbering"] .senses input')
   await page.locator('[data-concept="lumbering"] .senses label', { hasText: 'ponderous' }).locator('input').check()
-  await page.waitForSelector('#wordChips [data-word="ponderous"]', { timeout: 30_000 })
-  check(true, 'a ticked sense leads to related words')
-  await page.locator('#wordChips [data-word="ponderous"] button.word').click()
-  await page.waitForSelector('[data-kept="ponderous"]')
-  await page.locator('#candidateText').fill('Ponderous')
-  await page.locator('#addCandidate').click()
-  await page.locator('[data-status-of="Ponderous"]').selectOption('chosen')
-  await page.waitForFunction(() => /Chose “Ponderous”/.test(document.querySelector('#namingRecord')?.textContent ?? ''))
+  await page.waitForFunction(() => /words in reach/.test(document.querySelector('#wordsInReach')?.textContent ?? ''), null, {
+    timeout: 30_000
+  })
+  await page.locator('#namingExamples').fill('Aldren, Corvane, Mirel')
+  await page.locator('#namingExamples').press('Enter')
+  await page.locator('#nextBatch').click()
+  await page.waitForFunction(() => document.querySelectorAll('#batch .name-card').length === 10, null, { timeout: 30_000 })
+  check(true, 'the first batch has ten names')
+  const first = await page.locator('#batch .name-card').evaluateAll((els) => els.map((e) => e.getAttribute('data-name')))
+  await page.locator(`#batch [data-name="${first[0]}"] [data-act="like"]`).click()
+  await page.waitForSelector(`#batch [data-name="${first[0]}"].liked`)
+  await page.locator(`#batch [data-name="${first[1]}"] [data-act="lock"]`).click()
+  await page.waitForSelector(`#batch [data-name="${first[1]}"].locked`)
+  await page.locator('#nextBatch').click()
+  await page.waitForFunction(() => document.querySelector('.naming-batch h3')?.textContent === 'Batch 2', null, { timeout: 30_000 })
+  const second = await page.locator('#batch .name-card').evaluateAll((els) => els.map((e) => e.getAttribute('data-name')))
+  check(
+    second.length === 10 && second[0] === first[1] && !second.slice(1).some((x) => first.includes(x)),
+    `the next batch keeps the locked name and the rest are new (${second.join(', ')})`
+  )
+  await page.locator(`#batch [data-name="${first[1]}"] [data-act="choose"]`).click()
+  await page.waitForSelector('#namingChosen')
   const record = await page.evaluate(async () => {
     const snap = await window.malevo.world.snapshot()
     return snap.namings[0]?.value?.log?.map((l) => l.step)
   })
   check(
-    JSON.stringify(record) === JSON.stringify(['brief', 'look-up', 'sense', 'keep', 'candidate', 'status']),
+    JSON.stringify(record) === JSON.stringify(['brief', 'look-up', 'sense', 'examples', 'batch', 'like', 'lock', 'batch', 'choose']),
     `the naming records each step (${JSON.stringify(record)})`
   )
   await page.locator('#namingRecord summary').click()
