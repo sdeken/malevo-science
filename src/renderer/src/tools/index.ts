@@ -5,6 +5,7 @@ import { culturesTool } from './cultures/CulturesTool'
 import { defineTools } from './registry'
 import { routesTool } from './routes/RoutesTool'
 import { tripsTool } from './trips/TripsTool'
+import { whereaboutsTool } from './whereabouts/WhereaboutsTool'
 import { skyTool } from './sky/SkyTool'
 import { approachTool } from './approach/ApproachTool'
 import { historyTool } from './history/HistoryTool'
@@ -26,6 +27,7 @@ export const TOOLS = defineTools([
   cityPlanTool,
   routesTool,
   tripsTool,
+  whereaboutsTool,
   skyTool,
   approachTool,
   culturesTool,

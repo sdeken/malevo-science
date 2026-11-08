@@ -36,6 +36,7 @@ import type {
   WorldResult,
   WorldSnapshot
 } from '../shared/types'
+import type { DriftReport, TravellerReport } from '@malevo/model'
 
 type Unsubscribe = () => void
 
@@ -155,6 +156,13 @@ const api = {
     /** Save a 2048×1024 colour or height map where the author chooses. Resolves to the path, or null if cancelled. */
     export: (body: string, what: 'colour' | 'height' | 'clouds'): Promise<string | null> =>
       ipcRenderer.invoke(IPC.terrainExport, body, what)
+  },
+  where: {
+    /** A traveller's stops, each gap against the quickest possible trip, and where they are at `now`. */
+    traveller: (id: string, now: number): Promise<TravellerReport | { error: string }> => ipcRenderer.invoke(IPC.whereTraveller, id, now),
+    /** Where a drifter is at `now`, and the stars it passes in its first `horizon_yr` years. */
+    drift: (id: string, now: number, horizon_yr: number, passWithin_ly: number): Promise<DriftReport | { error: string }> =>
+      ipcRenderer.invoke(IPC.whereDrift, id, now, horizon_yr, passWithin_ly)
   },
   trips: {
     /** A ship flying a charted route between two of its waypoints. */

@@ -2026,3 +2026,89 @@ fieldset.plain {
 .file-name-form input {
   width: 14em;
 }
+
+/* ---- Whereabouts ---- */
+
+.whereabouts .split-list h3.label {
+  margin: 12px 0 4px;
+}
+
+.place-picker {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+.where-now {
+  font-size: 1.05em;
+  margin: 6px 0 12px;
+}
+
+.stops {
+  list-style: none;
+  padding: 0;
+  margin: 0 0 10px;
+  display: grid;
+  gap: 4px;
+}
+
+.stop {
+  border-left: 3px solid var(--border);
+  padding: 6px 0 6px 10px;
+  display: grid;
+  gap: 4px;
+}
+
+.stop-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 14px;
+  align-items: end;
+}
+
+.stop-actions {
+  display: inline-flex;
+  gap: 8px;
+  align-items: center;
+}
+
+.stop-note {
+  max-width: 520px;
+  font-size: 0.9em;
+}
+
+.gap {
+  margin: 4px 0 0 -13px;
+  padding: 4px 10px;
+  border-left: 3px solid var(--border);
+  font-size: 0.9em;
+  color: var(--muted);
+}
+
+.gap.ok {
+  border-left-color: var(--ok);
+}
+
+.gap.tight {
+  border-left-color: var(--warn);
+  color: var(--text);
+}
+
+.gap.impossible {
+  border-left-color: var(--danger);
+  color: var(--danger);
+}
+
+.gap-mark {
+  font-weight: 700;
+}
+
+.drifter tr.in-cone td {
+  font-weight: 600;
+}
+
+.whereabouts .split-list form input {
+  flex: 1;
+  width: auto;
+  min-width: 0;
+}

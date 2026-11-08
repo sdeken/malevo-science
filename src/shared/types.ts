@@ -164,6 +164,8 @@ export interface WorldSnapshot {
   /** settings/history.json, if the world has it. */
   historySettings: Record<string, unknown> | null
   ships: EntityDto[]
+  travellers: EntityDto[]
+  drifters: EntityDto[]
   /** settings/physics.json as written, if the world has it (for editing). */
   physicsSettings: Record<string, unknown> | null
   terrains: EntityDto[]
@@ -237,6 +239,8 @@ export type EditableKind =
   | 'city'
   | 'cityPlan'
   | 'ship'
+  | 'traveller'
+  | 'drifter'
 
 // ---- Phase 3: stars, systems, bodies ----
 

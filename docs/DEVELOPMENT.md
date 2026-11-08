@@ -257,6 +257,36 @@ module.exports = {
   (365.25 days), weeks, days, hours, minutes and seconds, at most three units, zeros left out,
   and tenths of a second under an hour ("1w 1d 13h", "14m 56.4s").
 
+### Whereabouts
+
+- **Where people and things are, and whether they could have got there** (the **Whereabouts** tool,
+  `packages/model/src/whereabouts.ts`).
+- **A traveller** is `travellers/<id>.json`: a name and a list of stops. Each stop has:
+  - a place: a city, a body, a system, a station or a bare star, the most specific one winning;
+  - an arrival date, a departure date, or both;
+  - an optional note.
+- **Each gap between stops is checked against the quickest trip** (`quickestHop`):
+  - **Between systems:** `planRoute`, door to door. That's the crawl out, foam legs within the
+    leg limit and clear of nebulae, a stopover at each star on the way, and the crawl in.
+  - **Inside one system:** a flip-and-burn between the two bodies, at their positions on the
+    departure date, at the cruise acceleration.
+
+  A gap shorter than the quickest trip is impossible, and also appears in the Checks tool
+  (`whereaboutsCheck`). Less than a tenth to spare is tight. The tool also says where the
+  traveller is at the current date: at a stop, or on the way between two.
+- **A drifter** is `drifters/<id>.json`. It leaves a place at a date at a speed, with a heading
+  given one of three ways:
+  - toward a place;
+  - as a galactic longitude and latitude;
+  - as a right ascension and declination (J2000), rotated into the galactic frame.
+
+  An optional cone (half-angle) says how sure the heading is. Its path is a straight line: stars
+  don't move and don't bend it.
+- **What it reports:** where it is at the current date (how far out, the cone's spread there,
+  the nearest star). It also lists every star that passes within a given distance of its path,
+  plus the cone's spread there, over a given number of years, in order: when, how far out, and
+  how close. A star inside the cone might be hit.
+
 ### Physics settings
 
 - **The World tool edits `settings/physics.json` in place:**

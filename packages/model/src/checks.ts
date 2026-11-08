@@ -7,6 +7,7 @@ import {
   DEG,
   compareStrings,
   formatInstant,
+  formatSpan,
   fromLatLon,
   parseGeneratedId,
   parseInstant,
@@ -21,6 +22,7 @@ import { allRoutes, nodePath, routeWorld, trafficReport, waypointNode } from './
 import { historySettings } from './history'
 import { SURFACE_CLASSES, terrainSampler } from './terrain'
 import { cityInfos } from './cities'
+import { travellerReport } from './whereabouts'
 import { portCapacity } from './cityplan'
 import { templateFiles } from './template'
 import {
@@ -35,7 +37,8 @@ import {
   terrainKind,
   cityPlanKind,
   type CalendarFile,
-  type StoredInstant
+  type StoredInstant,
+  travellerKind
 } from './kinds'
 import { entitiesOf, type Issue, type WorldData } from './load'
 
@@ -676,6 +679,41 @@ export const cityPlansCheck: Check = {
   }
 }
 
+/** Every traveller could have made every trip on their itinerary. */
+export const whereaboutsCheck: Check = {
+  id: 'whereabouts',
+  title: 'Every traveller could have made each trip in the time between stops',
+  run(world, env) {
+    const out: Issue[] = []
+    for (const e of [...entitiesOf(world, travellerKind)].sort((a, b) => compareStrings(a.id, b.id))) {
+      const r = travellerReport(world, env, e.value, 0)
+      r.stops.forEach((s, i) => {
+        if (s.error)
+          out.push({
+            severity: 'error',
+            check: 'whereabouts',
+            code: 'bad-place',
+            message: `Stop ${i + 1}: ${s.error}`,
+            path: e.path,
+            field: `stops[${i}].place`
+          })
+      })
+      for (const g of r.gaps) {
+        if (g.verdict !== 'impossible' || g.available === null || g.needed === null) continue
+        out.push({
+          severity: 'warning',
+          check: 'whereabouts',
+          code: 'too-fast',
+          message: `${e.value.name} has ${formatSpan(g.available)} to get from ${r.stops[g.from].name} to ${r.stops[g.to].name}, but the quickest trip takes ${formatSpan(g.needed)}.`,
+          path: e.path,
+          field: `stops[${g.to}]`
+        })
+      }
+    }
+    return out
+  }
+}
+
 export const BUILTIN_CHECKS: readonly Check[] = [
   filesCheck,
   referencesCheck,
@@ -689,6 +727,7 @@ export const BUILTIN_CHECKS: readonly Check[] = [
   terrainCheck,
   citiesCheck,
   cityPlansCheck,
+  whereaboutsCheck,
   templateCheck,
   formatCheck
 ]

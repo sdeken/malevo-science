@@ -54,6 +54,14 @@ import {
   planTrip,
   sizeShipForTrip,
   shipKind,
+  travellerKind,
+  drifterKind,
+  travellerReport,
+  driftReport,
+  type TravellerFile,
+  type DrifterFile,
+  type TravellerReport,
+  type DriftReport,
   knownPlanetsFor,
   terrainKind,
   terrainRaster,
@@ -171,7 +179,9 @@ const KIND_DEFS: Record<EditableKind, KindDef> = {
   terrain: terrainKind as KindDef,
   city: cityKind as KindDef,
   cityPlan: cityPlanKind as KindDef,
-  ship: shipKind as KindDef
+  ship: shipKind as KindDef,
+  traveller: travellerKind as KindDef,
+  drifter: drifterKind as KindDef
 }
 
 export class WorldSession extends EventEmitter {
@@ -318,6 +328,8 @@ export class WorldSession extends EventEmitter {
         })),
       cityPlans: entityDtos(world, cityPlanKind.kind),
       ships: entityDtos(world, shipKind.kind),
+      travellers: entityDtos(world, travellerKind.kind),
+      drifters: entityDtos(world, drifterKind.kind),
       physics: physicsFile
         ? {
             legLimit_ly: physicsFile.foam.legLimit_ly,
@@ -637,6 +649,20 @@ export class WorldSession extends EventEmitter {
 
   approachSeries(q: ApproachQueryDto, t0: number, t1: number, n: number): ApproachSeriesDto | { error: string } {
     return approachSeries(this.world(), this.env, q, t0, t1, n)
+  }
+
+  /** A traveller's stops, the gaps between them against the quickest trips, and where they are at `now`. */
+  traveller(id: string, now: number): TravellerReport | { error: string } {
+    const e = this.world().entities.get(`${travellerKind.kind}/${id}`)
+    if (!e || e.value === undefined) return { error: `There is no traveller "${id}" (or its file has errors).` }
+    return travellerReport(this.world(), this.env, e.value as TravellerFile, now)
+  }
+
+  /** Where a drifter is at `now`, and the stars it passes. */
+  drift(id: string, now: number, horizon_yr: number, passWithin_ly: number): DriftReport | { error: string } {
+    const e = this.world().entities.get(`${drifterKind.kind}/${id}`)
+    if (!e || e.value === undefined) return { error: `There is no drifter "${id}" (or its file has errors).` }
+    return driftReport(this.world(), this.env, e.value as DrifterFile, now, { horizon_yr, passWithin_ly })
   }
 
   // ---- editing (unsaved until save) ----

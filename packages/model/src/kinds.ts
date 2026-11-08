@@ -953,6 +953,72 @@ export const historySettingsKind: KindDef<HistorySettings> = {
   schema: historySettingsSchema
 }
 
+// ---- whereabouts ----
+
+/** A place someone or something can be: a city, a body, a system, a station or a bare star (the most specific one given wins). */
+export const placeSchema = obj({
+  city: opt(ref('city')),
+  body: opt(ref('body')),
+  system: opt(ref('system')),
+  station: opt(ref('station')),
+  star: opt(str({ pattern: STAR_ID, patternHint: 'is not a star id (hip.N, hyg.N or a generated g.… id)' }))
+})
+export type PlaceFile = Infer<typeof placeSchema>
+
+/**
+ * Someone's movements: where they are, when. Each stop has an arrival, a
+ * departure, or both; the gaps between stops are checked against the
+ * quickest trip the physics allows.
+ */
+export const travellerSchema = obj({
+  name: name(),
+  stops: arr(
+    obj({
+      place: placeSchema,
+      arrive: opt(instantSchema),
+      depart: opt(instantSchema),
+      note: opt(str({ max: 400 }))
+    })
+  ),
+  note: opt(str({ max: 2000 }))
+})
+export type TravellerFile = Infer<typeof travellerSchema>
+
+export const travellerKind: KindDef<TravellerFile> = {
+  kind: 'traveller',
+  label: 'traveller',
+  folder: 'travellers',
+  schema: travellerSchema
+}
+
+/**
+ * Something coasting between the stars: it leaves a place at a time, at a
+ * speed, in a direction (toward a place, or a galactic or sky direction), give
+ * or take a cone. Straight lines; the stars don't move and don't bend it.
+ */
+export const drifterSchema = obj({
+  name: name(),
+  from: placeSchema,
+  /** When it left. */
+  at: instantSchema,
+  speed_kms: num({ above: 0, max: 299792, sig: 9 }),
+  heading: obj({
+    toward: opt(placeSchema),
+    /** Galactic longitude and latitude. */
+    l_deg: opt(num({ min: -360, max: 360, sig: 9 })),
+    b_deg: opt(num({ min: -90, max: 90, sig: 9 })),
+    /** Right ascension and declination (J2000), for headings quoted that way. */
+    ra_deg: opt(num({ min: -360, max: 360, sig: 9 })),
+    dec_deg: opt(num({ min: -90, max: 90, sig: 9 }))
+  }),
+  /** How sure the heading is: half-angle of the cone it went in, degrees. */
+  cone_deg: opt(num({ min: 0, max: 90, sig: 6 })),
+  note: opt(str({ max: 2000 }))
+})
+export type DrifterFile = Infer<typeof drifterSchema>
+
+export const drifterKind: KindDef<DrifterFile> = { kind: 'drifter', label: 'drifter', folder: 'drifters', schema: drifterSchema }
+
 export const KINDS: readonly KindDef[] = [
   physicsKind as KindDef,
   starfieldKind as KindDef,
@@ -972,5 +1038,7 @@ export const KINDS: readonly KindDef[] = [
   terrainKind as KindDef,
   cityKind as KindDef,
   cityPlanKind as KindDef,
-  shipKind as KindDef
+  shipKind as KindDef,
+  travellerKind as KindDef,
+  drifterKind as KindDef
 ]

@@ -793,6 +793,35 @@ try {
     'renaming a city moves its file, and its plan follows'
   )
 
+  // 22. Whereabouts: a traveller too fast for the physics, and a drifter heading for Proxima.
+  await page.evaluate(() =>
+    window.malevo.world.setEntity('traveller', 'kativa', {
+      name: 'Kativa',
+      stops: [
+        { place: { body: 'earth' }, depart: { t_s: 0 } },
+        { place: { system: 'proxima-centauri' }, arrive: { t_s: 2 * 86400 } }
+      ]
+    })
+  )
+  await tool('Whereabouts')
+  await page.locator('[data-traveller="kativa"]').click()
+  await page.waitForSelector('[data-gap="impossible"]', { timeout: 30_000 })
+  check(
+    /short/.test((await page.locator('[data-gap="impossible"]').textContent()) ?? ''),
+    'a traveller who moves faster than the physics allows is flagged'
+  )
+  await page.locator('#newDrifterName').fill('The hulk')
+  await page.locator('#newDrifter').click()
+  await page.waitForSelector('#drifter')
+  await page.locator('#drifterFrom').selectOption('system:sol')
+  await page.waitForFunction(() => document.querySelector('#drifterFrom')?.value === 'system:sol')
+  await page.locator('#drifterHeadingMode').selectOption('toward')
+  await page.locator('#drifterToward').selectOption('system:proxima-centauri')
+  await page.waitForFunction(() => /Proxima/.test(document.querySelector('#drifterPasses')?.textContent ?? ''), null, { timeout: 30_000 })
+  check(true, 'a drifter lists the stars it passes')
+  await page.screenshot({ path: path.join(shots, '22-whereabouts.png') })
+  await page.evaluate(() => window.malevo.world.discard())
+
   // 10. The update status reports a dev build.
   const status = await page.evaluate(() => window.malevo.updates.status())
   check(status.state === 'unavailable', 'an unpackaged build reports updates as unavailable')
