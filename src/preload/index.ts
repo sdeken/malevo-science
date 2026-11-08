@@ -83,6 +83,13 @@ const api = {
     onChanged: (cb: (world: WorldInfo | null) => void): Unsubscribe => on(IPC.evWorldChanged, cb),
     // Edits are unsaved until save(); each is one undo step.
     setEntity: (kind: EditableKind, id: string, value: unknown): Promise<void> => ipcRenderer.invoke(IPC.worldSetEntity, kind, id, value),
+    /** Give an entity a new id: its files move, and every reference to it is rewritten (one undo step). */
+    renameEntity: (
+      kind: EditableKind,
+      oldId: string,
+      newId: string
+    ): Promise<{ updated: string[]; skipped: string[] } | { error: string }> =>
+      ipcRenderer.invoke(IPC.worldRenameEntity, kind, oldId, newId),
     deleteEntity: (kind: EditableKind, id: string): Promise<void> => ipcRenderer.invoke(IPC.worldDeleteEntity, kind, id),
     deleteEntities: (items: { kind: EditableKind; id: string }[]): Promise<void> => ipcRenderer.invoke(IPC.worldDeleteEntities, items),
     setScript: (id: string, code: string | null): Promise<void> => ipcRenderer.invoke(IPC.worldSetScript, id, code),

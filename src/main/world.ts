@@ -107,7 +107,8 @@ import {
   loadWorld,
   openWorld,
   type FileChange,
-  type OpenWorld
+  type OpenWorld,
+  renamePlan
 } from '@malevo/model/node'
 import type {
   BodyInfoDto,
@@ -645,6 +646,21 @@ export class WorldSession extends EventEmitter {
     if (!def) throw new WorldError('io', `"${kind}" cannot be edited here.`)
     this.editor!.setEntity(def, def.file ? def.kind : String(id), value)
     this.changed()
+  }
+
+  /**
+   * Give an entity a new id: its files (and any same-named file that belongs to it, like a body's
+   * terrain) move to the new name, and every reference to it is rewritten. One undoable step.
+   */
+  renameEntity(kind: EditableKind, oldId: string, newId: string): { updated: string[]; skipped: string[] } | { error: string } {
+    const def = KIND_DEFS[kind]
+    if (!def) throw new WorldError('io', `"${kind}" cannot be edited here.`)
+    const files = new Map(this.editor!.files().map((f) => [f.path, f.text]))
+    const plan = renamePlan(this.editor!.world(), files, def, oldId, newId)
+    if ('error' in plan) return plan
+    this.editor!.edit(plan.changes)
+    this.changed()
+    return { updated: plan.updated, skipped: plan.skipped }
   }
 
   /** Delete an entity and the note and script beside it. */

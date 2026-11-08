@@ -778,6 +778,21 @@ try {
   await page.screenshot({ path: path.join(shots, '21-trip.png') })
   await page.evaluate(() => window.malevo.world.discard())
 
+  // 21. Renaming: a placeholder file name follows the new name, and so does everything that points at it.
+  await tool('Population')
+  await page.waitForSelector('[data-city-detail="new-city"]')
+  await page.locator('#cityName').fill('Bluff')
+  await page.locator('#cityName').press('Enter')
+  await page.locator('#renameTo-new-city').click()
+  await page.waitForSelector('[data-city-detail="bluff"]')
+  await page.locator('.status-save').click()
+  await page.waitForFunction(() => document.querySelector('.status-saved') !== null)
+  const renamedPlan = JSON.parse(await fs.readFile(path.join(worldDir, 'cityplans/bluff.json'), 'utf8'))
+  check(
+    (await exists('cities/bluff.json')) && !(await exists('cities/new-city.json')) && renamedPlan.city === 'bluff',
+    'renaming a city moves its file, and its plan follows'
+  )
+
   // 10. The update status reports a dev build.
   const status = await page.evaluate(() => window.malevo.updates.status())
   check(status.state === 'unavailable', 'an unpackaged build reports updates as unavailable')

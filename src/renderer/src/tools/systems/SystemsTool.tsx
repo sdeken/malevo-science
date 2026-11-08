@@ -4,6 +4,7 @@ import { knownSystemOf } from '@malevo/model'
 import type { ElementsInfo, PlanetProposal, SystemInfoDto } from '../../../../shared/types'
 import { NumberField, TextField, duration, sig } from '../../components/fields'
 import { slugId, useWorldPref } from '../../state'
+import { FileName } from '../../components/FileName'
 import type { ToolDefinition, ToolProps } from '../registry'
 import { BodyEditor } from './BodyEditor'
 import { HistoryEditor } from './HistoryEditor'
@@ -81,6 +82,7 @@ function SystemsView({ world, snapshot, now, displayCal, navigate, focus }: Tool
           calendars={snapshot.calendars}
           navigate={navigate}
           snapshot={snapshot}
+          onRenamed={setSelectedId}
         />
       </div>
     </div>
@@ -94,8 +96,10 @@ function SystemDetail({
   displayCal,
   calendars,
   navigate,
-  snapshot
+  snapshot,
+  onRenamed
 }: {
+  onRenamed(id: string): void
   snapshot: ToolProps['snapshot']
   system: SystemInfoDto
   snapshotVersion: number
@@ -202,6 +206,14 @@ function SystemDetail({
 
   return (
     <div className="tool-page wide system-detail" data-system-detail={system.id}>
+      <FileName
+        kind="system"
+        folder="systems"
+        id={system.id}
+        name={system.name}
+        taken={snapshot.systems.map((s) => s.id)}
+        onRenamed={onRenamed}
+      />
       <div className="field-row">
         <TextField
           label="System name"
@@ -472,7 +484,9 @@ function SystemDetail({
           calendars={calendars}
           displayCal={displayCal}
           version={snapshotVersion}
+          bodyIds={snapshot.systems.flatMap((s) => s.bodies.map((b) => b.id))}
           onDeleted={() => setSelectedBody(null)}
+          onRenamed={(id) => setSelectedBody(id)}
         />
       )}
     </div>

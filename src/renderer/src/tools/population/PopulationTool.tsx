@@ -5,6 +5,7 @@ import type { SkyCamera } from '@malevo/viz'
 import type { CityInfoDto, ConditionsDto, TerrainRasterDto, WhenValue, WorldSnapshot } from '../../../../shared/types'
 import { NumberField, TextField, duration, sig } from '../../components/fields'
 import { slugId, useFormatted, useFormattedOne, useWorldPref } from '../../state'
+import { FileName } from '../../components/FileName'
 import type { ToolDefinition, ToolProps } from '../registry'
 import { SkyCanvas, twilight, useSky } from '../sky/SkyTool'
 import { WhenEditor } from '../timeline/WhenEditor'
@@ -104,6 +105,7 @@ function PopulationView({ world, snapshot, now, setNow, displayCal, focus }: Too
             setNow={setNow}
             displayCal={displayCal}
             rootKey={world.root}
+            onRenamed={setPref}
           />
         ) : (
           <p className="tool-page muted">Make a city to start: a place on a body, with its people over time.</p>
@@ -119,8 +121,10 @@ function CityDetail({
   now,
   setNow,
   displayCal,
-  rootKey
+  rootKey,
+  onRenamed
 }: {
+  onRenamed(id: string): void
   city: CityInfoDto
   snapshot: WorldSnapshot
   now: number
@@ -169,6 +173,7 @@ function CityDetail({
 
   return (
     <div className="tool-page wide city" data-city-detail={city.id}>
+      <FileName kind="city" folder="cities" id={city.id} name={v.name} taken={snapshot.cities.map((c) => c.id)} onRenamed={onRenamed} />
       <div className="field-row">
         <TextField label="City name" value={v.name} onCommit={(name) => name.trim() && save({ name: name.trim() })} id="cityName" />
         <label className="field">

@@ -160,6 +160,9 @@ export function registerIpc(deps: IpcDeps): void {
 
   ipcMain.handle(IPC.worldSnapshot, () => world.snapshot())
   ipcMain.handle(IPC.worldSetEntity, (_e, kind: unknown, id: unknown, value: unknown) => world.setEntity(asKind(kind), String(id), value))
+  ipcMain.handle(IPC.worldRenameEntity, (_e, kind: unknown, oldId: unknown, newId: unknown) =>
+    world.renameEntity(asKind(kind), String(oldId), String(newId))
+  )
   ipcMain.handle(IPC.worldDeleteEntity, (_e, kind: unknown, id: unknown) => world.deleteEntity(asKind(kind), String(id)))
   ipcMain.handle(IPC.worldDeleteEntities, (_e, items: unknown) =>
     world.deleteEntities(

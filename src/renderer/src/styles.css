@@ -2002,3 +2002,27 @@ fieldset.plain {
   fill: var(--text);
   font-weight: 600;
 }
+
+/* ---- File names (ids) ---- */
+
+.file-name {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 12px;
+  align-items: center;
+  margin: 0 0 6px;
+}
+
+.file-name code {
+  font-size: 0.95em;
+}
+
+.file-name-form {
+  display: inline-flex;
+  gap: 6px;
+  align-items: center;
+}
+
+.file-name-form input {
+  width: 14em;
+}

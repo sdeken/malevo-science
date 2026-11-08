@@ -25,6 +25,7 @@ export const IPC = {
   tripSize: 'trip:size',
   worldSnapshot: 'world:snapshot',
   worldSetEntity: 'world:setEntity',
+  worldRenameEntity: 'world:renameEntity',
   worldDeleteEntity: 'world:deleteEntity',
   worldDeleteEntities: 'world:deleteEntities',
   worldSetScript: 'world:setScript',

@@ -105,6 +105,13 @@ is never written into a world folder. The app has no git integration.
 - **Locked records** carry `"lock": { "gen": "name@1", "seed": …, "inputs": { "<entity key>":
   "<hash>" } }`. The checks flag a lock as stale when one of its inputs has changed.
 
+- **Renaming an id** (`renamePlan`, `packages/model/src/rename.ts`): the entity's `.json`, `.md` and
+  `.js` move to the new id, and every reference to it, found from the schema's `ref` fields, is
+  rewritten, all as one undoable edit. A file of another kind with the same id that refers to it (a
+  body's terrain, a city's plan) moves with it. Entities whose files have errors can't be rewritten;
+  their dangling references show up in the checks. The Systems and Population tools show each
+  entity's file with "Rename to …" (the name as an id) and "Change…".
+
 ### Events and dates
 
 An event is a file `events/<id>.json`:

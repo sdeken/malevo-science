@@ -3,6 +3,7 @@ import { daylightByLatitude } from '@malevo/model'
 import type { BodyInfoDto, CalendarInfo, SystemInfoDto } from '../../../../shared/types'
 import { DateInput } from '../../components/DateInput'
 import { NumberField, TextField, duration, sig } from '../../components/fields'
+import { FileName } from '../../components/FileName'
 import { useFormattedOne } from '../../state'
 
 const CLASSES = [
@@ -42,11 +43,14 @@ interface Props {
   calendars: CalendarInfo[]
   displayCal: string
   version: number
+  /** Every body id in the world (body ids are shared across systems). */
+  bodyIds: readonly string[]
   onDeleted(): void
+  onRenamed(id: string): void
 }
 
 /** Edit one body: what it is, its orbit, its spin; and what follows from them. Every change is unsaved until Save. */
-export function BodyEditor({ body, system, calendars, displayCal, version, onDeleted }: Props): React.JSX.Element {
+export function BodyEditor({ body, system, calendars, displayCal, version, bodyIds, onDeleted, onRenamed }: Props): React.JSX.Element {
   const v = body.value as Value
   const save = (patch: Partial<Value>): void => {
     const next: Value = { ...v, ...patch }
@@ -77,6 +81,7 @@ export function BodyEditor({ body, system, calendars, displayCal, version, onDel
 
   return (
     <div className="body-editor" data-editing={body.id}>
+      <FileName kind="body" folder="bodies" id={body.id} name={v.name} taken={bodyIds} onRenamed={onRenamed} />
       <div className="field-row">
         <TextField label="Name" value={v.name} onCommit={(name) => name.trim() && save({ name: name.trim() })} id="bodyName" />
         <label className="field">
