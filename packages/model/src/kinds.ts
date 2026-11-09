@@ -7,7 +7,19 @@
  * Every field name carries its unit (`_s`, `_au`, `_c`, ...). The converters
  * at the bottom turn file values into the SI values @malevo/core works in.
  */
-import { AU, C, DAY, G0, KM, LY, type CalendarDef, type FoamSettings, type ScriptCalendarImpl, type TorchLight } from '@malevo/core'
+import {
+  AU,
+  C,
+  DAY,
+  compareStrings,
+  G0,
+  KM,
+  LY,
+  type CalendarDef,
+  type FoamSettings,
+  type ScriptCalendarImpl,
+  type TorchLight
+} from '@malevo/core'
 import { arr, bool, dict, json, num, obj, oneOf, opt, ref, str, tagged, type Infer, type Schema } from './schema'
 
 export interface KindDef<T = unknown> {
@@ -21,6 +33,8 @@ export interface KindDef<T = unknown> {
   file?: string
   /** Members may have a JavaScript file beside them, at `<folder>/<id>.js`. */
   scripts?: boolean
+  /** For kinds whose id comes from their contents (a relation's pair), the id a value belongs under. */
+  idOf?(value: T): string | null
 }
 
 /** Entity keys: "calendar/gregorian" for a collection member, "physics" for a single-file kind. */
@@ -551,7 +565,13 @@ export const relationSchema = obj({
 })
 export type RelationFile = Infer<typeof relationSchema>
 
-export const relationKind: KindDef<RelationFile> = { kind: 'relation', label: 'relation', folder: 'relations', schema: relationSchema }
+export const relationKind: KindDef<RelationFile> = {
+  kind: 'relation',
+  label: 'relation',
+  folder: 'relations',
+  schema: relationSchema,
+  idOf: (v) => (v.between?.length === 2 ? [...v.between].sort(compareStrings).join('--') : null)
+}
 
 // ---- routes, stations and nebulae ----
 

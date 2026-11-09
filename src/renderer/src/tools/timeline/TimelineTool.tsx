@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import type { EventInfo } from '../../../../shared/types'
-import { slugId, useWorldPref } from '../../state'
+import { slugId, useWorldPref, useFollowRenames } from '../../state'
 import type { ToolDefinition, ToolProps } from '../registry'
 import { EventEditor } from './EventEditor'
 import { TimelineCanvas, fitView, type View } from './TimelineCanvas'
@@ -14,6 +14,7 @@ function TimelineView({ world, snapshot, now, setNow, displayCal }: ToolProps): 
     if (stored === null && events.some((e) => e.start)) setView(fitView(events, now))
   }, [stored, events, now, setView])
   const [selected, setSelected] = useState<string | null>(null)
+  useFollowRenames(selected, setSelected)
   const [query, setQuery] = useState('')
   const [type, setType] = useState<'' | 'event' | 'period' | 'story'>('')
   const [tag, setTag] = useState('')

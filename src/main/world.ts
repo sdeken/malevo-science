@@ -107,7 +107,9 @@ import {
   type SystemInfo,
   type WorldEnv,
   type ResolvedTime,
-  type WorldData
+  type WorldData,
+  idFromName,
+  uniqueSlug
 } from '@malevo/model'
 import {
   WorldEditor,
@@ -680,10 +682,39 @@ export class WorldSession extends EventEmitter {
 
   // ---- editing (unsaved until save) ----
 
+  /**
+   * Set an entity's value. When its name changes and its id was made from the old name ("new-event",
+   * "sol-8"), the id follows the new name: the files move and every reference is rewritten, in the same
+   * undo step. An id chosen by hand (one that doesn't match its name) stays put.
+   */
   setEntity(kind: EditableKind, id: string, value: unknown): void {
     const def = KIND_DEFS[kind]
     if (!def) throw new WorldError('io', `"${kind}" cannot be edited here.`)
+    const before = def.folder ? this.editor!.world().entities.get(`${def.kind}/${id}`) : undefined
+    const oldName = (before?.value as { name?: unknown } | undefined)?.name
+    const newName = (value as { name?: unknown } | null)?.name
     this.editor!.setEntity(def, def.file ? def.kind : String(id), value)
+    if (
+      def.folder &&
+      before &&
+      typeof oldName === 'string' &&
+      typeof newName === 'string' &&
+      oldName !== newName &&
+      idFromName(id, oldName)
+    ) {
+      const world = this.editor!.world()
+      const taken = [...world.entities.values()].filter((e) => e.kind.kind === def.kind && e.id !== id).map((e) => e.id)
+      const newId = uniqueSlug(newName, taken)
+      if (newId !== id) {
+        const files = new Map(this.editor!.files().map((f) => [f.path, f.text]))
+        const plan = renamePlan(world, files, def, id, newId)
+        if (!('error' in plan)) {
+          this.editor!.edit(plan.changes)
+          this.editor!.squash()
+          this.emit('renamed', { kind, from: id, to: newId })
+        }
+      }
+    }
     this.changed()
   }
 
@@ -698,6 +729,7 @@ export class WorldSession extends EventEmitter {
     const plan = renamePlan(this.editor!.world(), files, def, oldId, newId)
     if ('error' in plan) return plan
     this.editor!.edit(plan.changes)
+    this.emit('renamed', { kind, from: oldId, to: newId })
     this.changed()
     return { updated: plan.updated, skipped: plan.skipped }
   }

@@ -140,6 +140,7 @@ if (!gotLock) {
         mainWindow?.setTitle(info ? `${world.dirty ? '• ' : ''}${info.name} — Malevo Science` : 'Malevo Science')
       }
     })
+    world.on('renamed', (r) => mainWindow?.webContents.send(IPC.evRenamed, r))
     world.on('changed', (info) => {
       mainWindow?.webContents.send(IPC.evWorldChanged, info)
       mainWindow?.setTitle(info ? `${info.name} — Malevo Science` : 'Malevo Science')

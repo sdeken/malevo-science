@@ -111,6 +111,14 @@ is never written into a world folder. The app has no git integration.
   body's terrain, a city's plan) moves with it. Entities whose files have errors can't be rewritten;
   their dangling references show up in the checks. The Systems and Population tools show each
   entity's file with "Rename to …" (the name as an id) and "Change…".
+- **Ids follow names** (`WorldSession.setEntity`): when an entity's name changes and its id was
+  made from the old name (its slug, maybe with "-2" on the end: `new-event`, `sol-8`), the id
+  follows the new name. The rename happens in the same undo step as the name change, so
+  "Federated Stellar Nations" lands in `federated-stellar-nations.json`. An id set by hand,
+  which no longer matches its name, stays put. A kind whose id comes from its contents moves
+  with them (`KindDef.idOf`: a relation's `a--b` follows its cultures' renames).
+- **Selections follow too.** Main sends `ev:renamed`, and remembered ids (`useWorldPref`, and
+  `useFollowRenames` for selections held in component state) switch to the new id.
 
 ### Events and dates
 

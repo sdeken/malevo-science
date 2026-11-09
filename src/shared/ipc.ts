@@ -73,6 +73,7 @@ export const IPC = {
 
   evWorldChanged: 'ev:worldChanged',
   evSnapshot: 'ev:snapshot',
+  evRenamed: 'ev:renamed',
   evSettingsChanged: 'ev:settingsChanged',
   evUpdateStatus: 'ev:updateStatus',
   evMenu: 'ev:menu'

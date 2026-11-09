@@ -188,9 +188,9 @@ These rules carry over from devlog, adapted for structured data:
   `speed_kmh`). The schema converts to SI on load. A unit mismatch cannot hide in a bare number.
 - **An id is separate from a name.** Ids are short and name the files. Names are display data and
   can change freely: placeholder names are normal while exploring, so a rename touches one file and
-  breaks no references. An id changes only when the author asks (a placeholder id like `sol-8`
-  shouldn't outlive the placeholder): the files move, and every reference is rewritten in the same
-  undoable edit.
+  breaks no references. An id made from a name follows the name when it changes (a placeholder id like
+  `new-event` or `sol-8` shouldn't outlive the placeholder), and the author can change any id by
+  hand. Either way, the files move and every reference is rewritten in the same undoable edit.
 - **Generated entities get deterministic ids** (`g.c12_-3_4.17` for generated star 17 in cell
   (12, −3, 4)). An entity gets a file only once it is authored, locked or referenced.
 - **`world.json` carries `format: N`.** The loader refuses formats it does not understand, as

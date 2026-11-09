@@ -82,6 +82,8 @@ const api = {
     snapshot: (): Promise<WorldSnapshot | null> => ipcRenderer.invoke(IPC.worldSnapshot),
     onSnapshot: (cb: (snapshot: WorldSnapshot | null) => void): Unsubscribe => on(IPC.evSnapshot, cb),
     onChanged: (cb: (world: WorldInfo | null) => void): Unsubscribe => on(IPC.evWorldChanged, cb),
+    /** An entity's id changed (its file moved), by a rename or because its name changed. */
+    onRenamed: (cb: (r: { kind: EditableKind; from: string; to: string }) => void): Unsubscribe => on(IPC.evRenamed, cb),
     // Edits are unsaved until save(); each is one undo step.
     setEntity: (kind: EditableKind, id: string, value: unknown): Promise<void> => ipcRenderer.invoke(IPC.worldSetEntity, kind, id, value),
     /** Give an entity a new id: its files move, and every reference to it is rewritten (one undo step). */

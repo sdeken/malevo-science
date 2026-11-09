@@ -3,7 +3,7 @@ import { AU, DEG, G, KM, M_EARTH, M_SUN, type Vec3 } from '@malevo/core'
 import { knownSystemOf } from '@malevo/model'
 import type { ElementsInfo, PlanetProposal, SystemInfoDto } from '../../../../shared/types'
 import { NumberField, TextField, duration, sig } from '../../components/fields'
-import { slugId, useWorldPref } from '../../state'
+import { slugId, useWorldPref, useFollowRenames } from '../../state'
 import { FileName } from '../../components/FileName'
 import type { ToolDefinition, ToolProps } from '../registry'
 import { BodyEditor } from './BodyEditor'
@@ -109,6 +109,7 @@ function SystemDetail({
   navigate: ToolProps['navigate']
 }): React.JSX.Element {
   const [selectedBody, setSelectedBody] = useState<string | null>(null)
+  useFollowRenames(selectedBody, setSelectedBody)
   const [center, setCenter] = useState<string | null>(null)
   const [measuring, setMeasuring] = useState(false)
   const [isolines, setIsolines] = useState(false)

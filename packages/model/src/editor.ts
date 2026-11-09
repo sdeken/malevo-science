@@ -98,6 +98,11 @@ export class WorldEditor {
     this.edit([{ path: entityPath(kind as KindDef, id), text: entityText(kind, value) }])
   }
 
+  /** Fold the last edit into the one before it, so one undo takes back both. */
+  squash(): void {
+    if (this.past.length >= 2) this.past.pop()
+  }
+
   undo(): void {
     const prev = this.past.pop()
     if (!prev) return

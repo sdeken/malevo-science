@@ -1,3 +1,4 @@
+import { cultureKind, idFromName, slugify, uniqueSlug } from '@malevo/model'
 import { describe, expect, it } from 'vitest'
 import {
   bodyKind,
@@ -65,5 +66,27 @@ describe('renaming an entity', () => {
     expect(renamePlan(w, m, bodyKind, 'earth', 'mars')).toMatchObject({ error: expect.stringMatching(/already/) })
     expect(renamePlan(w, m, bodyKind, 'earth', 'Not An Id')).toMatchObject({ error: expect.stringMatching(/can't be an id/) })
     expect(renamePlan(w, m, systemKind, 'nowhere', 'x')).toMatchObject({ error: expect.stringMatching(/no system/) })
+  })
+
+  it('moves a relation to the id its new pair gives', () => {
+    const f = [
+      ...files(),
+      json('cultures/new-culture.json', { name: 'New culture', traits: {} }),
+      json('cultures/other.json', { name: 'Other', traits: {} }),
+      json('relations/new-culture--other.json', { between: ['new-culture', 'other'], affinity: 0.5 })
+    ]
+    const w = readWorld(f)
+    const plan = renamePlan(w, new Map(f.map((x) => [x.path, x.text])), cultureKind, 'new-culture', 'plainsfolk')
+    if ('error' in plan) throw new Error(plan.error)
+    const after = new Set(apply(f, plan.changes).map((x) => x.path))
+    expect(after.has('relations/other--plainsfolk.json') && !after.has('relations/new-culture--other.json')).toBe(true)
+  })
+
+  it('knows which ids came from names', () => {
+    expect(slugify('Federated Stellar Nations')).toBe('federated-stellar-nations')
+    expect(uniqueSlug('New event', ['new-event'])).toBe('new-event-2')
+    expect(idFromName('new-event-2', 'New event')).toBe(true)
+    expect(idFromName('sol-8', 'Sol 8')).toBe(true)
+    expect(idFromName('altaris', 'Sol 8')).toBe(false)
   })
 })

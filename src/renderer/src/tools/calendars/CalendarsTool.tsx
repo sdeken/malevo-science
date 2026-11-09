@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import type { CalendarInfo, WorldSnapshot } from '../../../../shared/types'
 import { DateInput } from '../../components/DateInput'
-import { slugId, useFormattedOne } from '../../state'
+import { slugId, useFormattedOne, useFollowRenames } from '../../state'
 import type { ToolDefinition, ToolProps } from '../registry'
 
 // Loose shapes of calendar files; main validates them against the schemas.
@@ -62,6 +62,7 @@ const STANDARD_TIME: Unit[] = [
 
 function CalendarsView({ snapshot, now, displayCal }: ToolProps): React.JSX.Element {
   const [selected, setSelected] = useState<string | null>(snapshot.calendars[0]?.id ?? null)
+  useFollowRenames(selected, setSelected)
   const [adding, setAdding] = useState(false)
   const current = snapshot.calendars.find((c) => c.id === selected) ?? null
 

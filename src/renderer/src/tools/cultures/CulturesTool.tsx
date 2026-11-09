@@ -11,7 +11,7 @@ import {
 } from '@malevo/model'
 import type { EntityDto, WorldSnapshot } from '../../../../shared/types'
 import { NumberField, TextField, sig } from '../../components/fields'
-import { slugId, useFormattedOne, useWorldPref } from '../../state'
+import { slugId, useFormattedOne, useWorldPref, useFollowRenames } from '../../state'
 import type { ToolDefinition, ToolProps } from '../registry'
 
 type Tab = 'cultures' | 'polities' | 'relations'
@@ -27,6 +27,7 @@ const COLORS = ['#4f8fe0', '#e0a43c', '#4fc1a6', '#d9604f', '#b07fe0', '#8bc34a'
 function CulturesView({ world, snapshot, now, navigate }: ToolProps): React.JSX.Element {
   const [tab, setTab] = useWorldPref<Tab>(world.root, 'culturesTab', 'cultures')
   const [selected, setSelected] = useState<string | null>(null)
+  useFollowRenames(selected, setSelected)
 
   const add = async (kind: 'culture' | 'polity'): Promise<void> => {
     const list = kind === 'culture' ? snapshot.cultures : snapshot.polities

@@ -227,14 +227,14 @@ try {
   check(!(await exists('events/new-event.json')), 'nothing is written before saving')
   await page.locator('#eventName').fill('Charter')
   await page.locator('#eventName').press('Enter')
-  const dateField = page.locator('[data-editing="new-event"] fieldset.when .date-input input').first()
+  const dateField = page.locator('[data-editing="charter"] fieldset.when .date-input input').first()
   await dateField.fill('2700-06')
   await dateField.press('Enter')
-  await page.waitForFunction(() => document.querySelector('[data-editing="new-event"] .resolved code')?.textContent === '2700-06')
+  await page.waitForFunction(() => document.querySelector('[data-editing="charter"] .resolved code')?.textContent === '2700-06')
   check(true, 'the date is parsed, and shown to the precision it was entered at')
   await page.locator('.status-save').click()
   await page.waitForFunction(() => document.querySelector('.status-saved') !== null)
-  const charter = JSON.parse(await fs.readFile(path.join(worldDir, 'events/new-event.json'), 'utf8'))
+  const charter = JSON.parse(await fs.readFile(path.join(worldDir, 'events/charter.json'), 'utf8'))
   check(
     charter.name === 'Charter' && charter.when.at.text === '2700-06' && charter.when.at.cal === 'gregorian',
     'saving writes the event file'
@@ -242,15 +242,15 @@ try {
 
   // A second event anchored to the first, 130 years later.
   await page.locator('#newEvent').click()
-  await page.waitForSelector('[data-editing="new-event-2"]')
+  await page.waitForSelector('[data-editing="new-event"]')
   await page.locator('#eventName').fill('Founding')
   await page.locator('#eventName').press('Enter')
-  await page.locator('[data-editing="new-event-2"] .seg button', { hasText: 'Relative to an event' }).click()
-  await page.waitForSelector('[data-editing="new-event-2"] .offset-grid')
-  const years = page.locator('[data-editing="new-event-2"] .offset-grid label', { hasText: 'years' }).locator('input')
+  await page.locator('[data-editing="founding"] .seg button', { hasText: 'Relative to an event' }).click()
+  await page.waitForSelector('[data-editing="founding"] .offset-grid')
+  const years = page.locator('[data-editing="founding"] .offset-grid label', { hasText: 'years' }).locator('input')
   await years.fill('130')
   await years.press('Enter')
-  await page.waitForFunction(() => document.querySelector('[data-editing="new-event-2"] .resolved code')?.textContent === '2830-06')
+  await page.waitForFunction(() => document.querySelector('[data-editing="founding"] .resolved code')?.textContent === '2830-06')
   check(true, 'an anchored event resolves 130 years after its anchor, at the anchor’s precision')
   await page.locator('.toolbar button', { hasText: 'Fit' }).click()
   await page.waitForFunction(() => document.querySelectorAll('[data-event]').length === 2)
@@ -261,31 +261,31 @@ try {
   await page.keyboard.press('Control+z')
   await page.waitForFunction(
     () =>
-      document.querySelector('[data-editing="new-event-2"] .resolved code')?.textContent !== '2830-06' ||
-      !document.querySelector('[data-editing="new-event-2"]')
+      document.querySelector('[data-editing="founding"] .resolved code')?.textContent !== '2830-06' ||
+      !document.querySelector('[data-editing="founding"]')
   )
   check(true, 'Ctrl+Z undoes the last change')
   await page.keyboard.press('Control+y')
-  await page.locator('[data-event="new-event-2"]').click()
-  await page.waitForFunction(() => document.querySelector('[data-editing="new-event-2"] .resolved code')?.textContent === '2830-06')
+  await page.locator('[data-event="founding"]').click()
+  await page.waitForFunction(() => document.querySelector('[data-editing="founding"] .resolved code')?.textContent === '2830-06')
   check(true, 'Ctrl+Y redoes it')
   await app.evaluate(({ Menu }) => {
     const file = Menu.getApplicationMenu().items.find((i) => i.label === '&File')
     file.submenu.items.find((i) => i.label === '&Save').click()
   })
   await page.waitForFunction(() => document.querySelector('.status-saved') !== null)
-  const founding = JSON.parse(await fs.readFile(path.join(worldDir, 'events/new-event-2.json'), 'utf8'))
-  check(founding.when.after === 'new-event' && founding.when.offset.year === 130, 'File › Save writes the anchored event')
+  const founding = JSON.parse(await fs.readFile(path.join(worldDir, 'events/founding.json'), 'utf8'))
+  check(founding.when.after === 'charter' && founding.when.offset.year === 130, 'File › Save writes the anchored event')
   await page.screenshot({ path: path.join(shots, '05-timeline.png') })
 
   // Moving the anchor moves what is anchored to it.
-  await page.locator('[data-event="new-event"]').click()
-  const charterDate = page.locator('[data-editing="new-event"] fieldset.when .date-input input').first()
+  await page.locator('[data-event="charter"]').click()
+  const charterDate = page.locator('[data-editing="charter"] fieldset.when .date-input input').first()
   await charterDate.fill('2750-06')
   await charterDate.press('Enter')
   await page.locator('.toolbar button', { hasText: 'Fit' }).click()
-  await page.locator('[data-event="new-event-2"]').click()
-  await page.waitForFunction(() => document.querySelector('[data-editing="new-event-2"] .resolved code')?.textContent === '2880-06')
+  await page.locator('[data-event="founding"]').click()
+  await page.waitForFunction(() => document.querySelector('[data-editing="founding"] .resolved code')?.textContent === '2880-06')
   check(true, 'moving the anchor moves the anchored event')
   await page.evaluate(() => window.malevo.world.discard())
   await page.waitForFunction(() => document.querySelector('.status-saved') !== null)
@@ -332,21 +332,21 @@ try {
   const forkDir = path.join(tmp, 'worlds', 'fork')
   const forked = await page.evaluate((dir) => window.malevo.world.fork(dir), forkDir)
   check(forked.ok && forked.world.name === 'Smoke World (fork)', 'forking copies the saved world under a new name')
-  const forkEvent = path.join(forkDir, 'events/new-event.json')
+  const forkEvent = path.join(forkDir, 'events/charter.json')
   const ev = JSON.parse(await fs.readFile(forkEvent, 'utf8'))
   ev.when.at.text = '2750-06'
   ev.when.at.t_s += 50 * 365.2425 * 86400
   await fs.writeFile(forkEvent, JSON.stringify(ev, null, 2) + '\n')
   const report = await page.evaluate((dir) => window.malevo.world.compare(dir), forkDir)
-  check(report.changed.length === 1 && report.changed[0].key === 'event/new-event', 'the comparison finds the one changed event')
-  check(report.timeChanges.map((c) => c.id).join() === 'new-event,new-event-2', 'and shows that the anchored event moves with it')
+  check(report.changed.length === 1 && report.changed[0].key === 'event/charter', 'the comparison finds the one changed event')
+  check(report.timeChanges.map((c) => c.id).join() === 'charter,founding', 'and shows that the anchored event moves with it')
   await tool('Fork & compare')
-  await page.evaluate((keys) => window.malevo.world.take(keys[0], keys.slice(1)), [forkDir, 'event/new-event'])
+  await page.evaluate((keys) => window.malevo.world.take(keys[0], keys.slice(1)), [forkDir, 'event/charter'])
   await page.waitForFunction(() => document.querySelector('.status-dirty') !== null)
   check(true, 'taking a change from the fork is an unsaved change here')
   await page.evaluate(() => window.malevo.world.discard())
   await page.waitForFunction(() => document.querySelector('.status-saved') !== null)
-  check(JSON.stringify(await listAll(forkDir)).includes('events/new-event.json'), 'the fork is a complete world folder')
+  check(JSON.stringify(await listAll(forkDir)).includes('events/charter.json'), 'the fork is a complete world folder')
 
   // 12. Phase 3: stars, a system on one, rolled planets, a calendar that follows a body.
   await tool('Stars')
@@ -446,23 +446,23 @@ try {
   await page.waitForSelector('[data-editing="new-culture"]')
   await page.locator('#cultureName').fill('Plainsfolk')
   await page.locator('#cultureName').press('Enter')
-  await page.locator('[data-editing="new-culture"] [data-trait="openness"]').fill('0.9')
+  await page.locator('[data-editing="plainsfolk"] [data-trait="openness"]').fill('0.9')
   await page.locator('#addEntity').click()
-  await page.waitForSelector('[data-editing="new-culture-2"]')
+  await page.waitForSelector('[data-editing="new-culture"]')
   await page.locator('#cultureName').fill('Hillfolk')
   await page.locator('#cultureName').press('Enter')
-  await page.locator('[data-editing="new-culture-2"] [data-trait="openness"]').fill('0.1')
+  await page.locator('[data-editing="hillfolk"] [data-trait="openness"]').fill('0.1')
   await page.waitForFunction(() => document.querySelectorAll('[data-entity]').length === 2)
   check(true, 'two cultures are made and given traits')
   await page.locator('[data-tab="relations"]').click()
-  const cell = page.locator('[data-cell="new-culture--new-culture-2"]').first()
+  const cell = page.locator('[data-cell="hillfolk--plainsfolk"]').first()
   await cell.waitFor()
   const derivedText = (await cell.textContent()) ?? ''
   check(Number(derivedText) < 0.5, `insular and open cultures start cool to each other (${derivedText})`)
   await cell.click()
   await page.locator('#relationAffinity').fill('0.8')
   await page.locator('#relationAffinity').press('Enter')
-  await page.waitForFunction(() => document.querySelector('[data-cell="new-culture--new-culture-2"]')?.textContent?.startsWith('0.8'))
+  await page.waitForFunction(() => document.querySelector('[data-cell="hillfolk--plainsfolk"]')?.textContent?.startsWith('0.8'))
   check(true, 'a relation set by hand replaces the affinity from their traits')
   await page.screenshot({ path: path.join(shots, '11-relations.png') })
   await page.locator('[data-tab="polities"]').click()
@@ -474,18 +474,18 @@ try {
   await page.waitForSelector('#addHistory')
   await page.locator('#addHistory').click()
   await page.waitForSelector('[data-history="0"]')
-  await page.locator('[data-history="0"] select').filter({ hasText: '(no polity)' }).selectOption('new-polity')
+  await page.locator('[data-history="0"] select').filter({ hasText: '(no polity)' }).selectOption('the-league')
   await page.waitForFunction(() => /At the current date: The League/.test(document.querySelector('.history-editor')?.textContent ?? ''))
   check(true, 'a history entry at the current date makes the polity hold the system now')
   await page.locator('.status-save').click()
   await page.waitForFunction(() => document.querySelector('.status-saved') !== null)
-  const relation = JSON.parse(await fs.readFile(path.join(worldDir, 'relations/new-culture--new-culture-2.json'), 'utf8'))
+  const relation = JSON.parse(await fs.readFile(path.join(worldDir, 'relations/hillfolk--plainsfolk.json'), 'utf8'))
   check(
-    relation.affinity === 0.8 && relation.between.join() === 'new-culture,new-culture-2',
+    relation.affinity === 0.8 && relation.between.join() === 'hillfolk,plainsfolk',
     'saving writes the relation under its sorted pair id'
   )
   const held = JSON.parse(await fs.readFile(path.join(worldDir, 'systems/proxima-centauri.json'), 'utf8'))
-  check(held.history?.[0]?.polity === 'new-polity', 'and the system’s history')
+  check(held.history?.[0]?.polity === 'the-league', 'and the system’s history')
   await tool('Checks')
   await page.locator('.checks-bar button').click()
   await page.waitForFunction(() => /No problems found|notes/.test(document.querySelector('.checks-summary')?.textContent ?? ''))
@@ -603,7 +603,7 @@ try {
   await tool('History')
   await page.waitForSelector('#historySetup')
   await page.locator('#histOrigin').selectOption('proxima-centauri')
-  await page.locator('#histCulture').selectOption('new-culture')
+  await page.locator('#histCulture').selectOption('plainsfolk')
   await page.locator('#histSlow').selectOption('slow-ships')
   await page.locator('#histFoam').selectOption('foam-drive')
   await page.locator('#histEnd').selectOption('run-end')
@@ -778,19 +778,18 @@ try {
   await page.screenshot({ path: path.join(shots, '21-trip.png') })
   await page.evaluate(() => window.malevo.world.discard())
 
-  // 21. Renaming: a placeholder file name follows the new name, and so does everything that points at it.
+  // 21. Renaming: a file named after a placeholder name follows the new name, and so does everything that points at it.
   await tool('Population')
   await page.waitForSelector('[data-city-detail="new-city"]')
   await page.locator('#cityName').fill('Bluff')
   await page.locator('#cityName').press('Enter')
-  await page.locator('#renameTo-new-city').click()
   await page.waitForSelector('[data-city-detail="bluff"]')
   await page.locator('.status-save').click()
   await page.waitForFunction(() => document.querySelector('.status-saved') !== null)
   const renamedPlan = JSON.parse(await fs.readFile(path.join(worldDir, 'cityplans/bluff.json'), 'utf8'))
   check(
     (await exists('cities/bluff.json')) && !(await exists('cities/new-city.json')) && renamedPlan.city === 'bluff',
-    'renaming a city moves its file, and its plan follows'
+    'naming a city moves its file to the new name, and its plan follows'
   )
 
   // 22. Whereabouts: a traveller too fast for the physics, and a drifter heading for Proxima.

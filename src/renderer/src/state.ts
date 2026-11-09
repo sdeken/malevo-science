@@ -5,6 +5,7 @@
  * localStorage, never in the world folder.
  */
 import { useCallback, useEffect, useRef, useState } from 'react'
+import { uniqueSlug } from '@malevo/model'
 import type { WorldSnapshot } from '../../shared/types'
 
 export function readPref<T>(key: string, fallback: T): T {
@@ -24,7 +25,33 @@ export function writePref(key: string, value: unknown): void {
   }
 }
 
-/** A value remembered per world. */
+// ---- following renames ----
+
+export interface Renamed {
+  kind: string
+  from: string
+  to: string
+}
+
+/** An id (or a "kind:id" or "something:id" key) after a rename, unchanged if the rename isn't about it. */
+export function renamedId(v: string, r: Renamed): string {
+  if (v === r.from) return r.to
+  if (v.endsWith(`:${r.from}`)) return `${v.slice(0, -r.from.length)}${r.to}`
+  return v
+}
+
+/** Keep a selected id pointing at the same thing when its id changes. */
+export function useFollowRenames(value: string | null, set: (v: string) => void): void {
+  useEffect(() => {
+    if (!value) return
+    return window.malevo.world.onRenamed((r) => {
+      const next = renamedId(value, r)
+      if (next !== value) set(next)
+    })
+  }, [value, set])
+}
+
+/** A value remembered per world. A remembered id follows its entity through a rename. */
 export function useWorldPref<T>(root: string, name: string, fallback: T): [T, (v: T) => void] {
   const key = `malevo.${name}:${root}`
   const [value, setValue] = useState<T>(() => readPref(key, fallback))
@@ -36,6 +63,13 @@ export function useWorldPref<T>(root: string, name: string, fallback: T): [T, (v
     },
     [key]
   )
+  useEffect(() => {
+    if (typeof value !== 'string' || !value) return
+    return window.malevo.world.onRenamed((r) => {
+      const next = renamedId(value, r)
+      if (next !== value) set(next as T)
+    })
+  }, [value, set])
   return [value, set]
 }
 
@@ -89,17 +123,7 @@ export function useFormattedOne(cal: string | null, t: number | null, precision?
 
 /** A readable id from a name, unique among `taken`: "Accord Charter" → "accord-charter", then "accord-charter-2". */
 export function slugId(name: string, taken: Iterable<string>): string {
-  const used = new Set(taken)
-  const base =
-    name
-      .toLowerCase()
-      .normalize('NFKD')
-      .replace(/[̀-ͯ]/g, '')
-      .replace(/[^a-z0-9]+/g, '-')
-      .replace(/^-+|-+$/g, '')
-      .slice(0, 48) || 'item'
-  if (!used.has(base)) return base
-  for (let n = 2; ; n++) if (!used.has(`${base}-${n}`)) return `${base}-${n}`
+  return uniqueSlug(name, taken)
 }
 
 /** Is focus in something that takes typing? */

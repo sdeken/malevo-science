@@ -102,6 +102,21 @@ export function renamePlan(
   }
   for (const [k, v] of values) {
     if (movedKeys.has(k)) continue
+    // A kind whose id comes from its contents (a relation's pair) moves to the id its new contents give.
+    const own = v.kind.idOf?.(v.value as never) ?? null
+    if (own && own !== v.id && !world.entities.has(key(v.kind, own))) {
+      const from = entityPath(v.kind, v.id).replace(/\.json$/, '')
+      const to = entityPath(v.kind, own).replace(/\.json$/, '')
+      changes.push({ path: `${to}.json`, text: entityText(v.kind, v.value) })
+      changes.push({ path: `${from}.json`, text: null })
+      for (const ext of ['md', 'js']) {
+        const text = files.get(`${from}.${ext}`)
+        if (text === undefined || text === null) continue
+        changes.push({ path: `${to}.${ext}`, text })
+        changes.push({ path: `${from}.${ext}`, text: null })
+      }
+      continue
+    }
     changes.push({ path: entityPath(v.kind, v.id), text: entityText(v.kind, v.value) })
   }
   return { changes, updated: updated.filter((k) => !movedKeys.has(k)), skipped }
