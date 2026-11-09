@@ -25,6 +25,7 @@ export const IPC = {
   tripSize: 'trip:size',
   whereTraveller: 'where:traveller',
   whereDrift: 'where:drift',
+  landingPlan: 'landing:plan',
   worldSnapshot: 'world:snapshot',
   worldSetEntity: 'world:setEntity',
   worldRenameEntity: 'world:renameEntity',

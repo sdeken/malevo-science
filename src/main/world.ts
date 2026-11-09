@@ -55,6 +55,10 @@ import {
   sizeShipForTrip,
   shipKind,
   travellerKind,
+  landingKind,
+  landingReport,
+  type LandingFile,
+  type LandingReport,
   drifterKind,
   travellerReport,
   driftReport,
@@ -181,7 +185,8 @@ const KIND_DEFS: Record<EditableKind, KindDef> = {
   cityPlan: cityPlanKind as KindDef,
   ship: shipKind as KindDef,
   traveller: travellerKind as KindDef,
-  drifter: drifterKind as KindDef
+  drifter: drifterKind as KindDef,
+  landing: landingKind as KindDef
 }
 
 export class WorldSession extends EventEmitter {
@@ -330,6 +335,7 @@ export class WorldSession extends EventEmitter {
       ships: entityDtos(world, shipKind.kind),
       travellers: entityDtos(world, travellerKind.kind),
       drifters: entityDtos(world, drifterKind.kind),
+      landings: entityDtos(world, landingKind.kind),
       physics: physicsFile
         ? {
             legLimit_ly: physicsFile.foam.legLimit_ly,
@@ -656,6 +662,13 @@ export class WorldSession extends EventEmitter {
     const e = this.world().entities.get(`${travellerKind.kind}/${id}`)
     if (!e || e.value === undefined) return { error: `There is no traveller "${id}" (or its file has errors).` }
     return travellerReport(this.world(), this.env, e.value as TravellerFile, now)
+  }
+
+  /** A landing worked out: the kit, the descent, the timeline, the tow and the tide. */
+  landing(id: string): LandingReport | { error: string } {
+    const e = this.world().entities.get(`${landingKind.kind}/${id}`)
+    if (!e || e.value === undefined) return { error: `There is no landing "${id}" (or its file has errors).` }
+    return landingReport(this.world(), this.env, e.value as LandingFile)
   }
 
   /** Where a drifter is at `now`, and the stars it passes. */

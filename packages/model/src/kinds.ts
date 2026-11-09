@@ -85,7 +85,36 @@ export const physicsSchema = obj({
   traffic: obj({
     balanceTolerance: num({ min: 0, max: 1, sig: 9 }),
     balanceFloor_perDay: num({ min: 0, sig: 9 })
-  })
+  }),
+  /** What ship parts weigh and how they shed heat, for the Shipyard. Each absent value takes its default (see design.ts). */
+  design: opt(
+    obj({
+      /** Torch (reactor and nozzle) mass per terawatt of jet power, tonnes. */
+      torch_t_per_TW: opt(num({ above: 0, sig: 6 })),
+      /** Share of a torch's fusion power that ends up in the jet. */
+      torchEfficiency: opt(num({ above: 0, max: 1, sig: 6 })),
+      /** Share of the torch's waste heat carried off in the exhaust (the rest needs radiators). */
+      heatToExhaust: opt(num({ min: 0, max: 1, sig: 6 })),
+      /** Ship's power plant (foam, hotel), tonnes per gigawatt of output. */
+      plant_t_per_GW: opt(num({ above: 0, sig: 6 })),
+      /** Share of the plant's fusion power delivered as electricity. */
+      plantEfficiency: opt(num({ above: 0, max: 1, sig: 6 })),
+      /** Radiator panels, kilograms per square metre. */
+      radiator_kg_per_m2: opt(num({ above: 0, sig: 6 })),
+      /** Radiator working temperature, kelvin. */
+      radiator_K: opt(num({ above: 0, sig: 6 })),
+      /** Tank, insulation and plumbing mass as a share of the propellant it holds. */
+      tankFraction: opt(num({ min: 0, max: 1, sig: 6 })),
+      /** Propellant density, kg/m³ (liquid hydrogen 71). */
+      propellantDensity_kg_m3: opt(num({ above: 0, sig: 6 })),
+      /** Living space, life support and stores per person aboard, tonnes. */
+      crew_t_each: opt(num({ min: 0, sig: 6 })),
+      /** Hotel power per person aboard, megawatts. */
+      hotel_MW_each: opt(num({ min: 0, sig: 6 })),
+      /** Hold structure as a share of the cargo it can carry. */
+      holdFraction: opt(num({ min: 0, max: 1, sig: 6 }))
+    })
+  )
 })
 export type PhysicsSettings = Infer<typeof physicsSchema>
 
@@ -579,7 +608,38 @@ export const shipSchema = obj({
   foamThrottle: opt(num({ min: 0, max: 1, sig: 6 })),
   /** How fast a port can fill the tanks, tonnes per hour. */
   refuel_tph: opt(num({ above: 0, sig: 9 })),
-  note: opt(str({ max: 400 }))
+  note: opt(str({ max: 400 })),
+  /**
+   * The ship as built from parts (the Shipyard). When present, the dry mass,
+   * propellant, engines, thrust and exhaust speed above are worked out from it.
+   */
+  design: opt(
+    obj({
+      /** Hull and frame, tonnes. */
+      hull_t: num({ min: 0, sig: 9 }),
+      crew: num({ integer: true, min: 0, max: 1000000 }),
+      /** Cargo the hold can take, tonnes. */
+      cargo_t: num({ min: 0, sig: 9 }),
+      /** Cargo aboard for trips, tonnes. */
+      load_t: opt(num({ min: 0, sig: 9 })),
+      /** Propellant the tanks hold, tonnes. */
+      tanks_t: num({ above: 0, sig: 9 }),
+      torches: obj({
+        count: num({ integer: true, min: 1, max: 100 }),
+        /** Thrust of each, meganewtons. */
+        thrust_MN: num({ above: 0, sig: 9 }),
+        /** Absent: the world's torch setting. */
+        exhaust_c: opt(num({ above: 0, max: 1, sig: 9 }))
+      }),
+      /** The power plant (foam field and hotel load), gigawatts. */
+      plant_GW: num({ min: 0, sig: 9 }),
+      /** Radiator area, square metres (both faces radiate). */
+      radiators_m2: num({ min: 0, sig: 9 }),
+      /** Armour and radiation shielding, tonnes. */
+      shielding_t: opt(num({ min: 0, sig: 9 })),
+      extras: opt(arr(obj({ name: str({ min: 1, max: 80 }), mass_t: num({ min: 0, sig: 9 }) })))
+    })
+  )
 })
 export type ShipFile = Infer<typeof shipSchema>
 
@@ -1019,6 +1079,48 @@ export type DrifterFile = Infer<typeof drifterSchema>
 
 export const drifterKind: KindDef<DrifterFile> = { kind: 'drifter', label: 'drifter', folder: 'drifters', schema: drifterSchema }
 
+// ---- landings ----
+
+/**
+ * Bringing a hull (or its sections) down from orbit: a descent kit of a
+ * ballute and chemical rockets, onto a pad or into the sea, then (for the
+ * sea) a tow to shore and a tide to beach on.
+ */
+export const landingSchema = obj({
+  name: name(),
+  body: ref('body'),
+  /** The town nearest the landing, for its tides. */
+  city: opt(ref('city')),
+  /** When the first section touches down. */
+  touchdown: instantSchema,
+  /** Everything coming down, hull and cargo, tonnes. */
+  mass_t: num({ above: 0, sig: 9 }),
+  sections: num({ integer: true, min: 1, max: 1000 }),
+  /** How far apart the sections ride in orbit before their burns, km. They land about that far apart. */
+  spacing_km: opt(num({ min: 0, sig: 6 })),
+  orbit_km: num({ above: 0, sig: 6 }),
+  ballute: obj({
+    /** Mass per drag area: lower is gentler and bigger. kg/m². */
+    beta_kg_m2: num({ above: 0, sig: 6 }),
+    /** Released at this altitude, km. */
+    release_km: num({ min: 0, sig: 6 })
+  }),
+  /** The hull's own mass per drag area once the ballute is gone, kg/m². */
+  hullBeta_kg_m2: num({ above: 0, sig: 6 }),
+  rockets: obj({
+    exhaust_kms: num({ above: 0, sig: 6 }),
+    /** Thrust per weight at ignition, in g. */
+    thrust_g: num({ above: 0, sig: 6 }),
+    touchdown_ms: num({ above: 0, sig: 6 })
+  }),
+  mode: oneOf(['pad', 'splash']),
+  tow: opt(obj({ offshore_km: num({ min: 0, sig: 6 }), knots: num({ above: 0, sig: 6 }) })),
+  note: opt(str({ max: 2000 }))
+})
+export type LandingFile = Infer<typeof landingSchema>
+
+export const landingKind: KindDef<LandingFile> = { kind: 'landing', label: 'landing', folder: 'landings', schema: landingSchema }
+
 export const KINDS: readonly KindDef[] = [
   physicsKind as KindDef,
   starfieldKind as KindDef,
@@ -1040,5 +1142,6 @@ export const KINDS: readonly KindDef[] = [
   cityPlanKind as KindDef,
   shipKind as KindDef,
   travellerKind as KindDef,
-  drifterKind as KindDef
+  drifterKind as KindDef,
+  landingKind as KindDef
 ]

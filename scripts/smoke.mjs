@@ -822,6 +822,40 @@ try {
   await page.screenshot({ path: path.join(shots, '22-whereabouts.png') })
   await page.evaluate(() => window.malevo.world.discard())
 
+  // 23. The Shipyard: a ship built from parts; starve its radiators and it says so.
+  await tool('Shipyard')
+  await page.locator('#newDesignName').fill('Evelyn Voss')
+  await page.locator('#newDesign').click()
+  await page.waitForSelector('#designResults')
+  check(
+    /Balanced/.test((await page.locator('#designResults').textContent()) ?? ''),
+    'a new design is balanced: radiators and power plant keep up'
+  )
+  await page.locator('#dRadiators').fill('1000')
+  await page.locator('#dRadiators').press('Enter')
+  await page.waitForSelector('#designProblems')
+  check(
+    /radiators/.test((await page.locator('#designProblems').textContent()) ?? ''),
+    'starving the radiators shows the heat it can’t shed'
+  )
+  await page.screenshot({ path: path.join(shots, '23-shipyard.png') })
+
+  // 24. Landings: the Voss in eight sections, into the sea and towed in.
+  await tool('Landings')
+  await page.locator('#newLandingName').fill('The Voss comes down')
+  await page.locator('#newLanding').click()
+  await page.waitForSelector('#landingTimeline', { timeout: 30_000 })
+  await page.locator('#landingSections').fill('8')
+  await page.locator('#landingSections').press('Enter')
+  await page.locator('#landingMode').selectOption('splash')
+  await page.waitForFunction(() => /Tugs/.test(document.querySelector('#landingTimeline')?.textContent ?? ''), null, { timeout: 30_000 })
+  check(
+    /Deorbit burn/.test((await page.locator('#landingTimeline').textContent()) ?? ''),
+    'a landing works back from touchdown to the deorbit burn, and the tow'
+  )
+  await page.screenshot({ path: path.join(shots, '24-landings.png') })
+  await page.evaluate(() => window.malevo.world.discard())
+
   // 10. The update status reports a dev build.
   const status = await page.evaluate(() => window.malevo.updates.status())
   check(status.state === 'unavailable', 'an unpackaged build reports updates as unavailable')

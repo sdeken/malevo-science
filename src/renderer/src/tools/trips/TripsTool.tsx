@@ -100,6 +100,12 @@ function ShipEditor({ id, ship, snapshot }: { id: string; ship: ShipFile; snapsh
   const burnFull = (ship.propellant_t * 1000 * exhaust) / Math.min(thrust, comfort * full)
   return (
     <section className="ship-editor" id="shipEditor">
+      {ship.design && (
+        <p className="muted small" id="shipFromDesign">
+          Built in the Shipyard: its dry mass, tanks, engines and thrust follow from its parts. Change them there, or a change here will be
+          overwritten the next time the design changes.
+        </p>
+      )}
       <div className="field-row">
         <TextField label="Ship" value={ship.name} onCommit={(v) => v.trim() && save({ name: v.trim() })} id="shipName" />
       </div>

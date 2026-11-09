@@ -36,7 +36,7 @@ import type {
   WorldResult,
   WorldSnapshot
 } from '../shared/types'
-import type { DriftReport, TravellerReport } from '@malevo/model'
+import type { DriftReport, LandingReport, TravellerReport } from '@malevo/model'
 
 type Unsubscribe = () => void
 
@@ -156,6 +156,10 @@ const api = {
     /** Save a 2048×1024 colour or height map where the author chooses. Resolves to the path, or null if cancelled. */
     export: (body: string, what: 'colour' | 'height' | 'clouds'): Promise<string | null> =>
       ipcRenderer.invoke(IPC.terrainExport, body, what)
+  },
+  landings: {
+    /** A landing worked out: kit, descent, timeline, tow and tide. */
+    plan: (id: string): Promise<LandingReport | { error: string }> => ipcRenderer.invoke(IPC.landingPlan, id)
   },
   where: {
     /** A traveller's stops, each gap against the quickest possible trip, and where they are at `now`. */

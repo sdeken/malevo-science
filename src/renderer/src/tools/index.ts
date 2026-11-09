@@ -6,6 +6,8 @@ import { defineTools } from './registry'
 import { routesTool } from './routes/RoutesTool'
 import { tripsTool } from './trips/TripsTool'
 import { whereaboutsTool } from './whereabouts/WhereaboutsTool'
+import { shipyardTool } from './shipyard/ShipyardTool'
+import { landingsTool } from './landings/LandingsTool'
 import { skyTool } from './sky/SkyTool'
 import { approachTool } from './approach/ApproachTool'
 import { historyTool } from './history/HistoryTool'
@@ -26,7 +28,9 @@ export const TOOLS = defineTools([
   populationTool,
   cityPlanTool,
   routesTool,
+  shipyardTool,
   tripsTool,
+  landingsTool,
   whereaboutsTool,
   skyTool,
   approachTool,

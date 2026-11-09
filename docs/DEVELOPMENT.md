@@ -257,6 +257,59 @@ module.exports = {
   (365.25 days), weeks, days, hours, minutes and seconds, at most three units, zeros left out,
   and tenths of a second under an hour ("1w 1d 13h", "14m 56.4s").
 
+### Shipyard
+
+- **A ship built from parts** (the **Shipyard** tool, `packages/model/src/design.ts`). A ship's
+  optional `design` holds:
+  - hull and frame, people aboard, armour;
+  - the hold and the load carried;
+  - tanks;
+  - torches (count, thrust each, exhaust speed);
+  - the power plant, radiator area, and extras.
+- **What it works out (`designReport`):**
+  - **Mass of each part.** Torches by jet power (½ × thrust × exhaust speed), the plant by its
+    gigawatts, tanks as a share of what they hold, radiators by area, living space per person,
+    the hold as a share of its capacity.
+  - **How it flies:** acceleration full and empty, Δv, burn time.
+  - **Heat:**
+    - the torches' fusion power less what reaches the jet, less the share carried off in the
+      exhaust;
+    - plus the plant's losses and the power it delivers, which ends up as heat;
+    - against what the radiators shed (both faces, emissivity 0.9, at their temperature).
+  - **Problems:** radiators that can't keep up, a plant smaller than the foam field and the
+    hotel load, a load bigger than the hold.
+- **The design sets the flying numbers** (`applyDesign`): dry mass (the load included, since
+  it doesn't burn), propellant, engines, thrust per engine, exhaust speed. So the trip planner
+  flies what was built. A ship without a design can start one from its numbers, with the hull
+  taking up whatever mass the parts don't.
+- **The coefficients are world settings** (`physics.design`), each with a default in
+  `DESIGN_DEFAULTS`. The defaults make a five-torch freighter like the Sandpiper come out at
+  about 6,600 t dry and just under 1 g laden. They are not canon.
+
+### Landings
+
+- **A hull, or its sections, brought down from orbit** (the **Landings** tool,
+  `packages/model/src/landing.ts`). A landing is `landings/<id>.json`: the body, a town for the
+  tides, the first touchdown time, the mass, the sections and their spacing in orbit, the orbit
+  height, the descent kit (ballute, hull drag, rockets), pad or sea, and for the sea, the tow.
+- **Each section's descent, step by step,** in the orbit's plane:
+  - a deorbit burn that drops the low point of the orbit to about six scale heights;
+  - the coast down (Kepler's equation) to the top of the air, about fifteen scale heights;
+  - the ballute's slow-down, recording peak deceleration and peak heating on it (Sutton–Graves,
+    with the ballute's radius);
+  - its release, then the fall on the hull's own drag;
+  - the rockets, fired whenever it's faster than the speed from which 80% of full thrust stops it
+    at the surface at touchdown speed.
+
+  The air is exponential, scaled from the body's surface pressure and scale height. The planet's
+  turning and the winds are left out.
+- **Sections** riding apart in orbit reach the deorbit point seconds apart, so they come down in
+  quick succession, landing about as far apart as they rode.
+- **For the sea,** the tow time from offshore distance and speed, then the town's next high water
+  after they arrive (`conditionsAt`), and low water about half a tidal cycle later.
+- **The timeline** runs back from the touchdown time to the deorbit burn. A note says the orbit
+  passes over a given spot only about twice a day, so touchdown times come in windows.
+
 ### Whereabouts
 
 - **Where people and things are, and whether they could have got there** (the **Whereabouts** tool,
