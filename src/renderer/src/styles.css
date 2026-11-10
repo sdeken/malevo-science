@@ -2191,3 +2191,40 @@ fieldset.plain {
 .landing-results .notes {
   padding-left: 1.2em;
 }
+
+/* What the star map is coloured by, over the map's top-left corner. */
+.map-colour {
+  position: absolute;
+  top: 8px;
+  left: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  max-width: 240px;
+}
+
+.map-legend {
+  list-style: none;
+  margin: 0;
+  padding: 6px 8px;
+  border-radius: 6px;
+  background: rgb(5 7 12 / 0.7);
+  color: #d6dbe4;
+}
+
+.map-legend li {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.map-legend .swatch {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  flex: none;
+}
+
+.map-legend .muted {
+  color: #8f99aa;
+}

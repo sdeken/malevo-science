@@ -454,6 +454,10 @@ and culture blending, all running on the shared core. It adds four things:
   fork to compare.
 - **Information propagation.** News moves only as fast as ships. The generator can answer "when
   did system X learn of event Y".
+- **Polities come about two ways** (history@2): by expansion from a capital, holding every colony
+  they seed; or by federation, formed by systems that broke away from an expanding polity and
+  growing as independent systems and minor polities apply to join. Independent systems form minor
+  polities of their own. Borders drawn at one date remain as the simpler alternative.
 
 ### 7.4 Solar system planner
 

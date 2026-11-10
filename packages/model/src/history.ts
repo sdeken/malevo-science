@@ -1,20 +1,20 @@
 /**
  * The history generator, wired to a world (docs/PLAN.md §7.3).
  *
- * `historyInput` gathers what history@1 plays out from the world's own files:
+ * `historyInput` gathers what the generator (history@2) plays out from the world's own files:
  * the settings, the events that bring each capability, the stars, the
  * polities, and every system that already exists (a fixed point: settled at
  * its first dated history entry, or, with none, a place the run should reach).
  * `proposeHistory` runs it and turns the result into proposed files (new
  * systems, cultures, routes and events, and changes to polities' capitals),
- * each locked to history@1. Nothing is written: the author accepts pieces.
+ * each locked to history@2. Nothing is written: the author accepts pieces.
  *
  * `newsArrival` answers "when did each system learn of this event": by radio
  * at the speed of light, or by ship over the routes open at the time, after
  * the foam drive, whichever is first.
  */
 import { DAY, JULIAN_YEAR, LY, compareStrings, starPhysics, type Ellipsoid } from '@malevo/core'
-import { history, runGenerator, type FixedSettlement, type HistoryInput, type HistoryOutput, type HistoryStar } from '@malevo/gen'
+import { history2, runGenerator, type FixedSettlement, type HistoryInput, type HistoryOutput, type HistoryStar } from '@malevo/gen'
 import { cultureFiles, systemHistory } from './cultures'
 import type { WorldEnv } from './env'
 import { whenResolver, worldCalendars, type WhenResolver } from './events'
@@ -37,7 +37,15 @@ import { entitiesOf, type WorldData } from './load'
 import { allRoutes, routeWorld, tripTime } from './routes'
 import { worldStars } from './systems'
 
-export const HISTORY_GEN = 'history@1'
+export const HISTORY_GEN = 'history@2'
+
+/** Defaults for how polities come about (settings/history.json `founding`). */
+export const FOUNDING_DEFAULTS = {
+  expand: { unify: 0.2, vigor: 4 },
+  federate: { direct: 0.15, join: { rate: 0.15, minAge_y: 40, similarity: 0, legs: 2 } },
+  breakaway: { rate: 0.2, distance_ly: 30, minAge_y: 30 },
+  minor: { rate: 0.005, size: 4, minAge_y: 30, max: 30 }
+} as const
 
 const yearOf = (t: number): number => t / JULIAN_YEAR
 const tOf = (y: number): number => Math.round(y * JULIAN_YEAR)
@@ -153,6 +161,41 @@ export function historyInput(world: WorldData, env: WorldEnv, seedOverride?: num
   }
   const nebulae: Ellipsoid[] = routeWorld(world, env).nebulae.map((n) => n.shape)
 
+  let founding: HistoryInput['founding']
+  if (s.founding && s.founding.list.length) {
+    const D = FOUNDING_DEFAULTS
+    const list: NonNullable<HistoryInput['founding']>['polities'] = []
+    for (const f of s.founding.list) {
+      const y = at(f.from, `${f.polity} founding`)
+      if (typeof y !== 'number') return y
+      const pv = world.entities.get(`${polityKind.kind}/${f.polity}`)?.value as { name?: string } | undefined
+      if (!pv) return { error: `The polity "${f.polity}" does not exist.` }
+      list.push({
+        key: f.polity,
+        name: pv.name ?? f.polity,
+        mode: f.mode,
+        from: y,
+        capital: polityCapital(f.polity),
+        unify: f.unify ?? D.expand.unify,
+        vigor: f.vigor ?? D.expand.vigor,
+        direct: f.direct ?? D.federate.direct,
+        join: {
+          rate: f.join?.rate ?? D.federate.join.rate,
+          minAge: f.join?.minAge_y ?? D.federate.join.minAge_y,
+          similarity: f.join?.similarity ?? D.federate.join.similarity,
+          legs: f.join?.legs ?? D.federate.join.legs
+        }
+      })
+    }
+    const b = s.founding.breakaway ?? D.breakaway
+    const m = s.founding.minor ?? D.minor
+    founding = {
+      polities: list,
+      breakaway: { rate: b.rate, distance: b.distance_ly, minAge: b.minAge_y },
+      minor: { rate: m.rate, size: m.size, minAge: m.minAge_y, max: m.max }
+    }
+  }
+
   const input: HistoryInput = {
     stars: list,
     origin: originStar.id,
@@ -177,7 +220,8 @@ export function historyInput(world: WorldData, env: WorldEnv, seedOverride?: num
       capital: polityCapital(p.polity),
       unify: p.unify ?? 0
     })),
-    fixed
+    fixed,
+    ...(founding ? { founding } : {})
   }
   return { input, seed: seedOverride ?? s.seed ?? world.manifest?.seed ?? 0, resolver, systemsByStar }
 }
@@ -219,7 +263,7 @@ export interface HistoryProposal {
 export function proposeHistory(world: WorldData, env: WorldEnv, seedOverride?: number): HistoryProposal | { error: string } {
   const prep = historyInput(world, env, seedOverride)
   if ('error' in prep) return prep
-  const out = runGenerator(history, prep.input, prep.seed)
+  const out = runGenerator(history2, prep.input, prep.seed)
   const lock = { gen: HISTORY_GEN, seed: prep.seed, inputs: {} }
   const files: ProposedFile[] = []
   const kinds = new Map(world.kinds.map((k) => [k.kind, k]))
@@ -269,6 +313,44 @@ export function proposeHistory(world: WorldData, env: WorldEnv, seedOverride?: n
   const systemOfStar = new Map<string, string>()
   for (const [star, s] of prep.systemsByStar) systemOfStar.set(star, s.id)
   for (const s of out.systems) if (!systemOfStar.has(s.star)) systemOfStar.set(s.star, slugFrom(s.name, systemIds))
+
+  // Minor polities the run made (history@2): systems refer to them.
+  const polityIds = takenIds(polityKind.kind)
+  const polityId = new Map<string, string>()
+  for (const p of out.polities ?? []) {
+    if (!p.minor) continue
+    const id = slugFrom(p.name, polityIds)
+    polityId.set(p.key, id)
+    const absorbed = p.dissolved !== null ? `, absorbed ${Math.round(p.dissolved)}` : ''
+    files.push({
+      key: entityKey(polityKind as KindDef, id),
+      kind: polityKind.kind,
+      id,
+      path: pathOf(polityKind.kind, id),
+      value: {
+        name: p.name,
+        color: p.color,
+        capital: p.capital ? systemOfStar.get(p.capital) : undefined,
+        tags: ['minor', 'history'],
+        lock
+      },
+      group: 'polity',
+      label: `${p.name}: formed ${Math.round(p.founded ?? 0)}${absorbed}${p.systems ? `, ${p.systems} systems at the end` : ''}`,
+      change: false,
+      year: p.founded,
+      stars: p.capital ? [p.capital] : []
+    })
+  }
+  const polityRef = (key: string | null): string | undefined => (key === null ? undefined : (polityId.get(key) ?? key))
+  const WHY: Record<string, string> = {
+    founding: 'Founds the polity',
+    founded: 'Founded as a colony of the polity',
+    breakaway: 'Breaks away',
+    minor: 'Forms a polity with its neighbours',
+    federation: 'Joins in forming the federation',
+    joined: 'Joins',
+    fixed: 'Polity as given'
+  }
   for (const s of out.systems) {
     const existing = prep.systemsByStar.get(s.star)
     if (existing && (existing.file.history?.length ?? 0) > 0) continue // its own history stands
@@ -276,11 +358,21 @@ export function proposeHistory(world: WorldData, env: WorldEnv, seedOverride?: n
     const entries: Record<string, unknown>[] = [
       { from: when(s.founded), cultures: shares(s.mixFounded), note: s.outpost ? 'Founded as an outpost' : 'Founded' }
     ]
-    if (s.polity !== null && s.politySince !== null)
+    if (s.changes) {
+      // history@2: every change of polity; one at the founding goes on the founding entry.
+      for (const c of s.changes) {
+        if (c.year <= s.founded && entries.length === 1) {
+          entries[0].polity = polityRef(c.polity)
+          if (c.why !== 'founded') entries[0].note = `${String(entries[0].note)}; ${WHY[c.why].toLowerCase()}`
+          continue
+        }
+        entries.push({ from: when(c.year), polity: polityRef(c.polity), cultures: shares(c.mix), note: WHY[c.why] })
+      }
+    } else if (s.polity !== null && s.politySince !== null)
       entries.push({ from: when(s.politySince), polity: s.polity, cultures: shares(s.mixAtPolities) ?? shares(s.mixFounded) })
     entries.push({
       from: when(prep.input.years.end),
-      polity: s.polity ?? undefined,
+      polity: polityRef(s.polity),
       cultures: shares(s.mixAtEnd),
       note: 'At the end of the run'
     })
@@ -294,7 +386,7 @@ export function proposeHistory(world: WorldData, env: WorldEnv, seedOverride?: n
       path: pathOf(systemKind.kind, id),
       value,
       group: 'system',
-      label: `${s.name}${s.outpost ? ' (outpost)' : ''}${s.polity ? `, ${s.polity}` : ''}`,
+      label: `${s.name}${s.outpost ? ' (outpost)' : ''}${s.polity ? `, ${polityRef(s.polity)}` : ''}`,
       change: Boolean(existing),
       year: s.founded,
       stars: [s.star]
@@ -377,7 +469,9 @@ export function proposeHistory(world: WorldData, env: WorldEnv, seedOverride?: n
   }
 
   // Polities without a capital get the one the run chose.
-  for (const [polity, star] of Object.entries(out.capitals)) {
+  const chosenCapitals: Record<string, string> = { ...out.capitals }
+  for (const p of out.polities ?? []) if (!p.minor && p.capital) chosenCapitals[p.key] = p.capital
+  for (const [polity, star] of Object.entries(chosenCapitals)) {
     const e = world.entities.get(`${polityKind.kind}/${polity}`)
     const v = e?.value as Record<string, unknown> | undefined
     if (!e || !v || v.capital) continue
@@ -390,7 +484,7 @@ export function proposeHistory(world: WorldData, env: WorldEnv, seedOverride?: n
       group: 'polity',
       label: `${String(v.name ?? e.id)}: capital at ${nameOfSystem.get(star) ?? star}`,
       change: true,
-      year: prep.input.years.polities,
+      year: (out.polities ?? []).find((p) => p.key === polity)?.founded ?? prep.input.years.polities,
       stars: [star]
     })
   }

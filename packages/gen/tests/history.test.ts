@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { segmentHitsEllipsoid } from '@malevo/core'
-import { history, runGenerator } from '@malevo/gen'
+import { history, history2, runGenerator, type FoundingInput } from '@malevo/gen'
 import { syntheticInput, syntheticStars } from './synthetic'
 
 const stars = syntheticStars(5000, 240)
@@ -83,3 +83,104 @@ describe('history@1', () => {
     expect(cap.capitals.north).toBe(near.star)
   })
 })
+
+/** An expanding polity from the origin and a federation of its breakaways (nobody's setting). */
+export const FOUNDING: FoundingInput = {
+  polities: [
+    {
+      key: 'core',
+      name: 'The Core',
+      mode: 'expand',
+      from: 600,
+      capital: null,
+      unify: 0.2,
+      vigor: 4,
+      direct: 0,
+      join: { rate: 0, minAge: 0, similarity: 0, legs: 1 }
+    },
+    {
+      key: 'league',
+      name: 'The League',
+      mode: 'federate',
+      from: 850,
+      capital: null,
+      unify: 0,
+      vigor: 1,
+      direct: 0.15,
+      join: { rate: 0.15, minAge: 40, similarity: 0, legs: 2 }
+    }
+  ],
+  breakaway: { rate: 0.2, distance: 30, minAge: 30 },
+  minor: { rate: 0.005, size: 4, minAge: 30, max: 30 }
+}
+
+describe('history@2', () => {
+  const field = syntheticStars(1500, 220, 9)
+  const base = syntheticInput(field, {
+    years: { slow: 300, foam: 650, end: 1000, polities: null },
+    growth: { total: 160, maxRadius: 110, outward: 7, legs: 2 },
+    polities: []
+  })
+
+  it('is history@1 when polities do not come about by founding', () => {
+    const inp = syntheticInput(stars)
+    expect(runGenerator(history2, inp, 11)).toEqual(runGenerator(history, inp, 11))
+  })
+
+  for (const seed of [1, 42, 7]) {
+    const out = runGenerator(history2, { ...base, founding: FOUNDING }, seed)
+    const bySt = new Map(out.systems.map((s) => [s.star, s]))
+    const count = (key: string): number => out.systems.filter((s) => s.polity === key).length
+
+    it(`grows an expanding polity, breaks systems away and federates them (seed ${seed})`, () => {
+      expect(out.conflicts).toEqual([])
+      expect(count('core')).toBeGreaterThan(50)
+      expect(count('league')).toBeGreaterThan(5)
+      const league = out.polities!.find((p) => p.key === 'league')!
+      expect(league.founded).toBe(850)
+      for (const s of out.systems) {
+        const changes = s.changes!
+        // Changes are in order, from the founding on.
+        for (let k = 1; k < changes.length; k++) expect(changes[k].year).toBeGreaterThanOrEqual(changes[k - 1].year)
+        for (const c of changes) expect(c.year).toBeGreaterThanOrEqual(s.founded - 1e-6)
+        // The federation's founders all broke away (or descend from those that did) or came in a minor polity.
+        for (const c of changes.filter((x) => x.why === 'federation')) {
+          expect(c.year).toBeGreaterThanOrEqual(850)
+          expect(c.year).toBeLessThan(860)
+          const before = changes.slice(0, changes.indexOf(c))
+          const last = before[before.length - 1]
+          expect(last?.polity ?? null).not.toBe('core')
+        }
+        // A colony of the expanding polity is born into it.
+        const parent = s.parent ? bySt.get(s.parent) : null
+        if (parent && changes[0]?.why === 'founded' && changes[0].polity === 'core')
+          expect(parent.changes!.some((c) => c.polity === 'core')).toBe(true)
+      }
+      expect(out.systems.some((s) => s.changes!.some((c) => c.why === 'breakaway'))).toBe(true)
+      expect(out.systems.some((s) => s.changes!.some((c) => c.why === 'joined'))).toBe(true)
+    })
+
+    it(`makes minor polities, some of which the federation takes in (seed ${seed})`, () => {
+      const minors = out.polities!.filter((p) => p.minor)
+      expect(minors.length).toBeGreaterThan(0)
+      for (const m of minors) {
+        expect(m.color).toMatch(/^#[0-9a-f]{6}$/)
+        if (m.dissolved !== null) expect(count(m.key)).toBe(0)
+      }
+    })
+  }
+
+  it('reports a federation that never formed', () => {
+    const out = runGenerator(
+      history2,
+      { ...base, founding: { ...FOUNDING, breakaway: { ...FOUNDING.breakaway, rate: 0 }, minor: { ...FOUNDING.minor, rate: 0 } } },
+      1
+    )
+    expect(out.conflicts.some((c) => /League never formed/.test(c))).toBe(true)
+    expect(count0(out, 'league')).toBe(0)
+  })
+})
+
+function count0(out: { systems: { polity: string | null }[] }, key: string): number {
+  return out.systems.filter((s) => s.polity === key).length
+}

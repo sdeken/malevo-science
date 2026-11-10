@@ -6,6 +6,8 @@ import { duration, sig } from '../../components/fields'
 import { slugId, useWorldPref } from '../../state'
 import type { ToolDefinition, ToolProps } from '../registry'
 import { StarMap, type MapNebula, type MapRoute, type MapSystem } from './StarMap'
+import { MapColour } from './MapColour'
+import { leadingCulture, territoryHolders, type ColourBy, type Territory } from './territory'
 import { mapNebulae, mapRoutes, mapStations } from '../routes/mapData'
 
 const SOL = 'hyg.0'
@@ -15,6 +17,7 @@ function StarsView({ world, snapshot, now, focus: navFocus, navigate }: ToolProp
   const [focusId, setFocusId] = useWorldPref<string>(world.root, 'starsFocus', systems[0]?.starId ?? SOL)
   const [radius, setRadius] = useWorldPref<number>(world.root, 'starsRadius', 20)
   const [showGenerated, setShowGenerated] = useWorldPref<boolean>(world.root, 'starsGenerated', true)
+  const [colourBy, setColourBy] = useWorldPref<ColourBy>(world.root, 'starsColourBy', 'type')
   const [focusStar, setFocusStar] = useState<StarInfoDto | null>(null)
   const [field, setField] = useState<StarField | null>(null)
   const [selected, setSelected] = useState<number | null>(null)
@@ -88,12 +91,24 @@ function StarsView({ world, snapshot, now, focus: navFocus, navigate }: ToolProp
       systems
         .filter((s) => s.star)
         .map((s): MapSystem => {
-          const polity = historyAt(s.history, now)?.polity
-          const color = polity ? String(snapshot.polities.find((p) => p.id === polity)?.value?.color ?? '') : ''
+          const h = historyAt(s.history, now)
+          const culture = colourBy === 'culture' ? leadingCulture(h?.cultures) : null
+          const color = culture
+            ? String(snapshot.cultures.find((c) => c.id === culture)?.value?.color ?? '')
+            : h?.polity
+              ? String(snapshot.polities.find((p) => p.id === h.polity)?.value?.color ?? '')
+              : ''
           return { id: s.id, name: s.name, pos: s.star!.pos, color: color || undefined }
         })
         .concat(mapStations(snapshot)),
-    [systems, now, snapshot]
+    [systems, now, snapshot, colourBy]
+  )
+  const territory: Territory | null = useMemo(
+    () =>
+      colourBy === 'type'
+        ? null
+        : { mode: colourBy, reach: snapshot.physics?.legLimit_ly ?? 10, holders: territoryHolders(snapshot, now, colourBy) },
+    [colourBy, snapshot, now]
   )
   const routes: MapRoute[] = useMemo(() => mapRoutes(snapshot), [snapshot])
   const nebulae: MapNebula[] = useMemo(() => mapNebulae(snapshot), [snapshot])
@@ -272,7 +287,9 @@ function StarsView({ world, snapshot, now, focus: navFocus, navigate }: ToolProp
           reach={legLimit}
           routes={routes}
           nebulae={nebulae}
+          territory={territory}
         />
+        <MapColour value={colourBy} onChange={setColourBy} territory={territory} />
         <p className="map-hint muted small">
           Drag to turn, wheel to zoom, right-drag to pan, click a star to pick it. The blue sphere is one leg.
         </p>

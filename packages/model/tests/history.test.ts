@@ -131,6 +131,60 @@ describe('the history generator on a world', () => {
   })
 })
 
+describe('polities that come about by founding', () => {
+  /** The base world with North expanding from Sol and South federating from its breakaways. */
+  const founding = (over: object = {}): WorldFile[] => {
+    const files = base()
+    const i = files.findIndex((f) => f.path === 'settings/history.json')
+    const settings = JSON.parse(files[i].text!) as Record<string, unknown>
+    delete settings.polities
+    files[i] = json('settings/history.json', {
+      ...settings,
+      growth: { systems: 70, maxRadius_ly: 70 },
+      founding: {
+        list: [
+          { polity: 'north', mode: 'expand', from: 'slow-ships' },
+          { polity: 'south', mode: 'federate', from: 'polities-form' }
+        ],
+        breakaway: { rate: 0.3, distance_ly: 20, minAge_y: 30 },
+        minor: { rate: 0.01, size: 3, minAge_y: 30, max: 10 },
+        ...over
+      }
+    })
+    return files
+  }
+
+  it('proposes system histories that change polity, minor polities, and a capital for each', () => {
+    const p = propose(founding())
+    expect(p.conflicts).toEqual([])
+    const sys = p.files.filter((f) => f.group === 'system')
+    const polityOf = (f: (typeof sys)[number]): string[] => ((f.value.history as { polity?: string }[]) ?? []).map((h) => h.polity ?? '-')
+    expect(sys.some((f) => polityOf(f).includes('north'))).toBe(true)
+    expect(sys.some((f) => polityOf(f).includes('south'))).toBe(true)
+    // Some systems were North's, then broke away (independent), then South's.
+    expect(sys.some((f) => /north,(-,)+.*south/.test(polityOf(f).join(',')))).toBe(true)
+    // South gets the capital the run chose; North's is at Sol.
+    expect(p.files.find((f) => f.key === 'polity/south')?.value.capital).toBeTruthy()
+    expect(p.files.find((f) => f.key === 'polity/north')?.value.capital).toBe('sol')
+    // Everything accepted makes a valid world.
+    const w = readWorld(accepted(founding(), p))
+    expect(w.issues).toEqual([])
+    const bad = runChecks(w, env).filter((i) => i.severity === 'error')
+    expect(bad).toEqual([])
+    expect(propose(founding())).toEqual(p)
+  })
+
+  it('names new minor polities and gives them colours', () => {
+    const p = propose(founding({ minor: { rate: 0.05, size: 3, minAge_y: 20, max: 10 } }))
+    const minors = p.files.filter((f) => f.group === 'polity' && !f.change)
+    expect(minors.length).toBeGreaterThan(0)
+    for (const m of minors) {
+      expect(m.value.tags).toEqual(['minor', 'history'])
+      expect(String(m.value.color)).toMatch(/^#[0-9a-f]{6}$/)
+    }
+  })
+})
+
 describe('news', () => {
   it('goes by ship once the foam drive exists, faster than radio, and by radio before', () => {
     const p = propose(base())

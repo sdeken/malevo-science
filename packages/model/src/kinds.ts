@@ -969,7 +969,7 @@ export const cityPlanKind: KindDef<CityPlanFile> = { kind: 'cityPlan', label: 'c
 
 // ---- the history generator's settings ----
 
-/** What history@1 plays out: where it starts, which events unlock what, and how it behaves. */
+/** What the history generator plays out: where it starts, which events unlock what, and how it behaves. */
 export const historySettingsSchema = obj({
   /** Seed for runs; absent means the world seed. */
   seed: opt(num({ integer: true, min: 0, max: 0xffffffff })),
@@ -1019,6 +1019,66 @@ export const historySettingsSchema = obj({
           share: num({ min: 0, max: 1, sig: 6 }),
           /** How fast it pulls its systems toward its capital's culture, per decade (0–1). */
           unify: opt(num({ min: 0, max: 1, sig: 6 }))
+        })
+      )
+    })
+  ),
+  /**
+   * How polities come about (history@2), instead of borders drawn at one date: some expand from a capital,
+   * some federate from systems that broke away; independent systems form minor polities of their own.
+   */
+  founding: opt(
+    obj({
+      list: arr(
+        obj({
+          polity: ref('polity'),
+          /** "expand": founded at its capital, it holds every colony it seeds. "federate": formed by breakaways, it grows by applicants. */
+          mode: oneOf(['expand', 'federate']),
+          /** When it is founded (expand) or formed (federate). */
+          from: ref('event'),
+          /** Expand: how fast it pulls its systems toward its overall culture mix, per decade (0–1). Default 0.2. */
+          unify: opt(num({ min: 0, max: 1, sig: 6 })),
+          /** Expand: how much more readily its systems found colonies. Default 4. */
+          vigor: opt(num({ above: 0, max: 50, sig: 6 })),
+          /** Federate: the chance a colony of one of its systems stays in it. Default 0.15. */
+          direct: opt(num({ min: 0, max: 1, sig: 6 })),
+          /** Federate: who may apply to join, and how often. */
+          join: opt(
+            obj({
+              /** Chance per decade that a qualifying applicant joins. Default 0.15. */
+              rate: num({ min: 0, max: 1, sig: 6 }),
+              /** How long an applicant must have stood. Default 40. */
+              minAge_y: num({ min: 0, sig: 6 }),
+              /** Least share of its culture mix in common with the federation's (0–1). Default 0: any. */
+              similarity: num({ min: 0, max: 1, sig: 6 }),
+              /** How near a member it must be, in legs. Default 2. */
+              legs: num({ above: 0, max: 10, sig: 6 })
+            })
+          )
+        })
+      ),
+      /** Systems far from an expanding polity's capital break away, with the colonies they founded. */
+      breakaway: opt(
+        obj({
+          /** Chance per decade, for each expanding polity, of a breakaway. Default 0.2. */
+          rate: num({ min: 0, max: 1, sig: 6 }),
+          /** Only systems at least this far from its capital. Default 30. */
+          distance_ly: num({ min: 0, sig: 6 }),
+          /** And settled at least this long. Default 30. */
+          minAge_y: num({ min: 0, sig: 6 })
+        })
+      ),
+      /** Independent systems organize into minor polities with their independent neighbours. */
+      minor: opt(
+        obj({
+          /** Chance per decade, for each independent system. Default 0.005. */
+          rate: num({ min: 0, max: 1, sig: 6 }),
+          /** Most systems one forms with. Default 4. */
+          size: num({ integer: true, min: 1, max: 50 }),
+          /** Settled at least this long first. Default 30. */
+          minAge_y: num({ min: 0, sig: 6 }),
+          /** Most minor polities in a run. Default 30. */
+          max: num({ integer: true, min: 0, max: 200 })
         })
       )
     })

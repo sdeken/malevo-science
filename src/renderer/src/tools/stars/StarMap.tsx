@@ -3,6 +3,7 @@ import * as THREE from 'three'
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js'
 import type { StarField } from '../../../../shared/types'
 import { starColour } from '../../components/fields'
+import { CONTESTED_COLOUR, claims, type Territory } from './territory'
 
 export interface MapSystem {
   id: string
@@ -38,6 +39,8 @@ interface Props {
   reach: number | null
   routes?: MapRoute[]
   nebulae?: MapNebula[]
+  /** Colour the stars by who holds them, with a faint bubble a leg across around each holding. */
+  territory?: Territory | null
 }
 
 const VERTEX = `
@@ -65,7 +68,7 @@ void main() {
  * galactic pole). Drag to orbit, wheel to zoom, right-drag to pan; click a
  * star to pick it. Systems are ringed and labelled. Renders on demand only.
  */
-export function StarMap({ field, focus, systems, selected, onPick, reach, routes, nebulae }: Props): React.JSX.Element {
+export function StarMap({ field, focus, systems, selected, onPick, reach, routes, nebulae, territory }: Props): React.JSX.Element {
   const host = useRef<HTMLDivElement>(null)
   const labels = useRef<HTMLDivElement>(null)
   const ctx = useRef<{
@@ -75,6 +78,7 @@ export function StarMap({ field, focus, systems, selected, onPick, reach, routes
     controls: OrbitControls
     stars: THREE.Points | null
     marks: THREE.Group
+    cloud: THREE.Group
     render(): void
   } | null>(null)
   const [failed, setFailed] = useState<string | null>(null)
@@ -101,6 +105,8 @@ export function StarMap({ field, focus, systems, selected, onPick, reach, routes
     controls.enableDamping = false
     const marks = new THREE.Group()
     scene.add(marks)
+    const cloud = new THREE.Group()
+    scene.add(cloud)
     const c = {
       renderer,
       scene,
@@ -108,6 +114,7 @@ export function StarMap({ field, focus, systems, selected, onPick, reach, routes
       controls,
       stars: null as THREE.Points | null,
       marks,
+      cloud,
       render() {
         renderer.render(scene, camera)
         placeLabels()
@@ -218,12 +225,6 @@ export function StarMap({ field, focus, systems, selected, onPick, reach, routes
       geo.setAttribute('position', new THREE.BufferAttribute(field.pos, 3))
       const size = new Float32Array(n)
       const tint = new Float32Array(n * 3)
-      for (let i = 0; i < n; i++) {
-        size[i] = Math.max(0.6, Math.min(5, 3.2 - 0.22 * field.absmag[i]))
-        const [r, g, b] = starColour(field.ci[i])
-        const dim = field.generated[i] ? 0.75 : 1
-        tint.set([r * dim, g * dim, b * dim], i * 3)
-      }
       geo.setAttribute('size', new THREE.BufferAttribute(size, 1))
       geo.setAttribute('tint', new THREE.BufferAttribute(tint, 3))
       const mat = new THREE.ShaderMaterial({
@@ -236,8 +237,74 @@ export function StarMap({ field, focus, systems, selected, onPick, reach, routes
       c.stars = new THREE.Points(geo, mat)
       c.scene.add(c.stars)
     }
-    c.render()
   }, [field])
+
+  // Star sizes and tints: by star type, or by who holds them.
+  useEffect(() => {
+    const c = ctx.current
+    if (!c) return
+    if (c.stars && field) {
+      const n = field.ids.length
+      const size = c.stars.geometry.getAttribute('size') as THREE.BufferAttribute
+      const tint = c.stars.geometry.getAttribute('tint') as THREE.BufferAttribute
+      const cl = territory && territory.holders.length ? claims(field.pos, territory) : null
+      const rgb = cl ? cl.groups.map((g) => new THREE.Color(g.color)) : []
+      const hot = new THREE.Color(CONTESTED_COLOUR)
+      for (let i = 0; i < n; i++) {
+        let sz = Math.max(0.6, Math.min(5, 3.2 - 0.22 * field.absmag[i]))
+        const [r, g, b] = starColour(field.ci[i])
+        const dim = field.generated[i] ? 0.75 : 1
+        if (!cl) tint.setXYZ(i, r * dim, g * dim, b * dim)
+        else if (cl.owner[i] < 0) tint.setXYZ(i, r * 0.18, g * 0.18, b * 0.2)
+        else {
+          const col = cl.contested[i] ? hot : rgb[cl.owner[i]]
+          const k = 0.55 + 0.45 * cl.best[i]
+          tint.setXYZ(i, col.r * k, col.g * k, col.b * k)
+          sz = Math.max(sz, 2.2) + 0.6
+        }
+        size.setX(i, sz)
+      }
+      size.needsUpdate = true
+      tint.needsUpdate = true
+    }
+    // Territory: a faint bubble a leg across around each holding; overlapping bubbles add up, so borders show where they meet.
+    for (const child of [...c.cloud.children]) {
+      c.cloud.remove(child)
+      ;((child as THREE.Mesh).material as THREE.Material).dispose()
+    }
+    if (territory && territory.holders.length) {
+      const unit = new THREE.SphereGeometry(1, 28, 18)
+      const byKey = new Map<string, { color: string; list: [number, number, number][] }>()
+      for (const h of territory.holders) {
+        const e = byKey.get(h.key) ?? { color: h.color, list: [] }
+        e.list.push(h.pos)
+        byKey.set(h.key, e)
+      }
+      const m4 = new THREE.Matrix4()
+      const q = new THREE.Quaternion()
+      const sc = new THREE.Vector3().setScalar(territory.reach)
+      const ps = new THREE.Vector3()
+      for (const { color, list } of byKey.values()) {
+        const mesh = new THREE.InstancedMesh(
+          unit,
+          new THREE.MeshBasicMaterial({
+            color: new THREE.Color(color),
+            transparent: true,
+            opacity: territory.mode === 'culture' ? 0.045 : 0.06,
+            depthWrite: false
+          }),
+          list.length
+        )
+        list.forEach((p, k) => {
+          ps.set(...p)
+          m4.compose(ps, q, sc)
+          mesh.setMatrixAt(k, m4)
+        })
+        c.cloud.add(mesh)
+      }
+    }
+    c.render()
+  }, [field, territory])
 
   // The camera follows the focus.
   useEffect(() => {

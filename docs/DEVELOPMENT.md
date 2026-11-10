@@ -208,6 +208,15 @@ module.exports = {
 
   Everything else is derived and shown, never stored: periods, positions at any date, sunlight,
   temperature, gravity, solar day, Hill sphere, foam collapse radius, and daylight by latitude.
+- **Colouring the map** (Stars tool; the History tool's run map, by polity): by star type, by
+  culture or by polity at the current date (`tools/stars/territory.ts`).
+  - Each system that a culture leads or a polity holds claims the stars within a leg, strongest
+    close in. A star goes to the strongest claim and is tinted with that group's colour; unclaimed
+    stars go dim.
+  - A star where a rival polity's claim is at least 75% of the strongest is contested, in red.
+  - Each holding gets a faint bubble a leg across, in its colour. Where bubbles overlap they add
+    up, so territory reads as coloured clouds with borders where they meet.
+  - The key lists the groups by systems held.
 - **`planets@1`** proposes a planetary system for a star.
   - Each roll number is its own keyed stream, so roll *n* of a system is always the same.
   - Keeping a roll writes locked bodies, recording `planets@1` and the seed. It replaces bodies
@@ -716,8 +725,12 @@ module.exports = {
   - how many systems by the end, and how far out;
   - culture rates: enclaves, branching, blending;
   - the belief cultures that found enclaves (each from an event);
-  - the polities: when they form, each one's target share of the systems, and how fast it pulls
-    its systems toward one culture.
+  - the polities, one of two ways:
+    - **by borders** (`polities`): when they form, each one's target share of the systems, and
+      how fast it pulls its systems toward one culture;
+    - **by founding** (`founding`, history@2): each polity *expands* from its capital or
+      *federates* from breakaways, plus the breakaway and minor-polity rates. When `founding`
+      lists any polity, borders are not drawn.
 - **`history@1`** (`packages/gen/src/history.ts`) has the prototype `settle.js` mechanics with
   nothing particular to one story:
   - slow-ship colonies near the origin, each starting a regional culture;
@@ -727,6 +740,31 @@ module.exports = {
 
   Stars off the main sequence are never settled. A history is path-dependent, so the run draws
   from one stream. Names come from per-star streams.
+- **`history@2`** is history@1 plus polities that come about over time. Without `founding` its
+  output is history@1's exactly (a test holds it to that). Its polity draws come from a stream of
+  their own. Defaults are `FOUNDING_DEFAULTS` in `packages/model/src/history.ts`.
+  - **Expanding** (`mode: "expand"`): founded at its capital (the polity's own, else the origin)
+    at its event. Every colony its systems found is its own, and its old systems keep founding
+    colonies (`vigor` times as readily as others, without the usual ageing). Each decade it pulls
+    its systems a share (`unify`) toward its own overall culture mix; enclaves resist.
+  - **Breakaways:** each decade, with chance `breakaway.rate` per expanding polity, a system at
+    least `distance_ly` from the capital and settled `minAge_y` years breaks away, with the
+    colonies it founded that are still in the polity. Their line is *free*: what they found later is
+    free too.
+  - **Federating** (`mode: "federate"`): formed at its event by the free independent systems and
+    the minor polities they formed (if there are none yet, it waits, and the run says so if it
+    never forms). Its capital is the polity's own if among them, else the founder with the most
+    founders within a leg. A colony of one of its systems stays in it only with chance `direct`.
+  - **Applications:** each decade, an independent system, or a minor polity as a whole, within
+    `join.legs` legs of a member, standing `join.minAge_y` years and sharing `join.similarity` of
+    its culture mix with the federation's, joins with chance `join.rate`. A minor polity that
+    joins is dissolved.
+  - **Minor polities:** each decade, an independent system settled `minor.minAge_y` years forms a
+    polity with chance `minor.rate`, taking in independent neighbours within a leg up to
+    `minor.size` systems. Its colonies are its own. Up to `minor.max` in a run; each gets a name
+    from its leading culture's sounds and a colour.
+  - Each system's every change of polity is in its output (`changes`), with the mix at the time
+    and why: founding, founded, breakaway, minor, federation, joined.
 - **Gated by the timeline:**
   - Nothing is settled before the slow-ship event.
   - Before the foam drive, nothing is settled beyond slow ships' reach.
@@ -740,12 +778,14 @@ module.exports = {
   - A polity's capital is kept.
   - What the run cannot honour is listed under "What it could not honour".
 - **Proposals:**
-  - A run proposes new systems (with histories: founded, when the polities formed, at the end)
-    and new regional cultures.
+  - A run proposes new systems (with histories: founded, each change of polity or when the
+    polities formed, at the end) and new regional cultures.
+  - With polities by founding, it proposes the minor polities it made (tagged `minor`,
+    `history`), and capitals for the world's polities that have none.
   - It proposes routes, with `opened` dates. Slow-ship links that fit the leg limit open when the
     foam drive does.
   - It proposes events, with `where`, and capitals for polities that have none.
-  - Accepted pieces are written as one undoable, unsaved step, locked to `history@1` (provenance
+  - Accepted pieces are written as one undoable, unsaved step, locked to `history@2` (provenance
     only: no inputs, so they never go stale). On the next run they are fixed points.
   - To compare runs, fork the world and accept in the fork.
 - **News** (`newsArrival`): when each system heard of an event that has a `where`.

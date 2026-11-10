@@ -613,13 +613,42 @@ try {
   // Keep the smoke run small.
   await page.evaluate(async () => {
     const s = (await window.malevo.world.snapshot()).historySettings
-    await window.malevo.world.setEntity('historySettings', 'historySettings', { ...s, growth: { systems: 30, maxRadius_ly: 45 } })
+    // The League expands from the origin; a second polity federates from its breakaways.
+    await window.malevo.world.setEntity('polity', 'free-worlds', { name: 'Free Worlds', color: '#4fb3d9' })
+    await window.malevo.world.setEntity('historySettings', 'historySettings', {
+      ...s,
+      growth: { systems: 30, maxRadius_ly: 45 },
+      founding: {
+        list: [
+          { polity: 'the-league', mode: 'expand', from: 'slow-ships' },
+          { polity: 'free-worlds', mode: 'federate', from: 'big-news' }
+        ],
+        breakaway: { rate: 0.5, distance_ly: 10, minAge_y: 20 }
+      }
+    })
   })
+  await page.locator('[data-tab="settings"]').click()
+  await page.waitForSelector('#foundingEditor')
+  check(
+    (await page.locator('#foundingEditor [data-founding]').count()) === 2 &&
+      (await page.locator('#foundMode-free-worlds').inputValue()) === 'federate',
+    'the settings show how each polity comes about: one expanding, one federating'
+  )
+  await page.locator('[data-tab="run"]').click()
   await page.locator('#historyRun').click()
   await page.waitForSelector('#historySummary', { timeout: 60_000 })
   const summary7 = (await page.locator('#historySummary').textContent()) ?? ''
   const proposedSystems = Number(summary7.match(/(\d+) systems/)?.[1] ?? 0)
   check(proposedSystems >= 15, `a run proposes a settlement history (${summary7.trim()})`)
+  const run7 = await page.evaluate(() => window.malevo.history.propose())
+  const polities7 = (f) => (f.value.history ?? []).map((h) => h.polity ?? '-')
+  const sys7 = run7.files.filter((f) => f.group === 'system')
+  check(
+    sys7.filter((f) => polities7(f).includes('the-league')).length >= 5 && sys7.some((f) => polities7(f).includes('free-worlds')),
+    `the expanding polity holds its colonies, and the federation forms from breakaways (${sys7.filter((f) => polities7(f).includes('free-worlds')).length} systems; ${run7.conflicts.join(' ') || 'no conflicts'})`
+  )
+  await page.waitForSelector('.history-map #mapLegend')
+  check(true, 'the run map colours territory by polity, with a key')
   await page.screenshot({ path: path.join(shots, '16-history.png') })
   await page.locator('#historyAccept').click()
   await page.waitForFunction(() => /Accepted \d+ file/.test(document.querySelector('.history-run')?.textContent ?? ''))
@@ -628,8 +657,22 @@ try {
   const sysFiles = await fs.readdir(path.join(worldDir, 'systems'))
   const locked = (
     await Promise.all(sysFiles.map(async (f) => JSON.parse(await fs.readFile(path.join(worldDir, 'systems', f), 'utf8')).lock?.gen))
-  ).filter((g) => g === 'history@1').length
-  check(locked >= 15, `accepting writes the systems, locked to history@1 (${locked})`)
+  ).filter((g) => g === 'history@2').length
+  check(locked >= 15, `accepting writes the systems, locked to history@2 (${locked})`)
+  // The star map coloured by polity: the territory as a cloud, with a key.
+  await page.locator('#currentDate').fill('2790-06-01 12:00')
+  await page.locator('#currentDate').press('Enter')
+  await tool('Stars')
+  await page.locator('#colourBy-polity').click()
+  await page.waitForSelector('#mapLegend')
+  check(
+    /League|Free Worlds|No system/.test((await page.locator('#mapLegend').textContent()) ?? ''),
+    `the star map colours stars by polity (${((await page.locator('#mapLegend').textContent()) ?? '').slice(0, 80)})`
+  )
+  await page.screenshot({ path: path.join(shots, '16-stars-polity.png') })
+  await page.locator('#colourBy-type').click()
+  await tool('History')
+  await page.waitForSelector('#historyRun')
   await page.evaluate(async () => {
     const yr = 31_557_600
     await window.malevo.world.setEntity('event', 'big-news', {

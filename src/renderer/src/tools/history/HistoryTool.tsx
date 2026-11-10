@@ -1,10 +1,13 @@
 import { useMemo, useState } from 'react'
 import { JULIAN_YEAR } from '@malevo/core'
+import { FOUNDING_DEFAULTS } from '@malevo/model'
 import type { HistoryProposalDto, NewsDto, ProposedFileDto, WorldSnapshot } from '../../../../shared/types'
 import { NumberField, sig } from '../../components/fields'
 import { useFormatted, useWorldPref } from '../../state'
 import type { ToolDefinition, ToolProps } from '../registry'
 import { StarMap, type MapRoute, type MapSystem } from '../stars/StarMap'
+import { MapColour } from '../stars/MapColour'
+import type { Territory, TerritoryHolder } from '../stars/territory'
 
 type Tab = 'run' | 'settings' | 'news'
 type Settings = {
@@ -20,6 +23,23 @@ type Settings = {
   culture: { enclaveRate: number; splitRate: number; splitDistance_ly: number; blendRate: number }
   enclaves?: { culture: string; from?: string }[]
   polities?: { from: string; list: { polity: string; share: number; unify?: number }[] }
+  founding?: Founding
+}
+
+type JoinRule = { rate: number; minAge_y: number; similarity: number; legs: number }
+type FoundingEntry = {
+  polity: string
+  mode: 'expand' | 'federate'
+  from: string
+  unify?: number
+  vigor?: number
+  direct?: number
+  join?: JoinRule
+}
+type Founding = {
+  list: FoundingEntry[]
+  breakaway?: { rate: number; distance_ly: number; minAge_y: number }
+  minor?: { rate: number; size: number; minAge_y: number; max: number }
 }
 
 const GROUPS: { group: ProposedFileDto['group']; title: string }[] = [
@@ -291,8 +311,19 @@ function SettingsEditor({ snapshot, settings }: { snapshot: WorldSnapshot; setti
           ))}
       </select>
 
-      <h3>Polities</h3>
-      {!polities ? (
+      <h3>How polities come about</h3>
+      <FoundingEditor
+        snapshot={snapshot}
+        founding={settings.founding}
+        save={(founding) => save({ founding })}
+        evSelect={evSelect}
+        firstEvent={events[0]?.id ?? ''}
+      />
+
+      <h3>Polities by borders</h3>
+      {settings.founding?.list.length ? (
+        <p className="muted small">Not used while polities come about by founding (above).</p>
+      ) : !polities ? (
         <button onClick={() => events[0] && save({ polities: { from: events[0].id, list: [] } })} disabled={!snapshot.polities.length}>
           Draw polity borders in the run
         </button>
@@ -359,6 +390,192 @@ function SettingsEditor({ snapshot, settings }: { snapshot: WorldSnapshot; setti
             No polities in the run
           </button>
           <p className="muted small">A polity with a capital keeps it; the run chooses capitals for the rest, spread apart.</p>
+        </>
+      )}
+    </div>
+  )
+}
+
+/**
+ * Polities that expand from a capital (holding every colony they seed) or federate from breakaways (growing by
+ * applicants), with breakaways from the expanding ones and minor polities among the independents.
+ */
+function FoundingEditor({
+  snapshot,
+  founding,
+  save,
+  evSelect,
+  firstEvent
+}: {
+  snapshot: WorldSnapshot
+  founding: Founding | undefined
+  save(f: Founding | undefined): void
+  evSelect(value: string | undefined, onChange: (v: string) => void): React.JSX.Element
+  firstEvent: string
+}): React.JSX.Element {
+  const D = FOUNDING_DEFAULTS
+  const f: Founding = founding ?? { list: [] }
+  const setList = (list: FoundingEntry[]): void => save(list.length || f.breakaway || f.minor ? { ...f, list } : undefined)
+  const set = (k: number, patch: Partial<FoundingEntry>): void => setList(f.list.map((x, j) => (j === k ? { ...x, ...patch } : x)))
+  const clamp01 = (v: number | undefined): number | undefined => (v === undefined ? undefined : Math.max(0, Math.min(1, v)))
+  const hasExpand = f.list.some((x) => x.mode === 'expand')
+  const b = f.breakaway ?? D.breakaway
+  const m = f.minor ?? D.minor
+  return (
+    <div className="founding" id="foundingEditor">
+      <p className="muted small">
+        <strong>Expanding</strong> polities are founded at their capital (or the origin) and hold every colony their systems seed, pulling
+        them toward their overall culture. Far from the capital, systems sometimes <strong>break away</strong>, with the colonies they
+        founded. A <strong>federation</strong> forms from those breakaways (and the minor polities they made); it seldom founds colonies
+        itself, and grows as independent systems and minor polities near it apply to join. Independent systems now and then form{' '}
+        <strong>minor polities</strong> with their neighbours.
+      </p>
+      {f.list.map((p, k) => {
+        const join = p.join ?? { ...D.federate.join }
+        return (
+          <fieldset key={p.polity} className="founding-polity" data-founding={p.polity}>
+            <legend>{name(snapshot.polities, p.polity)}</legend>
+            <div className="field-row">
+              <label className="field">
+                Comes about by
+                <select
+                  value={p.mode}
+                  onChange={(e) => set(k, { mode: e.target.value as FoundingEntry['mode'] })}
+                  id={`foundMode-${p.polity}`}
+                >
+                  <option value="expand">Expanding from its capital</option>
+                  <option value="federate">Federating from breakaways</option>
+                </select>
+              </label>
+              <label className="field">
+                {p.mode === 'expand' ? 'Founded at' : 'Formed at'} {evSelect(p.from, (v) => set(k, { from: v }))}
+              </label>
+              <button className="link" onClick={() => setList(f.list.filter((_, j) => j !== k))}>
+                Remove
+              </button>
+            </div>
+            {p.mode === 'expand' ? (
+              <div className="field-row">
+                <NumberField
+                  label="Unifies its culture, per decade"
+                  value={p.unify}
+                  optional
+                  placeholder={String(D.expand.unify)}
+                  onCommit={(v) => set(k, { unify: clamp01(v) })}
+                />
+                <NumberField
+                  label="Vigour (colonizes this much more)"
+                  value={p.vigor}
+                  optional
+                  placeholder={String(D.expand.vigor)}
+                  onCommit={(v) => set(k, { vigor: v !== undefined && v > 0 ? v : undefined })}
+                />
+              </div>
+            ) : (
+              <>
+                <div className="field-row">
+                  <NumberField
+                    label="Colonies that stay in it"
+                    value={p.direct}
+                    optional
+                    placeholder={String(D.federate.direct)}
+                    onCommit={(v) => set(k, { direct: clamp01(v) })}
+                    hint="The rest are founded independent"
+                  />
+                  <NumberField
+                    label="Applicants joining, per decade"
+                    value={join.rate}
+                    onCommit={(v) => v !== undefined && set(k, { join: { ...join, rate: clamp01(v)! } })}
+                    id={`joinRate-${p.polity}`}
+                  />
+                </div>
+                <div className="field-row">
+                  <NumberField
+                    label="Applicants within, legs"
+                    value={join.legs}
+                    onCommit={(v) => v !== undefined && v > 0 && set(k, { join: { ...join, legs: v } })}
+                  />
+                  <NumberField
+                    label="Standing at least, years"
+                    value={join.minAge_y}
+                    onCommit={(v) => v !== undefined && v >= 0 && set(k, { join: { ...join, minAge_y: v } })}
+                  />
+                  <NumberField
+                    label="Culture in common, at least"
+                    value={join.similarity}
+                    onCommit={(v) => v !== undefined && set(k, { join: { ...join, similarity: clamp01(v)! } })}
+                    hint="0 to 1; 0 takes anyone"
+                  />
+                </div>
+              </>
+            )}
+          </fieldset>
+        )
+      })}
+      <select
+        value=""
+        onChange={(e) =>
+          e.target.value && setList([...f.list, { polity: e.target.value, mode: hasExpand ? 'federate' : 'expand', from: firstEvent }])
+        }
+        aria-label="Add a polity that comes about by founding"
+        id="addFounding"
+      >
+        <option value="">Add a polity…</option>
+        {snapshot.polities
+          .filter((p) => !f.list.some((x) => x.polity === p.id))
+          .map((p) => (
+            <option key={p.id} value={p.id}>
+              {String(p.value?.name ?? p.id)}
+            </option>
+          ))}
+      </select>
+      {f.list.length > 0 && (
+        <>
+          <h4>Breakaways</h4>
+          <div className="field-row">
+            <NumberField
+              label="Chance per decade"
+              value={b.rate}
+              onCommit={(v) => v !== undefined && save({ ...f, breakaway: { ...b, rate: clamp01(v)! } })}
+              hint="For each expanding polity"
+              id="breakawayRate"
+            />
+            <NumberField
+              label="At least this far from its capital, ly"
+              value={b.distance_ly}
+              onCommit={(v) => v !== undefined && v >= 0 && save({ ...f, breakaway: { ...b, distance_ly: v } })}
+            />
+            <NumberField
+              label="Settled at least, years"
+              value={b.minAge_y}
+              onCommit={(v) => v !== undefined && v >= 0 && save({ ...f, breakaway: { ...b, minAge_y: v } })}
+            />
+          </div>
+          <h4>Minor polities</h4>
+          <div className="field-row">
+            <NumberField
+              label="Chance per decade"
+              value={m.rate}
+              onCommit={(v) => v !== undefined && save({ ...f, minor: { ...m, rate: clamp01(v)! } })}
+              hint="For each independent system"
+              id="minorRate"
+            />
+            <NumberField
+              label="Most systems at forming"
+              value={m.size}
+              onCommit={(v) => v !== undefined && v >= 1 && save({ ...f, minor: { ...m, size: Math.round(v) } })}
+            />
+            <NumberField
+              label="Settled at least, years"
+              value={m.minAge_y}
+              onCommit={(v) => v !== undefined && v >= 0 && save({ ...f, minor: { ...m, minAge_y: v } })}
+            />
+            <NumberField
+              label="At most, in a run"
+              value={m.max}
+              onCommit={(v) => v !== undefined && v >= 0 && save({ ...f, minor: { ...m, max: Math.round(v) } })}
+            />
+          </div>
         </>
       )}
     </div>
@@ -561,18 +778,29 @@ function ProposalMap({
   proposal: HistoryProposalDto | null
   chosen: Set<string>
 }): React.JSX.Element {
-  const systems: MapSystem[] = useMemo(() => {
-    const polColor = (id: unknown): string | undefined =>
-      typeof id === 'string' ? String(snapshot.polities.find((p) => p.id === id)?.value?.color ?? '') || undefined : undefined
+  const { systems, territory } = useMemo(() => {
+    // Polities of the world, and the minor ones the run proposes.
+    const polities = new Map<string, { name: string; color: string }>()
+    for (const p of snapshot.polities)
+      polities.set(p.id, { name: String(p.value?.name ?? p.id), color: String(p.value?.color ?? '#9aa4b2') })
+    for (const f of proposal?.files ?? [])
+      if (f.group === 'polity' && !f.change)
+        polities.set(f.id, { name: String(f.value.name ?? f.id), color: String(f.value.color ?? '#9aa4b2') })
     const out: MapSystem[] = snapshot.systems.filter((s) => s.star).map((s) => ({ id: s.id, name: s.name, pos: s.star!.pos }))
+    const holders: TerritoryHolder[] = []
     if (proposal)
       for (const f of proposal.files) {
         if (f.group !== 'system' || f.change || !chosen.has(f.key)) continue
         const p = proposal.positions[f.stars[0]]
         const hist = (f.value.history as { polity?: string }[] | undefined) ?? []
-        if (p) out.push({ id: f.id, name: '', pos: p, color: polColor(hist[hist.length - 1]?.polity) ?? '#9aa4b2' })
+        const key = hist[hist.length - 1]?.polity
+        const pol = key ? polities.get(key) : undefined
+        if (!p) continue
+        out.push({ id: f.id, name: '', pos: p, color: pol?.color ?? '#9aa4b2' })
+        if (key && pol) holders.push({ key, name: pol.name, color: pol.color, pos: p })
       }
-    return out
+    const t: Territory | null = holders.length ? { mode: 'polity', reach: snapshot.physics?.legLimit_ly ?? 10, holders } : null
+    return { systems: out, territory: t }
   }, [snapshot, proposal, chosen])
   const routes: MapRoute[] = useMemo(
     () =>
@@ -587,7 +815,21 @@ function ProposalMap({
     () => (proposal ? (proposal.positions[proposal.origin] ?? [0, 0, 0]) : [0, 0, 0]),
     [proposal]
   )
-  return <StarMap field={null} focus={focus} systems={systems} selected={null} onPick={() => {}} reach={null} routes={routes} />
+  return (
+    <>
+      <StarMap
+        field={null}
+        focus={focus}
+        systems={systems}
+        selected={null}
+        onPick={() => {}}
+        reach={null}
+        routes={routes}
+        territory={territory}
+      />
+      {territory && <MapColour value="polity" onChange={() => {}} territory={territory} choices={false} />}
+    </>
+  )
 }
 
 // ---- news ----

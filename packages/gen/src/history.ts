@@ -26,7 +26,7 @@
  * system keeps its name as long as it is settled at all.
  */
 import { compareStrings, segmentHitsEllipsoid, type Ellipsoid, type Point3, type Random } from '@malevo/core'
-import { defineGenerator } from './generator'
+import { defineGenerator, type GenContext } from './generator'
 import { nameFrom } from './names'
 
 export interface HistoryStar {
@@ -66,6 +66,70 @@ export interface HistoryInput {
   enclaves: { culture: string; from: number }[]
   polities: { key: string; share: number; capital: string | null; unify: number }[]
   fixed: FixedSettlement[]
+  /** history@2 only: polities that come about by expansion or by federation, breakaways, and minor polities. */
+  founding?: FoundingInput
+}
+
+/**
+ * How polities come about (history@2).
+ *
+ * - `expand`: founded at its capital at a date; every colony its systems seed is its own, and it pulls its
+ *   systems' cultures toward its overall mix.
+ * - `federate`: formed at a date by the independent systems that broke away from an expanding polity (and
+ *   their colonies, and minor polities they formed); it rarely founds colonies itself, and grows by
+ *   independent systems and minor polities next to it applying to join.
+ * - Breakaways: now and then a system far from an expanding polity's capital breaks away, with the colonies
+ *   it founded.
+ * - Minor polities: independent systems now and then organize, with their independent neighbours, into a
+ *   small polity of their own.
+ */
+export interface FoundingInput {
+  polities: FoundingPolity[]
+  breakaway: { rate: number; distance: number; minAge: number }
+  minor: { rate: number; size: number; minAge: number; max: number }
+}
+
+export interface FoundingPolity {
+  key: string
+  name: string
+  mode: 'expand' | 'federate'
+  /** The year it is founded (expand) or formed (federate). */
+  from: number
+  /** Its capital's star, if fixed. An expanding polity without one starts at the origin. */
+  capital: string | null
+  /** Expand: how fast it pulls its systems toward its overall culture mix, per decade (0–1). */
+  unify: number
+  /** Expand: how much more readily its systems found colonies than others do (1: no more). */
+  vigor: number
+  /** Federate: the chance a colony one of its systems founds stays in it (the rest are independent). */
+  direct: number
+  /**
+   * Federate: who may join, and how often. A system (or a minor polity, as a whole) applies when it is within
+   * `legs` legs of a member, has stood `minAge` years, and shares at least `similarity` (0–1) of its culture
+   * mix with the federation's; each qualifying applicant joins with chance `rate` per decade.
+   */
+  join: { rate: number; minAge: number; similarity: number; legs: number }
+}
+
+export interface HistoryPolityChange {
+  year: number
+  polity: string | null
+  mix: Record<string, number>
+  why: 'founded' | 'founding' | 'breakaway' | 'minor' | 'federation' | 'joined' | 'fixed'
+}
+
+export interface HistoryPolity {
+  key: string
+  name: string
+  /** Null for a polity of the world (it has its own). */
+  color: string | null
+  minor: boolean
+  founded: number | null
+  capital: string | null
+  /** The year it was absorbed into another, if it was. */
+  dissolved: number | null
+  /** Systems it holds at the end. */
+  systems: number
 }
 
 export interface HistorySystem {
@@ -81,6 +145,8 @@ export interface HistorySystem {
   politySince: number | null
   mixAtPolities: Record<string, number> | null
   mixAtEnd: Record<string, number>
+  /** history@2: every change of polity, in order. */
+  changes?: HistoryPolityChange[]
 }
 
 export interface HistoryCulture {
@@ -103,6 +169,8 @@ export interface HistoryOutput {
   capitals: Record<string, string>
   shares: Record<string, { target: number; actual: number }>
   conflicts: string[]
+  /** history@2 with founding: the polities of the run, the world's and the minor ones it made. */
+  polities?: HistoryPolity[]
 }
 
 /** X: off the main sequence (a giant), never settled. */
@@ -159,6 +227,9 @@ interface Sys {
   fixedPolity?: string | null
   exhausted: boolean
   name?: string
+  /** history@2: descended from a breakaway, with no expanding polity since. */
+  free?: boolean
+  changes?: HistoryPolityChange[]
 }
 
 const round4 = (x: number): number => Math.round(x * 1e4) / 1e4
@@ -173,8 +244,25 @@ export const history = defineGenerator<HistoryInput, HistoryOutput>({
   version: 1,
   description: 'A settlement history on the stars: slow ships, then the foam; cultures, enclaves and polity borders',
   frozen: true,
-  generate(inp, ctx) {
+  generate: (inp, ctx) => run(inp, ctx, 1)
+})
+
+export const history2 = defineGenerator<HistoryInput, HistoryOutput>({
+  name: 'history',
+  version: 2,
+  description: 'history@1, with polities that expand from a capital or federate from breakaways and take in applicants, and minor polities',
+  frozen: true,
+  generate: (inp, ctx) => run(inp, ctx, 2)
+})
+
+const FORMS = ['League', 'Compact', 'Union', 'Republic', 'Concord', 'Assembly', 'Commonwealth', 'Accord']
+
+function run(inp: HistoryInput, ctx: GenContext, version: 1 | 2): HistoryOutput {
+  {
     const r = ctx.stream('run', inp.origin)
+    // history@2's polities draw from a stream of their own, so the settlement itself is history@1's.
+    const F = version >= 2 ? (inp.founding ?? null) : null
+    const rp = ctx.stream('polities', inp.origin)
     const st = [...inp.stars].sort((a, b) => compareStrings(a.id, b.id))
     const index = new Map(st.map((s, i) => [s.id, i]))
     const origin = index.get(inp.origin)
@@ -291,6 +379,38 @@ export const history = defineGenerator<HistoryInput, HistoryOutput>({
     const addLane = (nodes: number[], year: number): void => {
       lanes.push({ nodes, opened: year })
     }
+    /** history@2: a system changes polity (null: independent). */
+    const setPolity = (k: number, key: string | null, year: number, why: HistoryPolityChange['why']): void => {
+      const s = sys[k]
+      // Within a step, a colony founded part way through cannot change before it exists.
+      year = Math.max(year, s.founded)
+      s.polity = key
+      s.politySince = key === null ? null : year
+      if (key !== null && !s.mixAtPolities) s.mixAtPolities = new Map(s.mix)
+      ;(s.changes ??= []).push({ year: round4(year), polity: key, mix: mixRecord(s.mix), why })
+    }
+    const foundingOf = new Map((F?.polities ?? []).map((p) => [p.key, p]))
+    const minorPolities = new Map<string, HistoryPolity>()
+    const modeOf = (key: string | null): 'expand' | 'federate' | 'minor' | null =>
+      key === null ? null : (foundingOf.get(key)?.mode ?? (minorPolities.has(key) ? 'minor' : null))
+    /** history@2: the polity a new colony of system k gets. */
+    const inherit = (k: number, kk: number, year: number, enclave: boolean): void => {
+      const par = sys[k]
+      sys[kk].free = par.free === true && modeOf(par.polity) !== 'expand'
+      if (sys[kk].fixedPolity !== undefined) {
+        if (sys[kk].fixedPolity !== null) setPolity(kk, sys[kk].fixedPolity!, year, 'fixed')
+        return
+      }
+      const mode = modeOf(par.polity)
+      if (mode === null) return
+      if (mode === 'federate') {
+        if (rp() < foundingOf.get(par.polity!)!.direct) setPolity(kk, par.polity, year, 'founded')
+        else sys[kk].free = true
+        return
+      }
+      if (mode === 'minor' && enclave) return
+      setPolity(kk, par.polity, year, 'founded')
+    }
 
     // Fixed settlements: by year, and wanted ones (no year) as strong candidates.
     const fixedByStar = new Map<number, FixedSettlement>()
@@ -343,15 +463,242 @@ export const history = defineGenerator<HistoryInput, HistoryOutput>({
             )
           parent = best >= 0 ? best : null
         }
-        settle(i, y, parent, fixedMix(f, parent !== null ? sys[parent].mix : one(inp.originCulture)), {
+        const kf = settle(i, y, parent, fixedMix(f, parent !== null ? sys[parent].mix : one(inp.originCulture)), {
           fixed: true,
           fixedPolity: f.polity === undefined ? undefined : f.polity,
           name: f.name
         })
+        if (F) {
+          if (parent !== null) inherit(parent, kf, y, false)
+          else if (f.polity) setPolity(kf, f.polity, y, 'fixed')
+        }
         if (parent !== null && dist(sys[parent].i, i) <= L && clear(sys[parent].i, i)) addLane([sys[parent].i, i], y)
       }
     }
     const fmtYear = (y: number): string => `year ${Math.round(y)}`
+
+    // ---- history@2: polities that expand, break away, organize, federate and take in applicants ----
+    const founded = new Map<string, { year: number; capital: number }>()
+    const waiting = new Set<string>()
+    const chance = (perDecade: number): number => 1 - Math.pow(1 - Math.min(1, Math.max(0, perDecade)), inp.step / 10)
+    const free = (k: number): boolean => sys[k].fixedPolity === undefined
+    const members = (key: string): number[] => sys.flatMap((s, k) => (s.polity === key ? [k] : []))
+    const meanMix = (ks: readonly number[]): Mix => {
+      const m: Mix = new Map()
+      for (const k of ks) for (const [c, v] of sys[k].mix) m.set(c, (m.get(c) ?? 0) + v / ks.length)
+      return m
+    }
+    const similarity = (a: Mix, b: Mix): number => {
+      let t = 0
+      for (const [c, v] of a) t += Math.min(v, b.get(c) ?? 0)
+      return t
+    }
+    const nameOfPolity = (key: string): string => foundingOf.get(key)?.name ?? minorPolities.get(key)?.name ?? key
+    /** Found the expanding polities (and form the federations) that are due by `year`. */
+    function foundDue(year: number): void {
+      if (!F) return
+      for (const p of F.polities) {
+        if (founded.has(p.key) || p.from > year) continue
+        if (p.mode === 'expand') {
+          const ci = p.capital !== null ? index.get(p.capital) : origin
+          const k = ci === undefined ? undefined : at.get(ci)
+          if (k === undefined) {
+            if (!waiting.has(p.key)) waiting.add(p.key)
+            continue
+          }
+          waiting.delete(p.key)
+          founded.set(p.key, { year: Math.max(p.from, sys[k].founded), capital: k })
+          if (free(k)) setPolity(k, p.key, Math.max(p.from, sys[k].founded), 'founding')
+          sys[k].free = false
+          ev(Math.max(p.from, sys[k].founded), `${p.name} is founded at @${st[sys[k].i].id}.`, sys[k].i)
+          continue
+        }
+        // A federation: the independent systems of the breakaway line, and the minor polities they formed.
+        const fromMinor = new Set<string>()
+        for (const [key] of minorPolities) {
+          const ms = members(key)
+          if (ms.length && ms.filter((k) => sys[k].free).length * 2 >= ms.length) fromMinor.add(key)
+        }
+        const founders = sys.flatMap((s, k) =>
+          free(k) && ((s.polity === null && s.free) || (s.polity !== null && fromMinor.has(s.polity))) ? [k] : []
+        )
+        if (!founders.length) {
+          waiting.add(p.key)
+          continue
+        }
+        waiting.delete(p.key)
+        const fixedCap = p.capital !== null ? at.get(index.get(p.capital) ?? -1) : undefined
+        let cap = fixedCap !== undefined && founders.includes(fixedCap) ? fixedCap : -1
+        if (cap < 0) {
+          let bestN = -1
+          for (const k of founders) {
+            if (sys[k].outpost) continue
+            const n = founders.filter((q) => dist(sys[q].i, sys[k].i) <= L).length
+            if (n > bestN) [bestN, cap] = [n, k]
+          }
+          if (cap < 0) cap = founders[0]
+        }
+        for (const key of fromMinor) {
+          const m = minorPolities.get(key)!
+          if (m.dissolved === null) m.dissolved = round4(year)
+        }
+        for (const k of founders) setPolity(k, p.key, year, 'federation')
+        founded.set(p.key, { year, capital: cap })
+        ev(
+          year,
+          `${p.name} is formed by ${founders.length} systems that broke away${fromMinor.size ? `, with ${fromMinor.size} polities of their own` : ''}; its capital is @${st[sys[cap].i].id}.`,
+          sys[cap].i
+        )
+      }
+    }
+    /** One step of polity life (history@2). */
+    function polityStep(year: number): void {
+      if (!F) return
+      foundDue(year)
+      // Breakaways: now and then a system far from an expanding polity's capital leaves, with the colonies it founded.
+      const children = new Map<number, number[]>()
+      sys.forEach((s, k) => {
+        if (s.parent === null) return
+        let c = children.get(s.parent)
+        if (!c) children.set(s.parent, (c = []))
+        c.push(k)
+      })
+      for (const p of F.polities) {
+        const f = founded.get(p.key)
+        if (p.mode !== 'expand' || !f || rp() >= chance(F.breakaway.rate)) continue
+        const capPos = sys[f.capital].i
+        const elig = sys.flatMap((s, k) =>
+          s.polity === p.key &&
+          k !== f.capital &&
+          free(k) &&
+          !s.outpost &&
+          year - s.founded >= F.breakaway.minAge &&
+          dist(s.i, capPos) > F.breakaway.distance
+            ? [k]
+            : []
+        )
+        if (!elig.length) continue
+        const seed =
+          elig[
+            pickWeighted(
+              rp,
+              elig.map((k) => dist(sys[k].i, capPos))
+            )
+          ]
+        const line: number[] = []
+        const walk = (k: number): void => {
+          if (sys[k].polity !== p.key || !free(k)) return
+          line.push(k)
+          for (const c of children.get(k) ?? []) walk(c)
+        }
+        walk(seed)
+        for (const k of line) {
+          setPolity(k, null, year, 'breakaway')
+          sys[k].free = true
+        }
+        ev(
+          year,
+          `@${st[sys[seed].i].id} breaks away from ${p.name}${line.length > 1 ? `, with ${line.length - 1} of its colonies` : ''}.`,
+          sys[seed].i
+        )
+      }
+      // Minor polities: an independent system organizes with its independent neighbours.
+      const indep = (k: number): boolean => sys[k].polity === null && free(k)
+      for (let k = 0; k < sys.length; k++) {
+        if (minorPolities.size >= F.minor.max) break
+        if (!indep(k) || sys[k].outpost || year - sys[k].founded < F.minor.minAge || rp() >= chance(F.minor.rate)) continue
+        const group = [k]
+        for (let q = 0; q < group.length && group.length < F.minor.size; q++)
+          near(pos(sys[group[q]].i), L, (j) => {
+            const kj = at.get(j)
+            if (kj !== undefined && indep(kj) && !group.includes(kj) && group.length < F.minor.size) group.push(kj)
+          })
+        const n = minorPolities.size
+        const lead = dominant(meanMix(group))
+        const base = nameFrom(ctx.stream(`polity-${n}`, 'name'), palette.get(lead) ?? 0)
+        const form = FORMS[Math.floor(ctx.stream(`polity-${n}`, 'form')() * FORMS.length)]
+        let key = `minor-${base.toLowerCase().replace(/[^a-z]+/g, '')}`
+        while (foundingOf.has(key) || minorPolities.has(key)) key += '-x'
+        hue = (hue + 137.508) % 360
+        const m: HistoryPolity = {
+          key,
+          name: `${base} ${form}`,
+          color: hsl(hue, 45, 52),
+          minor: true,
+          founded: round4(year),
+          capital: st[sys[k].i].id,
+          dissolved: null,
+          systems: 0
+        }
+        minorPolities.set(key, m)
+        for (const q of group) setPolity(q, key, year, 'minor')
+        ev(year, `The ${m.name} is formed at @${st[sys[k].i].id}${group.length > 1 ? `, by ${group.length} systems` : ''}.`, sys[k].i)
+      }
+      // Applications: independent systems and minor polities next to a federation join it, if they are alike enough.
+      for (const p of F.polities) {
+        const f = founded.get(p.key)
+        if (p.mode !== 'federate' || !f) continue
+        const ms = members(p.key)
+        if (!ms.length) continue
+        const pmix = meanMix(ms)
+        const nextTo = (k: number): boolean => ms.some((q) => dist(sys[q].i, sys[k].i) <= p.join.legs * L)
+        const units: { ks: number[]; minor: string | null }[] = []
+        const seenMinor = new Set<string>()
+        sys.forEach((s, k) => {
+          if (!free(k) || s.outpost) return
+          if (s.polity === null) {
+            if (year - s.founded >= p.join.minAge && nextTo(k)) units.push({ ks: [k], minor: null })
+          } else if (minorPolities.has(s.polity) && !seenMinor.has(s.polity)) {
+            const mk = members(s.polity)
+            if (mk.some(nextTo) && year - minorPolities.get(s.polity)!.founded! >= p.join.minAge) units.push({ ks: mk, minor: s.polity })
+            seenMinor.add(s.polity)
+          }
+        })
+        for (const u of units) {
+          if (similarity(meanMix(u.ks), pmix) < p.join.similarity || rp() >= chance(p.join.rate)) continue
+          for (const k of u.ks) setPolity(k, p.key, year, 'joined')
+          if (u.minor) {
+            minorPolities.get(u.minor)!.dissolved = round4(year)
+            ev(year, `The ${nameOfPolity(u.minor)} joins ${p.name} (${u.ks.length} systems).`, sys[u.ks[0]].i)
+          } else ev(year, `@${st[sys[u.ks[0]].i].id} joins ${p.name}.`, sys[u.ks[0]].i)
+        }
+      }
+      // Expanding polities pull their systems toward their own overall mix.
+      for (const p of F.polities) {
+        if (p.mode !== 'expand' || p.unify <= 0 || !founded.has(p.key)) continue
+        const ms = members(p.key)
+        const pmix = meanMix(ms)
+        const a = chance(p.unify)
+        for (const k of ms) {
+          const s = sys[k]
+          if (kind.get(dominant(s.mix)) === 'enclave') continue
+          const keys = new Set([...s.mix.keys(), ...pmix.keys()])
+          for (const c of keys) s.mix.set(c, (s.mix.get(c) ?? 0) * (1 - a) + (pmix.get(c) ?? 0) * a)
+        }
+      }
+    }
+    function politiesOut(): HistoryPolity[] {
+      const count = new Map<string, number>()
+      for (const s of sys) if (s.polity !== null) count.set(s.polity, (count.get(s.polity) ?? 0) + 1)
+      for (const key of waiting)
+        conflicts.push(
+          foundingOf.get(key)!.mode === 'expand'
+            ? `${nameOfPolity(key)} was never founded: its capital was never settled.`
+            : `${nameOfPolity(key)} never formed: no system had broken away by then (raise the breakaway rate, or move its event later).`
+        )
+      const out: HistoryPolity[] = (F?.polities ?? []).map((p) => ({
+        key: p.key,
+        name: p.name,
+        color: null,
+        minor: false,
+        founded: founded.get(p.key)?.year ?? null,
+        capital: founded.has(p.key) ? st[sys[founded.get(p.key)!.capital].i].id : null,
+        dissolved: null,
+        systems: count.get(p.key) ?? 0
+      }))
+      for (const m of minorPolities.values()) out.push({ ...m, systems: count.get(m.key) ?? 0 })
+      return out
+    }
 
     // ---- the origin and the slow-ship era ----
     if (!fixedByStar.has(origin) || fixedByStar.get(origin)!.year === null)
@@ -361,6 +708,7 @@ export const history = defineGenerator<HistoryInput, HistoryOutput>({
       })
     settleDue(inp.years.slow)
     if (!at.has(origin)) settle(origin, inp.years.slow, null, one(inp.originCulture))
+    if (F) foundDue(inp.years.slow)
     {
       const cand: number[] = []
       near(pos(origin), inp.slow.reach, (j) => {
@@ -389,7 +737,11 @@ export const history = defineGenerator<HistoryInput, HistoryOutput>({
         if (n === enclaveAt && slowEnclaves.length && r() < inp.culture.enclave * 4)
           c = slowEnclaves[Math.floor(r() * slowEnclaves.length)].culture
         else c = regional(null, year, j)
-        settle(j, year, at.get(origin)!, c ? one(c) : one(inp.originCulture), { name: fixedByStar.get(j)?.name })
+        const kj = settle(j, year, at.get(origin)!, c ? one(c) : one(inp.originCulture), { name: fixedByStar.get(j)?.name })
+        if (F) {
+          foundDue(year)
+          inherit(at.get(origin)!, kj, year, c !== null && kind.get(c) === 'enclave')
+        }
         addLane([origin, j], year)
         ev(
           year,
@@ -483,11 +835,16 @@ export const history = defineGenerator<HistoryInput, HistoryOutput>({
         }
         const founded = year + r() * inp.step * 0.9
         const kk = settle(c.j, founded, k, mix, { name: fixedByStar.get(c.j)?.name })
-        if (par.polity !== null && !enclave) {
+        if (F) inherit(k, kk, founded, enclave)
+        else if (par.polity !== null && !enclave) {
           sys[kk].polity = par.polity
           sys[kk].politySince = founded
         }
-        if (via >= 0 && !at.has(via)) settle(via, founded, k, new Map(mix), { outpost: true })
+        if (via >= 0 && !at.has(via)) {
+          const ko = settle(via, founded, k, new Map(mix), { outpost: true })
+          if (F && sys[kk].polity !== null) setPolity(ko, sys[kk].polity, founded, 'founded')
+          if (F) sys[ko].free = sys[kk].free
+        }
         addLane(via >= 0 ? [a, via, c.j] : [a, c.j], founded)
         wanted.delete(c.j)
         return true
@@ -606,7 +963,7 @@ export const history = defineGenerator<HistoryInput, HistoryOutput>({
     let politiesFormed = false
     for (let year = inp.years.foam; year < inp.years.end; year += inp.step) {
       settleDue(year)
-      if (!politiesFormed && inp.years.polities !== null && year >= inp.years.polities && inp.polities.length) {
+      if (!F && !politiesFormed && inp.years.polities !== null && year >= inp.years.polities && inp.polities.length) {
         formPolities(inp.years.polities)
         politiesFormed = true
       }
@@ -620,6 +977,9 @@ export const history = defineGenerator<HistoryInput, HistoryOutput>({
           if (s.exhausted || s.outpost || year - s.founded < 15) return
           let x = Math.exp(-(year - s.founded) / 260) * (0.15 + Math.pow(dO(s.i) / front, 2))
           if (kind.get(dominant(s.mix)) === 'enclave') x *= 0.3
+          // An expanding polity keeps founding colonies from its old systems too, not only from its frontier.
+          if (F && s.polity !== null && foundingOf.get(s.polity)?.mode === 'expand')
+            x = Math.max(x, 0.15 + Math.pow(dO(s.i) / front, 2)) * foundingOf.get(s.polity)!.vigor
           pool.push(k)
           w.push(x)
         })
@@ -632,6 +992,7 @@ export const history = defineGenerator<HistoryInput, HistoryOutput>({
         }
         if (!ok) break
       }
+      polityStep(year)
       // Cultures blend along lanes; enclaves resist.
       const delta = sys.map(() => new Map<string, number>())
       const add = (m: Map<string, number>, k: string, v: number): void => {
@@ -662,7 +1023,8 @@ export const history = defineGenerator<HistoryInput, HistoryOutput>({
       })
     }
     settleDue(inp.years.end)
-    if (!politiesFormed && inp.years.polities !== null && inp.polities.length) formPolities(inp.years.polities)
+    if (!F && !politiesFormed && inp.years.polities !== null && inp.polities.length) formPolities(inp.years.polities)
+    if (F && inp.polities.length) conflicts.push('Polities by borders are left out: the polities come about by founding instead.')
     for (const i of wanted) if (!at.has(i)) conflicts.push(`${fixedByStar.get(i)?.name ?? st[i].id} was never reached.`)
 
     // ---- busy neighbours within one leg get lanes too, so the network is a mesh, not a tree ----
@@ -734,14 +1096,16 @@ export const history = defineGenerator<HistoryInput, HistoryOutput>({
         polity: s.polity,
         politySince: s.politySince === null ? null : round4(s.politySince),
         mixAtPolities: s.mixAtPolities ? mixRecord(s.mixAtPolities) : null,
-        mixAtEnd: mixRecord(s.mix)
+        mixAtEnd: mixRecord(s.mix),
+        ...(F ? { changes: s.changes ?? [] } : {})
       })),
       cultures,
       lanes: lanes.map((l) => ({ stars: l.nodes.map((i) => st[i].id), opened: round4(l.opened), slow: l.opened < inp.years.foam })),
       events,
       capitals: Object.fromEntries(Object.entries(capitals).map(([k, v]) => [k, st[sys[v].i].id])),
       shares,
-      conflicts
+      conflicts,
+      ...(F ? { polities: politiesOut() } : {})
     }
   }
-})
+}

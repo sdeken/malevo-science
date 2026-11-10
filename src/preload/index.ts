@@ -135,7 +135,7 @@ const api = {
   /** The prime meridian that makes it local noon at a longitude at an instant (for rotation.meridian_deg). */
   skyNoon: (body: string, lon: number, t: number): Promise<number | null> => ipcRenderer.invoke(IPC.skyNoon, body, lon, t),
   history: {
-    /** Run history@1 and return what it proposes (nothing is written). */
+    /** Run the history generator (history@2) and return what it proposes (nothing is written). */
     propose: (seed?: number): Promise<HistoryProposalDto | { error: string }> => ipcRenderer.invoke(IPC.historyPropose, seed),
     /** Accept pieces of the last run, by entity key: one undoable, unsaved step. */
     accept: (keys: string[]): Promise<number> => ipcRenderer.invoke(IPC.historyAccept, keys),

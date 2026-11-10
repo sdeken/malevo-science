@@ -1,5 +1,5 @@
 import { generatorId, type Generator } from './generator'
-import { history } from './history'
+import { history, history2 } from './history'
 import { terrain } from './terrain'
 import { bands } from './bands'
 import { clouds } from './clouds'
@@ -38,6 +38,11 @@ export { bands, bandsField, DEFAULT_BANDS, type BandsInput, type BandsParams, ty
 export { terrain, terrainField, DEFAULT_TERRAIN, type TerrainInput, type TerrainParams, type TerrainField } from './terrain'
 export {
   history,
+  history2,
+  type FoundingInput,
+  type FoundingPolity,
+  type HistoryPolity,
+  type HistoryPolityChange,
   type HistoryInput,
   type HistoryOutput,
   type HistoryStar,
@@ -52,6 +57,7 @@ export const GENERATORS: readonly Generator<never, unknown>[] = [
   starfield as Generator<never, unknown>,
   planets as Generator<never, unknown>,
   history as Generator<never, unknown>,
+  history2 as Generator<never, unknown>,
   terrain as Generator<never, unknown>,
   bands as Generator<never, unknown>,
   clouds as Generator<never, unknown>,

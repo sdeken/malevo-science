@@ -66,6 +66,42 @@ const CASES: Record<string, { seed: number; input: unknown }[]> = {
       years: { slow: 300, foam: 650, end: 900, polities: 850 }
     })
   })),
+  'history@2': [1, 42].map((seed) => ({
+    seed,
+    input: syntheticInput(syntheticStars(1500, 220, 9), {
+      growth: { total: 80, maxRadius: 90, outward: 7, legs: 2 },
+      years: { slow: 300, foam: 650, end: 950, polities: null },
+      polities: [],
+      founding: {
+        polities: [
+          {
+            key: 'core',
+            name: 'Core',
+            mode: 'expand',
+            from: 600,
+            capital: null,
+            unify: 0.2,
+            vigor: 4,
+            direct: 0,
+            join: { rate: 0, minAge: 0, similarity: 0, legs: 1 }
+          },
+          {
+            key: 'league',
+            name: 'League',
+            mode: 'federate',
+            from: 850,
+            capital: null,
+            unify: 0,
+            vigor: 1,
+            direct: 0.15,
+            join: { rate: 0.15, minAge: 40, similarity: 0, legs: 2 }
+          }
+        ],
+        breakaway: { rate: 0.2, distance: 30, minAge: 30 },
+        minor: { rate: 0.005, size: 4, minAge: 30, max: 30 }
+      }
+    })
+  })),
   'terrain@1': [1, 42].flatMap((seed) =>
     [
       { plates: 12, continents: 0.35, ocean: 0.7, mountains_km: 6, roughness: 0.5 },
