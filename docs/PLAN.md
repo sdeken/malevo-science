@@ -466,7 +466,8 @@ and culture blending, all running on the shared core. It adds four things:
   of each body, synodic periods and alignment seasons between any pair.
 - **Orbit view at the current date.**
 - Systems nobody has worked on are generated lazily from their star's key and become files only
-  once locked.
+  once locked. Likewise the real Solar System and known exoplanets are built into the app and
+  become files only once changed (docs/DEVELOPMENT.md, "Built-in astronomy").
 - **Feasibility questions answered directly.** Example: "can a city at this latitude have only
   10 hours of daylight at midwinter with this tilt?" The app gives the answer and the range of
   tilts that would allow it.

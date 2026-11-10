@@ -15,7 +15,7 @@ lit by the sun at any hour. Giant planets got cloud bands. Phase 9 added the pop
 their people over time, and the conditions there at any date (local time, season, daylight,
 tide, who holds it, ships in port) with the sky overhead. Phase 8 added planet terrain: plates, mountains and seas
 generated on the sphere, rolled and locked, shaped by hand as latitude/longitude text, and
-coloured by each world's own climate. Every new world also starts with the real Solar System.
+coloured by each world's own climate. Every new world also shows the real Solar System, built into the app: it gets files only where the author changes it.
 Phase 7 added the history generator. It plays settlement out
 on the stars, gated by the timeline's technology events, and proposes systems, cultures, routes
 and events for the author to accept. It also shows when news of an event reached each system.

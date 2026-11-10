@@ -30,6 +30,11 @@ export interface Entity {
   /** Hash of the canonical text (or of the raw text if it did not parse). */
   hash: string
   refs: Ref[]
+  /**
+   * "builtin": built into the app, with no file (its path is where a file would go).
+   * "override": a file standing in for a built-in.
+   */
+  origin?: 'builtin' | 'override'
 }
 
 export interface Issue {
@@ -54,6 +59,8 @@ export interface WorldData {
   /** JavaScript files beside entities of kinds that allow them, by path ("calendars/x.js"). */
   scripts: Map<string, string>
   kinds: readonly KindDef[]
+  /** The built-ins this world has (by key, canonical text), whether or not a file overrides them. Set by addBuiltins. */
+  builtins?: Map<string, string>
 }
 
 /** Read every entity from a world's files. Never throws for bad content; problems become issues. */

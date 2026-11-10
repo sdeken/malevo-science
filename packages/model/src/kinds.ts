@@ -1033,6 +1033,33 @@ export const historySettingsKind: KindDef<HistorySettings> = {
   schema: historySettingsSchema
 }
 
+// ---- built-ins ----
+
+/**
+ * The real Solar System and the planets found around real stars are built into
+ * the app, not written into the world: a built-in entity gets a file only when
+ * it is changed (the file then overrides it). This file, when present, turns
+ * them off or hides the ones the author deleted.
+ */
+export const builtinSettingsSchema = obj({
+  /** The Solar System (default on). */
+  solarSystem: opt(bool()),
+  /** Confirmed planets of real stars, in systems made on those stars (default on). */
+  knownPlanets: opt(bool()),
+  /** Also the disputed candidates (default off). */
+  candidates: opt(bool()),
+  /** Built-ins the author deleted, as "kind/id". */
+  hidden: opt(arr(str()))
+})
+export type BuiltinSettings = Infer<typeof builtinSettingsSchema>
+
+export const builtinSettingsKind: KindDef<BuiltinSettings> = {
+  kind: 'builtinSettings',
+  label: 'built-in settings',
+  file: 'settings/builtins.json',
+  schema: builtinSettingsSchema
+}
+
 // ---- whereabouts ----
 
 /** A place someone or something can be: a city, a body, a system, a station or a bare star (the most specific one given wins). */
@@ -1157,6 +1184,7 @@ export const KINDS: readonly KindDef[] = [
   routeKind as KindDef,
   viewpointKind as KindDef,
   historySettingsKind as KindDef,
+  builtinSettingsKind as KindDef,
   terrainKind as KindDef,
   cityKind as KindDef,
   cityPlanKind as KindDef,

@@ -169,6 +169,14 @@ export function registerIpc(deps: IpcDeps): void {
   ipcMain.handle(IPC.worldAddKnownPlanets, (_e, sys: unknown, candidates: unknown) =>
     world.addKnownPlanets(String(sys), candidates === true)
   )
+  ipcMain.handle(IPC.worldSetBuiltins, (_e, set: unknown) => {
+    const o = (set ?? {}) as Record<string, unknown>
+    const b = (v: unknown): boolean | undefined => (typeof v === 'boolean' ? v : undefined)
+    world.setBuiltins({ solarSystem: b(o.solarSystem), knownPlanets: b(o.knownPlanets), candidates: b(o.candidates) })
+  })
+  ipcMain.handle(IPC.worldUnhideBuiltins, () => world.unhideBuiltins())
+  ipcMain.handle(IPC.worldTidyBuiltins, () => world.tidyBuiltins())
+  ipcMain.handle(IPC.worldResetBuiltin, (_e, kind: unknown, id: unknown) => world.resetBuiltin(asKind(kind), String(id)))
   ipcMain.handle(IPC.worldFix, (_e, paths: unknown) => world.fix(Array.isArray(paths) ? paths.map(String) : []))
 
   ipcMain.handle(IPC.worldSnapshot, () => world.snapshot())

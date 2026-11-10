@@ -109,8 +109,7 @@ function StarsView({ world, snapshot, now, focus: navFocus, navigate }: ToolProp
       systems.map((s) => s.id)
     )
     await window.malevo.world.setEntity('system', id, { name, star: star.id })
-    // A star with planets found around it (Proxima Centauri) starts with the confirmed ones.
-    await window.malevo.world.addKnownPlanets(id, false)
+    // A star with planets found around it (Proxima Centauri) shows the confirmed ones: they are built in.
     navigate('systems', id)
   }
 

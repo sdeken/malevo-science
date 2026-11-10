@@ -75,10 +75,19 @@ const api = {
     fix: (paths: string[]): Promise<string[]> => ipcRenderer.invoke(IPC.worldFix, paths),
     /** Add any new-world template files the world is missing. Resolves to the paths added. */
     addTemplate: (): Promise<string[]> => ipcRenderer.invoke(IPC.worldAddTemplate),
-    /** Add the real Solar System, or the parts of it the world lacks (unsaved, undoable). Resolves to Sol's system id. */
+    /** Bring back the built-in Solar System, or the parts of it deleted (unsaved, undoable). Resolves to Sol's system id. */
     addSolarSystem: (): Promise<string | null> => ipcRenderer.invoke(IPC.worldAddSolarSystem),
     addKnownPlanets: (system: string, candidates: boolean): Promise<string[]> =>
       ipcRenderer.invoke(IPC.worldAddKnownPlanets, system, candidates),
+    /** Turn the built-in Solar System, known planets or candidates on or off (unsaved, undoable). */
+    setBuiltins: (set: { solarSystem?: boolean; knownPlanets?: boolean; candidates?: boolean }): Promise<void> =>
+      ipcRenderer.invoke(IPC.worldSetBuiltins, set),
+    /** Bring back every deleted built-in. */
+    unhideBuiltins: (): Promise<void> => ipcRenderer.invoke(IPC.worldUnhideBuiltins),
+    /** Delete files that say just what their built-in says. Resolves to how many. */
+    tidyBuiltins: (): Promise<number> => ipcRenderer.invoke(IPC.worldTidyBuiltins),
+    /** Throw away a built-in's changes: its file goes and the built-in shows through. */
+    resetBuiltin: (kind: EditableKind, id: string): Promise<void> => ipcRenderer.invoke(IPC.worldResetBuiltin, kind, id),
     snapshot: (): Promise<WorldSnapshot | null> => ipcRenderer.invoke(IPC.worldSnapshot),
     onSnapshot: (cb: (snapshot: WorldSnapshot | null) => void): Unsubscribe => on(IPC.evSnapshot, cb),
     onChanged: (cb: (world: WorldInfo | null) => void): Unsubscribe => on(IPC.evWorldChanged, cb),

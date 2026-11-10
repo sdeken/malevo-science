@@ -11,6 +11,7 @@
 import { promises as fs } from 'node:fs'
 import path from 'node:path'
 import { compareStrings } from '@malevo/core'
+import { addBuiltins } from './builtins'
 import { canonicalJson } from './canonical'
 import { KINDS, entityPath, type KindDef } from './kinds'
 import { readWorld, type WorldData, type WorldFile } from './load'
@@ -47,7 +48,7 @@ export class WorldEditor {
 
   /** The world as the app sees it: disk plus pending changes. */
   world(): WorldData {
-    this.cached ??= readWorld(this.files(), this.kinds)
+    this.cached ??= addBuiltins(readWorld(this.files(), this.kinds))
     return this.cached
   }
 

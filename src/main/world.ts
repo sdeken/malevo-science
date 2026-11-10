@@ -50,7 +50,13 @@ import {
   meridianForNoon,
   historySettingsKind,
   proposeHistory,
-  solarSystemFor,
+  SOL_STAR,
+  solarSystem,
+  builtinSettings,
+  changeBuiltins,
+  hideBuiltins,
+  redundantBuiltinFiles,
+  knownSystemOf,
   planTrip,
   sizeShipForTrip,
   shipKind,
@@ -66,7 +72,6 @@ import {
   type DrifterFile,
   type TravellerReport,
   type DriftReport,
-  knownPlanetsFor,
   terrainKind,
   terrainRaster,
   cityKind,
@@ -127,6 +132,7 @@ import {
 import type {
   BodyInfoDto,
   EntityDto,
+  BuiltinsDto,
   CalendarInfo,
   CheckReport,
   CompareReport,
@@ -338,6 +344,8 @@ export class WorldSession extends EventEmitter {
       travellers: entityDtos(world, travellerKind.kind),
       drifters: entityDtos(world, drifterKind.kind),
       landings: entityDtos(world, landingKind.kind),
+      origins: Object.fromEntries([...world.entities.values()].filter((e) => e.origin).map((e) => [e.key, e.origin!])),
+      builtins: builtinsDto(world, this.editor.files()),
       physics: physicsFile
         ? {
             legLimit_ly: physicsFile.foam.legLimit_ly,
@@ -545,23 +553,70 @@ export class WorldSession extends EventEmitter {
     return meridianForNoon(this.world(), this.env, body, lon, t)
   }
 
-  /** Add the real Solar System (or what of it is missing): one undoable, unsaved step. Returns the system's id. */
+  /** Bring back the built-in Solar System (turned off, or parts of it deleted): one undoable, unsaved step. Returns Sol's system id. */
   addSolarSystem(): string | null {
-    const files = solarSystemFor(this.world())
-    if (!files.length) return null
-    this.editor!.edit(files.map((f) => ({ path: f.path, text: entityText(f.kind, f.value) })))
-    this.changed()
-    const sys = files.find((f) => f.kind.kind === systemKind.kind)
-    return sys?.id ?? (files[0].value as { system?: string }).system ?? null
+    const world = this.world()
+    const solIds = new Set(solarSystem().map((f) => `${f.kind.kind}/${f.id}`))
+    const change = changeBuiltins(world, { solarSystem: true, unhide: (k) => solIds.has(k) })
+    if (change) {
+      this.editor!.edit([change])
+      this.changed()
+    }
+    return entitiesOf(this.world(), systemKind).find((e) => e.value.star === SOL_STAR)?.id ?? null
   }
 
-  /** Add a system's known planets (from published data) that it lacks: one undoable, unsaved step. Returns their ids. */
+  /** Bring back a system's known planets (built in; candidates too if asked): one undoable, unsaved step. Returns their ids. */
   addKnownPlanets(systemId: string, candidates: boolean): string[] {
-    const files = knownPlanetsFor(this.world(), systemId, { candidates })
-    if (!files.length) return []
-    this.editor!.edit(files.map((f) => ({ path: f.path, text: entityText(f.kind, f.value) })))
+    const world = this.world()
+    const sys = entitiesOf(world, systemKind).find((e) => e.id === systemId)
+    const known = knownSystemOf(sys?.value.star)
+    if (!known) return []
+    const ids = new Set(known.planets.map((p) => `${bodyKind.kind}/${p.id}`))
+    const change = changeBuiltins(world, {
+      knownPlanets: true,
+      ...(candidates ? { candidates: true } : {}),
+      unhide: (k) => ids.has(k)
+    })
+    if (change) {
+      this.editor!.edit([change])
+      this.changed()
+    }
+    return known.planets.map((p) => p.id).filter((id) => this.world().entities.has(`${bodyKind.kind}/${id}`))
+  }
+
+  /** Turn groups of built-ins on or off: one undoable, unsaved step. */
+  setBuiltins(set: { solarSystem?: boolean; knownPlanets?: boolean; candidates?: boolean }): void {
+    const change = changeBuiltins(this.world(), set)
+    if (!change) return
+    this.editor!.edit([change])
     this.changed()
-    return files.map((f) => f.id)
+  }
+
+  /** Bring back every built-in that was deleted. */
+  unhideBuiltins(): void {
+    const change = changeBuiltins(this.world(), { unhide: () => true })
+    if (!change) return
+    this.editor!.edit([change])
+    this.changed()
+  }
+
+  /** Delete the files that say just what their built-in says. Returns how many. */
+  tidyBuiltins(): number {
+    const files = new Map(this.editor!.files().map((f) => [f.path, f.text]))
+    const changes = redundantBuiltinFiles(this.world(), files)
+    if (!changes.length) return 0
+    this.editor!.edit(changes)
+    this.changed()
+    return changes.length
+  }
+
+  /** Throw away the changes to a built-in: its file goes, and the built-in shows through. */
+  resetBuiltin(kind: EditableKind, id: string): void {
+    const def = KIND_DEFS[kind]
+    const e = def?.folder ? this.world().entities.get(`${def.kind}/${id}`) : undefined
+    if (!e || e.origin !== 'override') return
+    this.editor!.edit([{ path: e.path, text: null }])
+    this.changed()
   }
 
   // ---- terrain: rasters are derived, cached here, never written to the world ----
@@ -743,12 +798,18 @@ export class WorldSession extends EventEmitter {
   deleteEntities(items: readonly { kind: EditableKind; id: string }[]): void {
     const files = new Set(this.editor!.files().map((f) => f.path))
     const changes: FileChange[] = []
+    const keys: string[] = []
     for (const { kind, id } of items) {
       const def = KIND_DEFS[kind]
       if (!def?.folder) throw new WorldError('io', `"${kind}" entities cannot be deleted.`)
       const base = entityPath(def, String(id)).replace(/\.json$/, '')
       for (const p of [`${base}.json`, `${base}.md`, `${base}.js`]) if (files.has(p)) changes.push({ path: p, text: null })
+      keys.push(`${def.kind}/${id}`)
     }
+    // Built-ins have no file to delete (or would show through it): they are hidden instead.
+    const hide = hideBuiltins(this.world(), keys)
+    if (hide) changes.push(hide)
+    if (!changes.length) return
     this.editor!.edit(changes)
     this.changed()
   }
@@ -982,6 +1043,20 @@ function bodyDto(b: BodyInfo): BodyInfoDto {
     insolation: b.insolation,
     equilibriumTemp: b.equilibriumTemp,
     generatedBy: lock?.gen ?? null
+  }
+}
+
+function builtinsDto(world: WorldData, files: readonly { path: string; text: string | null }[]): BuiltinsDto {
+  const s = builtinSettings(world)
+  const all = [...world.entities.values()]
+  return {
+    solarSystem: s.solarSystem !== false,
+    knownPlanets: s.knownPlanets !== false,
+    candidates: s.candidates === true,
+    hidden: s.hidden?.length ?? 0,
+    builtin: all.filter((e) => e.origin === 'builtin').length,
+    overridden: all.filter((e) => e.origin === 'override').length,
+    redundant: redundantBuiltinFiles(world, new Map(files.map((f) => [f.path, f.text]))).length
   }
 }
 

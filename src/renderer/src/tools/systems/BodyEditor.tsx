@@ -45,12 +45,23 @@ interface Props {
   version: number
   /** Every body id in the world (body ids are shared across systems). */
   bodyIds: readonly string[]
+  origin?: 'builtin' | 'override'
   onDeleted(): void
   onRenamed(id: string): void
 }
 
 /** Edit one body: what it is, its orbit, its spin; and what follows from them. Every change is unsaved until Save. */
-export function BodyEditor({ body, system, calendars, displayCal, version, bodyIds, onDeleted, onRenamed }: Props): React.JSX.Element {
+export function BodyEditor({
+  body,
+  system,
+  calendars,
+  displayCal,
+  version,
+  bodyIds,
+  origin,
+  onDeleted,
+  onRenamed
+}: Props): React.JSX.Element {
   const v = body.value as Value
   const save = (patch: Partial<Value>): void => {
     const next: Value = { ...v, ...patch }
@@ -81,7 +92,7 @@ export function BodyEditor({ body, system, calendars, displayCal, version, bodyI
 
   return (
     <div className="body-editor" data-editing={body.id}>
-      <FileName kind="body" folder="bodies" id={body.id} name={v.name} taken={bodyIds} onRenamed={onRenamed} />
+      <FileName kind="body" folder="bodies" id={body.id} name={v.name} taken={bodyIds} origin={origin} onRenamed={onRenamed} />
       <div className="field-row">
         <TextField label="Name" value={v.name} onCommit={(name) => name.trim() && save({ name: name.trim() })} id="bodyName" />
         <label className="field">

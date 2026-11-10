@@ -167,6 +167,9 @@ export interface WorldSnapshot {
   travellers: EntityDto[]
   drifters: EntityDto[]
   landings: EntityDto[]
+  /** Built-in entities ("builtin": no file) and files standing in for them ("override"), by "kind/id". */
+  origins: Record<string, 'builtin' | 'override'>
+  builtins: BuiltinsDto
   /** settings/physics.json as written, if the world has it (for editing). */
   physicsSettings: Record<string, unknown> | null
   terrains: EntityDto[]
@@ -368,6 +371,21 @@ export interface PlanetProposal {
 // ---- Phase 4: cultures, polities, relations ----
 
 /** An entity's id, file and value (null when the file does not parse). */
+/** The built-in Solar System and known planets: what is on, and how many files stand in for built-ins. */
+export interface BuiltinsDto {
+  solarSystem: boolean
+  knownPlanets: boolean
+  candidates: boolean
+  /** Built-ins the author deleted. */
+  hidden: number
+  /** Built-ins showing, with no file. */
+  builtin: number
+  /** Files standing in for built-ins. */
+  overridden: number
+  /** Of those, files that say exactly what the built-in says. */
+  redundant: number
+}
+
 export interface EntityDto {
   id: string
   path: string

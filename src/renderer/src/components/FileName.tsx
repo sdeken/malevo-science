@@ -12,6 +12,7 @@ export function FileName({
   id,
   name,
   taken,
+  origin,
   onRenamed
 }: {
   kind: EditableKind
@@ -20,6 +21,8 @@ export function FileName({
   name: string
   /** Ids already used by this kind. */
   taken: readonly string[]
+  /** Built into the app (no file until changed), or a file standing in for a built-in. */
+  origin?: 'builtin' | 'override'
   onRenamed(newId: string): void
 }): React.JSX.Element {
   const others = taken.filter((t) => t !== id)
@@ -37,8 +40,27 @@ export function FileName({
   return (
     <div className="file-name muted small" data-file-name={id}>
       <span>
-        File: <code>{`${folder}/${id}.json`}</code>
+        {origin === 'builtin' ? (
+          <span title="Real astronomy, built into the app. A file is written only when you change it.">
+            Built in: no file until it is changed (<code>{`${folder}/${id}.json`}</code>)
+          </span>
+        ) : (
+          <>
+            File: <code>{`${folder}/${id}.json`}</code>
+            {origin === 'override' && ' (changes a built-in)'}
+          </>
+        )}
       </span>
+      {origin === 'override' && !editing && (
+        <button
+          className="link"
+          id={`resetBuiltin-${id}`}
+          onClick={() => void window.malevo.world.resetBuiltin(kind, id)}
+          title="Delete the file, so the built-in shows through again"
+        >
+          Reset to built-in
+        </button>
+      )}
       {!editing && suggested !== id && (
         <button
           className="link"

@@ -1,3 +1,4 @@
+import type { BuiltinsDto } from '../../../../shared/types'
 import { NumberField, duration, sig } from '../../components/fields'
 import type { ToolDefinition, ToolProps } from '../registry'
 
@@ -26,8 +27,74 @@ function WorldView({ world, snapshot }: ToolProps): React.JSX.Element {
       <p className="muted">
         The seed is the root of every procedural choice in this world and never changes. Its calendars live in <code>calendars/</code>.
       </p>
+      <Builtins b={snapshot.builtins} />
       <PhysicsEditor value={snapshot.physicsSettings as Physics | null} />
     </div>
+  )
+}
+
+/** The real Solar System and known planets: built into the app, written to files only when changed. */
+function Builtins({ b }: { b: BuiltinsDto }): React.JSX.Element {
+  const w = window.malevo.world
+  return (
+    <section className="builtins" id="builtins">
+      <h2>Built-in astronomy</h2>
+      <p className="muted small">
+        The real Solar System and the planets found around real stars are built into the app, not written into the world. One gets a file
+        only when you change it, and the file then stands in for it; deleting one hides it. A later version of the app may correct the data
+        of the ones you have not changed.
+      </p>
+      <div className="field-row">
+        <label className="check">
+          <input
+            type="checkbox"
+            checked={b.solarSystem}
+            onChange={(e) => void w.setBuiltins({ solarSystem: e.target.checked })}
+            id="builtinSol"
+          />
+          The Solar System
+        </label>
+        <label className="check">
+          <input
+            type="checkbox"
+            checked={b.knownPlanets}
+            onChange={(e) => void w.setBuiltins({ knownPlanets: e.target.checked })}
+            id="builtinKnown"
+          />
+          Known planets of real stars (in systems you make on them)
+        </label>
+        <label className="check">
+          <input
+            type="checkbox"
+            checked={b.candidates}
+            disabled={!b.knownPlanets}
+            onChange={(e) => void w.setBuiltins({ candidates: e.target.checked })}
+            id="builtinCandidates"
+          />
+          Disputed candidates too
+        </label>
+      </div>
+      <p className="small" id="builtinCounts">
+        {b.builtin} built in without files; {b.overridden} changed (with files)
+        {b.hidden > 0 && (
+          <>
+            ; {b.hidden} deleted{' '}
+            <button className="link" onClick={() => void w.unhideBuiltins()} id="unhideBuiltins">
+              Bring them back
+            </button>
+          </>
+        )}
+        .
+      </p>
+      {b.redundant > 0 && (
+        <p className="notice small">
+          {b.redundant} file{b.redundant === 1 ? ' says' : 's say'} exactly what the built-in says.{' '}
+          <button onClick={() => void w.tidyBuiltins()} id="tidyBuiltins" title="Delete them (unsaved and undoable, like any edit)">
+            Delete {b.redundant === 1 ? 'it' : 'them'}
+          </button>
+        </p>
+      )}
+    </section>
   )
 }
 

@@ -91,17 +91,14 @@ try {
   // A new world holds world.json and a copy of the template (packages/model/template, less its README).
   const TEMPLATE_FILES = (await listAll(path.join(appRoot, 'packages/model/template'))).filter((p) => p !== 'README.md')
   const files = await listAll(worldDir)
-  // Every new world also starts with the real Solar System: Sol and its bodies.
-  const solBodies = files.filter((p) => p.startsWith('bodies/'))
+  // The real Solar System is built in: a new world shows it but holds no file for it.
+  const EXPECTED_FILES = JSON.stringify([...TEMPLATE_FILES, 'world.json'].sort())
+  check(JSON.stringify(files) === EXPECTED_FILES, `the world folder holds world.json and the template, nothing else (${files.join(', ')})`)
+  const firstSnap = await page.evaluate(() => window.malevo.world.snapshot())
+  const solSys = firstSnap.systems.find((x) => x.id === 'sol')
   check(
-    ['bodies/earth.json', 'bodies/moon.json', 'bodies/main-belt.json', 'bodies/jupiter.json'].every((p) => solBodies.includes(p)) &&
-      solBodies.length >= 30,
-    `a new world starts with the Solar System (${solBodies.length} bodies)`
-  )
-  const EXPECTED_FILES = JSON.stringify([...TEMPLATE_FILES, ...solBodies, 'systems/sol.json', 'world.json'].sort())
-  check(
-    JSON.stringify(files) === EXPECTED_FILES,
-    `the world folder holds world.json, the template and the Solar System, nothing else (${files.join(', ')})`
+    solSys && ['earth', 'moon', 'main-belt', 'jupiter'].every((b) => solSys.bodies.some((x) => x.id === b)) && solSys.bodies.length >= 30,
+    `but it shows the built-in Solar System (${solSys?.bodies.length} bodies, ${firstSnap.builtins.builtin} built-ins)`
   )
   const text = await fs.readFile(path.join(worldDir, 'world.json'), 'utf8')
   const manifest = JSON.parse(text)
@@ -366,7 +363,7 @@ try {
   await page.waitForSelector('[data-body-row="proxima-b"]', { timeout: 15_000 })
   check(
     (await page.locator('[data-body-row="proxima-d"]').count()) === 1 && (await page.locator('[data-body-row="proxima-c"]').count()) === 0,
-    'a system on Proxima Centauri starts with its confirmed planets, b and d, not the disputed c'
+    'a system on Proxima Centauri shows its confirmed planets, b and d, not the disputed c'
   )
   await page.locator('#rollPlanets').click()
   await page.waitForSelector('.roll-panel', { timeout: 15_000 })
@@ -396,6 +393,10 @@ try {
   check(sysFile.star === 'hip.70890', 'saving writes the system on its star')
   const bodyFiles = (await fs.readdir(path.join(worldDir, 'bodies'))).filter((f) => f.startsWith('proxima-centauri-'))
   check(bodyFiles.length === kept, 'and one file per kept planet')
+  check(
+    !(await fs.readdir(path.join(worldDir, 'bodies'))).some((f) => f.startsWith('proxima-b') || f === 'earth.json'),
+    'but none for the built-in planets (Proxima b, Earth)'
+  )
   const planetFile = JSON.parse(await fs.readFile(path.join(worldDir, 'bodies', bodyFiles[0]), 'utf8'))
   check(
     planetFile.lock?.gen === 'planets@1' && Number.isInteger(planetFile.lock.seed),
@@ -853,6 +854,36 @@ try {
     'a landing works back from touchdown to the deorbit burn, and the tow'
   )
   await page.screenshot({ path: path.join(shots, '24-landings.png') })
+  await page.evaluate(() => window.malevo.world.discard())
+
+  // 25. Built-ins: a file that changes nothing can be tidied away; the Solar System can be turned off and deleted bodies brought back.
+  await page.evaluate(async () => {
+    const snap = await window.malevo.world.snapshot()
+    const earth = snap.systems.find((x) => x.id === 'sol').bodies.find((b) => b.id === 'earth')
+    await window.malevo.world.setEntity('body', 'earth', { ...earth.value, albedo: 0.5 })
+    await window.malevo.world.setEntity('body', 'earth', earth.value)
+    await window.malevo.world.deleteEntity('body', 'pluto')
+  })
+  await tool('World')
+  await page.waitForSelector('#tidyBuiltins', { timeout: 15_000 })
+  const before25 = await page.evaluate(() => window.malevo.world.snapshot())
+  check(
+    before25.origins['body/earth'] === 'override' && before25.builtins.redundant === 1 && before25.builtins.hidden === 1,
+    'a file that says what the built-in says is offered for tidying, and a deleted built-in is counted'
+  )
+  await page.screenshot({ path: path.join(shots, '25-builtins.png') })
+  await page.locator('#tidyBuiltins').click()
+  await page.locator('#unhideBuiltins').click()
+  await page.waitForFunction(async () => {
+    const s = await window.malevo.world.snapshot()
+    return s.origins['body/earth'] === 'builtin' && s.builtins.hidden === 0
+  })
+  check(true, 'tidying deletes the file and bringing them back restores Pluto')
+  await page.locator('#builtinSol').uncheck()
+  await page.waitForFunction(async () => !(await window.malevo.world.snapshot()).systems.some((x) => x.id === 'sol'))
+  await page.locator('#builtinSol').check()
+  await page.waitForFunction(async () => (await window.malevo.world.snapshot()).systems.some((x) => x.id === 'sol'))
+  check(true, 'the Solar System can be turned off and on again')
   await page.evaluate(() => window.malevo.world.discard())
 
   // 10. The update status reports a dev build.

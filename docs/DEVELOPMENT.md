@@ -540,9 +540,30 @@ module.exports = {
 - Loading a prototype city file directly is not built; the format is close enough to paste its
   objects in by hand.
 
+### Built-in astronomy
+
+- **The real Solar System and the known planets of real stars are built into the app**, not
+  written into the world (`packages/model/src/builtins.ts`). `addBuiltins` adds them to a world
+  read from its files, as entities with `origin: 'builtin'` and the path a file would have. So a
+  new world holds only `world.json` and the template, and a world's repository holds only what the
+  author made or changed.
+- **Changing one writes its file**, which then stands in for it (`origin: 'override'`). The
+  editors show "Built in" or "changes a built-in" by the file name, with **Reset to built-in**
+  (delete the file).
+- **Deleting one hides it:** its key goes into `hidden` in `settings/builtins.json`, which also
+  turns the groups off (`solarSystem`, `knownPlanets`) or the disputed `candidates` on. Without
+  that file everything is on but the candidates. Renaming a built-in writes it under its new id
+  and hides the old one. Renaming Sol's system writes only the system: built-in bodies join
+  whatever system sits on the Sun (`hyg.0`), and known planets whatever system sits on their star.
+- **A note beside a built-in** (`bodies/earth.md` with no `earth.json`) belongs to it.
+- **The World tool** turns the groups on and off, brings deleted ones back, and offers to
+  delete files that say exactly what their built-in says (left from before, or changed back).
+- **Built-ins follow the app:** a later version with better data changes every world that has
+  not overridden them. They are real astronomy only, never a setting.
+
 ### The Solar System
 
-- **Every new world starts with the real Solar System** (`packages/model/src/solarSystem.ts`):
+- **Every new world shows the real Solar System**, built in (`packages/model/src/solarSystem.ts`):
   - Sol;
   - the eight planets, plus Pluto, from JPL's J2000 elements;
   - Ceres, Haumea, Makemake and Eris;
@@ -550,8 +571,9 @@ module.exports = {
   - the main belt and the Kuiper belt.
 
   It is astronomy, not a setting; change or delete any of it.
-- **Worlds made before it** get it from the Systems tool's **Add the Solar System**. If a
-  system already sits on Sol, the bodies join it; bodies whose ids are taken are left out.
+- **If it was turned off or Sol deleted**, the Systems tool's **Bring back the Solar System**
+  turns it on again. If a system already sits on Sol, the bodies join it; a file whose id a body
+  would take (in another system) wins, and that body is left out.
 - **Orientation and rotation** come from the IAU's poles, prime meridians and rotation rates,
   converted to tilt, equinox and meridian. Earth's seasons and clock are real: at J2000 noon the
   Sun stands about 15.5° up, due south, over Greenwich.
@@ -568,8 +590,8 @@ module.exports = {
   - **d** (0.029 AU, at least 0.26 Earth masses), confirmed, too hot for liquid water;
   - **b** (0.049 AU, at least 1.07 Earth masses), confirmed, in the habitable zone;
   - **c** (1.5 AU, at least 7 Earth masses), a disputed candidate.
-- **A system made on the star** from the Stars tool starts with the confirmed planets. The
-  Systems tool offers any that are missing, and the candidate on request.
+- **A system made on the star** shows the confirmed planets, built in. The Systems tool offers
+  back any that were deleted, and the candidate on request.
 - **What is not measured is placeholder:**
   - The orbits lie in the system plane, since the inclination is unknown.
   - Masses are minimum masses; radii are estimated from them.

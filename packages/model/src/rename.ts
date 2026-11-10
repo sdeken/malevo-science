@@ -7,6 +7,7 @@
  * that belongs to the renamed entity (a body's terrain, a city's plan) moves
  * with it.
  */
+import { hideBuiltins } from './builtins'
 import type { FileChange } from './editor'
 import { entityText } from './editor'
 import { entityPath, type KindDef } from './kinds'
@@ -72,6 +73,8 @@ export function renamePlan(
   for (const e of world.entities.values()) {
     const refs = e.refs.filter((r) => r.kind === kind.kind && r.id === oldId)
     if (!refs.length) continue
+    // Built-in bodies join whatever system sits on their star, so they follow a system's new id by themselves.
+    if (e.origin === 'builtin' && kind.kind === 'system' && !movedKeys.has(e.key)) continue
     const k = e.kind
     if (e.value === undefined) {
       skipped.push(e.key)
@@ -92,6 +95,12 @@ export function renamePlan(
   for (const m of moves) {
     const from = entityPath(m.kind, m.id).replace(/\.json$/, '')
     const to = entityPath(m.kind, newId).replace(/\.json$/, '')
+    const moved = world.entities.get(key(m.kind, m.id))
+    if (moved?.origin === 'builtin') {
+      // No file yet: the built-in is written under its new id.
+      const v = values.get(key(m.kind, m.id))
+      changes.push({ path: `${to}.json`, text: v ? entityText(v.kind, v.value) : entityText(m.kind, moved.value) })
+    }
     for (const ext of ['json', 'md', 'js']) {
       const text = files.get(`${from}.${ext}`)
       if (text === undefined || text === null) continue
@@ -119,5 +128,8 @@ export function renamePlan(
     }
     changes.push({ path: entityPath(v.kind, v.id), text: entityText(v.kind, v.value) })
   }
+  // A built-in that moved away is hidden under its old id, or it would come back.
+  const hide = hideBuiltins(world, [...movedKeys])
+  if (hide) changes.push(hide)
   return { changes, updated: updated.filter((k) => !movedKeys.has(k)), skipped }
 }

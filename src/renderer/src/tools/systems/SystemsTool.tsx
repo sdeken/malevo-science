@@ -18,7 +18,8 @@ function SystemsView({ world, snapshot, now, displayCal, navigate, focus }: Tool
     if (focus && systems.some((s) => s.id === focus)) setSelectedId(focus)
   }, [focus]) // eslint-disable-line react-hooks/exhaustive-deps
   const system = systems.find((s) => s.id === selectedId) ?? systems[0] ?? null
-  const hasSol = systems.some((s) => s.starId === 'hyg.0' && s.bodies.some((b) => b.name === 'Earth'))
+  // The Solar System is built in; this brings it back when it was turned off or deleted.
+  const hasSol = systems.some((s) => s.starId === 'hyg.0' && s.bodies.some((b) => b.id === 'earth'))
   const addSol = async (): Promise<void> => {
     const id = await window.malevo.world.addSolarSystem()
     if (id) setSelectedId(id)
@@ -27,9 +28,9 @@ function SystemsView({ world, snapshot, now, displayCal, navigate, focus }: Tool
     <button
       onClick={() => void addSol()}
       id="addSolarSystem"
-      title="Sol, its planets, dwarf planets, major moons and belts, from published data"
+      title="Sol, its planets, dwarf planets, major moons and belts, from published data (built in: no files until changed)"
     >
-      Add the Solar System
+      Bring back the Solar System
     </button>
   )
 
@@ -213,6 +214,7 @@ function SystemDetail({
         id={system.id}
         name={system.name}
         taken={snapshot.systems.map((s) => s.id)}
+        origin={snapshot.origins[`system/${system.id}`]}
         onRenamed={onRenamed}
       />
       <div className="field-row">
@@ -486,6 +488,7 @@ function SystemDetail({
           displayCal={displayCal}
           version={snapshotVersion}
           bodyIds={snapshot.systems.flatMap((s) => s.bodies.map((b) => b.id))}
+          origin={snapshot.origins[`body/${body.id}`]}
           onDeleted={() => setSelectedBody(null)}
           onRenamed={(id) => setSelectedBody(id)}
         />
@@ -538,7 +541,8 @@ function KnownPlanets({ system }: { system: SystemInfoDto }): React.JSX.Element 
   return (
     <div className="notice" id="knownPlanets">
       <p>
-        <strong>{known.name}</strong> has planets found by astronomers that this system does not have:
+        <strong>{known.name}</strong> has planets found by astronomers that this system does not show (they are built in, but were deleted,
+        turned off, or are disputed candidates):
       </p>
       <ul className="small">
         {missing.map((p) => (
@@ -554,12 +558,12 @@ function KnownPlanets({ system }: { system: SystemInfoDto }): React.JSX.Element 
       <div className="toolbar tight">
         {confirmed.length > 0 && (
           <button onClick={() => void window.malevo.world.addKnownPlanets(system.id, false)} id="addKnownPlanets">
-            Add the confirmed planets
+            Bring back the confirmed planets
           </button>
         )}
         {candidates.length > 0 && (
           <button onClick={() => void window.malevo.world.addKnownPlanets(system.id, true)}>
-            Add {confirmed.length ? 'them and ' : ''}the candidate{candidates.length > 1 ? 's' : ''}
+            Show {confirmed.length ? 'them and ' : ''}the candidate{candidates.length > 1 ? 's' : ''}
           </button>
         )}
       </div>

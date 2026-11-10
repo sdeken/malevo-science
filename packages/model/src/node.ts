@@ -18,7 +18,7 @@ import { catalogFrom, type StarCatalog, type WorldEnv } from './env'
 import { readWorld, serializeEntity, type WorldData, type WorldFile } from './load'
 import { sandboxedCalendar } from './sandbox'
 import { templateFiles } from './template'
-import { solarSystem } from './solarSystem'
+import { addBuiltins } from './builtins'
 import { WORLD_FILE, WorldError, newWorldManifest, parseWorldManifest, serializeWorldManifest, type WorldManifest } from './world'
 
 export interface OpenWorld {
@@ -88,8 +88,6 @@ export async function createWorld(dir: string, name: string, seed: number): Prom
   try {
     await fs.mkdir(root, { recursive: true })
     for (const f of templateFiles()) await writeWorldFile(root, f.path, f.text)
-    // Every new world starts with the real Solar System (astronomy, not anyone's setting; delete it freely).
-    for (const f of solarSystem()) await writeWorldFile(root, entityPath(f.kind, f.id), serializeEntity(f.kind, f.value))
     await writeFileAtomic(path.join(root, WORLD_FILE), serializeWorldManifest(manifest))
   } catch (err) {
     throw asWorldError(err)
@@ -144,7 +142,7 @@ export async function readWorldFiles(root: string): Promise<WorldFile[]> {
 
 /** Load and parse a whole world. Read-only; bad content becomes issues, not exceptions. */
 export async function loadWorld(root: string, kinds: readonly KindDef[] = KINDS): Promise<WorldData> {
-  return readWorld(await readWorldFiles(root), kinds)
+  return addBuiltins(readWorld(await readWorldFiles(root), kinds))
 }
 
 /** Write one file of a world, creating its folder. Returns false (and writes nothing) if the text is already there. */
