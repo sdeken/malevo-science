@@ -13,6 +13,7 @@ import { entityText } from './editor'
 import { entityPath, type KindDef } from './kinds'
 import type { WorldData } from './load'
 import { isId } from './schema'
+import { withRelinks } from './wiki'
 
 export interface RenamePlan {
   changes: FileChange[]
@@ -47,7 +48,9 @@ export function renamePlan(
   files: ReadonlyMap<string, string | null>,
   kind: KindDef,
   oldId: string,
-  newId: string
+  newId: string,
+  /** The entity's name changed too: link text that was the old name follows. */
+  retitle?: { from: string; to: string }
 ): RenamePlan | { error: string } {
   if (!kind.folder) return { error: `A ${kind.label} has no id to change.` }
   if (!isId(newId)) return { error: `"${newId}" can't be an id: lowercase letters, digits, ".", "_" and "-" only.` }
@@ -128,8 +131,13 @@ export function renamePlan(
     }
     changes.push({ path: entityPath(v.kind, v.id), text: entityText(v.kind, v.value) })
   }
+  // Articles move with their entities (written or not): links to them, and their own links, follow.
+  const article = (k: KindDef, id: string): string => entityPath(k, id).replace(/\.json$/, '.md')
+  const mdMoves = new Map<string, string>()
+  for (const m of moves) mdMoves.set(article(m.kind, m.id), article(m.kind, newId))
   // A built-in that moved away is hidden under its old id, or it would come back.
   const hide = hideBuiltins(world, [...movedKeys])
   if (hide) changes.push(hide)
-  return { changes, updated: updated.filter((k) => !movedKeys.has(k)), skipped }
+  const relinked = withRelinks(files, changes, mdMoves, retitle ? new Map([[article(kind, newId), retitle]]) : undefined)
+  return { changes: relinked, updated: updated.filter((k) => !movedKeys.has(k)), skipped }
 }

@@ -6,7 +6,11 @@ traffic, timelines and calendars, cultures, colonization history, planet terrain
 cities. Every tool works from one shared model, so details stay consistent from story to story.
 
 The app contains no setting and knows nothing about git. It reads and writes plain world folders
-of JSON. The author decides what is canon and commits it by hand to a repository of their own.
+of JSON and Markdown. The author decides what is canon and commits it by hand to a repository of their own.
+
+The Encyclopedia holds the canon in the author's own words: an article for anything the world
+tracks, and pages of their own for people, organizations and places, linked with `@`. The app
+writes only what the author types, and keeps links working when pages move.
 
 **Status:** Phases 0–10 are built, and a trip planner. Phase 10 added the city planner: districts, streets, rail
 and landmarks drawn on a plan and generated into buildings, timetabled services, door-to-door

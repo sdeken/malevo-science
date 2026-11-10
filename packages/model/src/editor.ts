@@ -17,6 +17,7 @@ import { KINDS, entityPath, type KindDef } from './kinds'
 import { readWorld, type WorldData, type WorldFile } from './load'
 import { readWorldFiles, writeWorldFile } from './node'
 import { isId, parseWith } from './schema'
+import { isWikiPath } from './wiki'
 import { WorldError } from './world'
 
 export interface FileChange {
@@ -155,9 +156,9 @@ export function entityText<T>(kind: KindDef<T>, value: T): string {
   return `${JSON.stringify(value, null, 2)}\n`
 }
 
-/** Edits may only touch files the world format owns: an entity's .json, its .md note, or its .js script. */
+/** Edits may only touch files the world format owns: an entity's .json, its .md article, its .js script, or a page under wiki/. */
 export function assertWorldPath(p: string, kinds: readonly KindDef[]): void {
-  if (kinds.some((k) => k.file === p)) return
+  if (kinds.some((k) => k.file === p) || isWikiPath(p)) return
   const m = /^([a-z]+)\/([^/]+)\.(json|md|js)$/.exec(p)
   const kind = m && kinds.find((k) => k.folder === m[1])
   if (!m || !kind || !isId(m[2]) || (m[3] === 'js' && !kind.scripts))

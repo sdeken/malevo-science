@@ -51,6 +51,16 @@ import {
   historySettingsKind,
   proposeHistory,
   SOL_STAR,
+  articleKinds,
+  articlePath,
+  backlinksTo,
+  headingTitle,
+  isPagePath,
+  isWikiPath,
+  movePageChanges,
+  relink,
+  titleFromPath,
+  WIKI_DIR,
   solarSystem,
   builtinSettings,
   changeBuiltins,
@@ -133,6 +143,7 @@ import type {
   BodyInfoDto,
   EntityDto,
   BuiltinsDto,
+  PageDto,
   CalendarInfo,
   CheckReport,
   CompareReport,
@@ -346,6 +357,7 @@ export class WorldSession extends EventEmitter {
       landings: entityDtos(world, landingKind.kind),
       origins: Object.fromEntries([...world.entities.values()].filter((e) => e.origin).map((e) => [e.key, e.origin!])),
       builtins: builtinsDto(world, this.editor.files()),
+      pages: pageIndex(world, this.editor.files()),
       physics: physicsFile
         ? {
             legLimit_ly: physicsFile.foam.legLimit_ly,
@@ -749,6 +761,9 @@ export class WorldSession extends EventEmitter {
     const oldName = (before?.value as { name?: unknown } | undefined)?.name
     const newName = (value as { name?: unknown } | null)?.name
     this.editor!.setEntity(def, def.file ? def.kind : String(id), value)
+    const renamedTo =
+      typeof oldName === 'string' && typeof newName === 'string' && oldName !== newName ? { from: oldName, to: newName } : null
+    let moved = false
     if (
       def.folder &&
       before &&
@@ -762,15 +777,57 @@ export class WorldSession extends EventEmitter {
       const newId = uniqueSlug(newName, taken)
       if (newId !== id) {
         const files = new Map(this.editor!.files().map((f) => [f.path, f.text]))
-        const plan = renamePlan(world, files, def, id, newId)
+        const plan = renamePlan(world, files, def, id, newId, renamedTo ?? undefined)
         if (!('error' in plan)) {
           this.editor!.edit(plan.changes)
           this.editor!.squash()
           this.emit('renamed', { kind, from: id, to: newId })
+          moved = true
         }
       }
     }
+    // A new name with the id kept: link text that was the old name follows it.
+    if (renamedTo && def.folder && !moved) {
+      const files = new Map(this.editor!.files().map((f) => [f.path, f.text]))
+      const fixes = relink(files, new Map(), new Map([[articlePath(def, String(id)), renamedTo]]))
+      if (fixes.length) {
+        this.editor!.edit(fixes)
+        this.editor!.squash()
+      }
+    }
     this.changed()
+  }
+
+  // ---- pages (the author's own words: written only as typed, moved only with their links) ----
+
+  /** A page's text with unsaved changes, or null if it has none yet. */
+  pageText(p: string): string | null {
+    return this.editor!.files().find((f) => f.path === p)?.text ?? null
+  }
+
+  /** Write a page as typed (an empty page is removed): unsaved, one undo step. */
+  writePage(p: string, text: string): void {
+    if (!isPagePath(p, KINDS)) throw new WorldError('io', `"${p}" is not a page (wiki/…/*.md, or an article beside an entity).`)
+    const next = text.trim() === '' ? null : text
+    if ((this.pageText(p) ?? null) === next) return
+    this.editor!.edit([{ path: p, text: next }])
+    this.changed()
+  }
+
+  /** Move or rename a free page; links to it, and its own, keep working. */
+  movePage(from: string, to: string, title?: { from: string; to: string }): { error: string } | null {
+    if (!isWikiPath(from) || !isWikiPath(to)) return { error: 'Only pages under wiki/ can be moved; an article moves with its entity.' }
+    const files = new Map(this.editor!.files().map((f) => [f.path, f.text]))
+    const changes = movePageChanges(files, from, to, title)
+    if ('error' in changes) return changes
+    this.editor!.edit(changes)
+    this.changed()
+    return null
+  }
+
+  /** The pages that link to this one. */
+  backlinks(p: string): string[] {
+    return backlinksTo(new Map(this.editor!.files().map((f) => [f.path, f.text])), p)
   }
 
   /**
@@ -1044,6 +1101,39 @@ function bodyDto(b: BodyInfo): BodyInfoDto {
     equilibriumTemp: b.equilibriumTemp,
     generatedBy: lock?.gen ?? null
   }
+}
+
+/** Every page: entities' articles (written or waiting), free pages under wiki/, and stray articles. */
+function pageIndex(world: WorldData, files: readonly { path: string; text: string | null }[]): PageDto[] {
+  const texts = new Map(files.map((f) => [f.path, f.text]))
+  const out: PageDto[] = []
+  const seen = new Set<string>()
+  const kinds = new Set(articleKinds(world.kinds).map((k) => k.kind))
+  for (const e of world.entities.values()) {
+    if (!kinds.has(e.kind.kind)) continue
+    const path = articlePath(e.kind, e.id)
+    seen.add(path)
+    const name = (e.value as { name?: unknown } | undefined)?.name
+    out.push({
+      path,
+      title: typeof name === 'string' && name ? name : e.id,
+      category: e.kind.label,
+      exists: typeof texts.get(path) === 'string',
+      kind: e.kind.kind as EditableKind,
+      id: e.id
+    })
+  }
+  for (const [path, text] of texts) {
+    if (seen.has(path) || typeof text !== 'string' || !path.endsWith('.md')) continue
+    if (isWikiPath(path)) {
+      const dir = path.slice(WIKI_DIR.length + 1, path.lastIndexOf('/') > WIKI_DIR.length ? path.lastIndexOf('/') : WIKI_DIR.length + 1)
+      out.push({ path, title: headingTitle(text) ?? titleFromPath(path), category: dir, exists: true, kind: null, id: null })
+    } else if (isPagePath(path, world.kinds)) {
+      const kind = world.kinds.find((k) => k.folder === path.split('/')[0])
+      out.push({ path, title: headingTitle(text) ?? titleFromPath(path), category: kind?.label ?? '', exists: true, kind: null, id: null })
+    }
+  }
+  return out.sort((a, b) => compareStrings(a.title.toLowerCase(), b.title.toLowerCase()) || compareStrings(a.path, b.path))
 }
 
 function builtinsDto(world: WorldData, files: readonly { path: string; text: string | null }[]): BuiltinsDto {

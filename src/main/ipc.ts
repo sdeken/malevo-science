@@ -169,6 +169,17 @@ export function registerIpc(deps: IpcDeps): void {
   ipcMain.handle(IPC.worldAddKnownPlanets, (_e, sys: unknown, candidates: unknown) =>
     world.addKnownPlanets(String(sys), candidates === true)
   )
+  ipcMain.handle(IPC.pageRead, (_e, p: unknown) => world.pageText(String(p)))
+  ipcMain.handle(IPC.pageWrite, (_e, p: unknown, text: unknown) => world.writePage(String(p), String(text ?? '')))
+  ipcMain.handle(IPC.pageMove, (_e, from: unknown, to: unknown, title: unknown) => {
+    const t = title as { from?: unknown; to?: unknown } | null
+    return world.movePage(
+      String(from),
+      String(to),
+      t && typeof t.from === 'string' && typeof t.to === 'string' ? { from: t.from, to: t.to } : undefined
+    )
+  })
+  ipcMain.handle(IPC.pageBacklinks, (_e, p: unknown) => world.backlinks(String(p)))
   ipcMain.handle(IPC.worldSetBuiltins, (_e, set: unknown) => {
     const o = (set ?? {}) as Record<string, unknown>
     const b = (v: unknown): boolean | undefined => (typeof v === 'boolean' ? v : undefined)

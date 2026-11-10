@@ -132,3 +132,18 @@ export function typingInto(el: Element | null): boolean {
   const tag = el.tagName
   return tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT' || (el as HTMLElement).isContentEditable
 }
+
+// ---- writes waiting on a pause (pages being typed) ----
+
+const pendingWrites = new Set<() => Promise<void>>()
+
+/** Register something that holds typing not yet written to the world; Save waits for it. Returns the unregister. */
+export function holdPendingWrite(flush: () => Promise<void>): () => void {
+  pendingWrites.add(flush)
+  return () => pendingWrites.delete(flush)
+}
+
+/** Write everything still held back (before saving). */
+export async function flushPendingWrites(): Promise<void> {
+  await Promise.all([...pendingWrites].map((f) => f()))
+}

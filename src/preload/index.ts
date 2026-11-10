@@ -134,6 +134,17 @@ const api = {
   },
   /** The prime meridian that makes it local noon at a longitude at an instant (for rotation.meridian_deg). */
   skyNoon: (body: string, lon: number, t: number): Promise<number | null> => ipcRenderer.invoke(IPC.skyNoon, body, lon, t),
+  pages: {
+    /** A page's text (with unsaved changes), or null if it has none yet. */
+    read: (path: string): Promise<string | null> => ipcRenderer.invoke(IPC.pageRead, path),
+    /** Write a page as typed (empty removes it): unsaved, one undo step. */
+    write: (path: string, text: string): Promise<void> => ipcRenderer.invoke(IPC.pageWrite, path, text),
+    /** Move or rename a page under wiki/, keeping links to it working; with a title, its heading and link text follow. */
+    move: (from: string, to: string, title?: { from: string; to: string }): Promise<{ error: string } | null> =>
+      ipcRenderer.invoke(IPC.pageMove, from, to, title ?? null),
+    /** The pages that link to this one. */
+    backlinks: (path: string): Promise<string[]> => ipcRenderer.invoke(IPC.pageBacklinks, path)
+  },
   history: {
     /** Run the history generator (history@2) and return what it proposes (nothing is written). */
     propose: (seed?: number): Promise<HistoryProposalDto | { error: string }> => ipcRenderer.invoke(IPC.historyPropose, seed),

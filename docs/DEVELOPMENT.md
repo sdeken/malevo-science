@@ -549,6 +549,43 @@ module.exports = {
 - Loading a prototype city file directly is not built; the format is close enough to paste its
   objects in by hand.
 
+### The encyclopedia
+
+- **Pages are the canon; the JSON is a convenience built on them.** Nothing cross-checks the two:
+  an article may say what the files don't (`packages/model/src/wiki.ts`, the Encyclopedia tool).
+- **Two kinds of page:**
+  - an entity's article, the Markdown file beside its JSON: `bodies/altaris.md`. Every entity
+    of a kind that has articles (not relations, viewpoints, terrains or city plans) has one
+    waiting, unwritten until you type. Built-ins have them too.
+  - a free page under `wiki/`, in folders of the author's choosing: `wiki/people/kativa.md`,
+    `wiki/places/bluff/the-meridian.md`. Its title is its first line if that is a `# Heading`,
+    else its file name.
+- **The app never changes what a page says.** It writes only what is typed (after a pause,
+  unsaved and undoable like any edit), and opening a page writes nothing. A new page starts with
+  the title given, as its heading. Front matter is kept verbatim. Emptying a page removes its
+  file.
+- **Formatting:** the editor writes Markdown its own way (`*` for emphasis, for one). When opening
+  a page shows that the first edit would also change lines not touched, it says how many, shows
+  one, and waits for **Edit anyway**. Tables and images survive; footnotes and raw HTML do not
+  (they are escaped or dropped), so a page using them shows that notice.
+- **Links** are ordinary relative Markdown links (`[Altaris](../../bodies/altaris.md)`), so they
+  work in any Markdown viewer.
+  - Typing `@` offers every page (every entity and every free page, by title) and inserts a link
+    to the one picked, or to a new page of that name under `wiki/`.
+  - Clicking a link follows it; clicking anywhere else edits. Links to pages that are not written
+    (and are not about an entity) show red; web links open in the browser.
+- **Link management**, the only change the app makes to the author's words (`relink`):
+  - When a free page is renamed or moved, every relative link to it, in any `.md` in the world, is
+    rewritten. So are the moved page's own relative links. With a new title, its heading follows
+    if it was the old title, and so does link text that was exactly the old title.
+  - When an entity's id changes (by hand, or following its name), its article moves, written or
+    not, and links to it follow. When its name changes, link text that was the old name follows.
+  - Code spans and fenced code are never touched.
+- **Each article shows an infobox** of facts from the world's files (system, class, mass and
+  radius for a body; the body and people now for a city; colour and capital for a polity; the date
+  for an event), and **What links here**.
+- Images in pages keep their links but are not drawn from the world folder yet.
+
 ### Built-in astronomy
 
 - **The real Solar System and the known planets of real stars are built into the app**, not

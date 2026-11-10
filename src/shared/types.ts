@@ -170,6 +170,7 @@ export interface WorldSnapshot {
   /** Built-in entities ("builtin": no file) and files standing in for them ("override"), by "kind/id". */
   origins: Record<string, 'builtin' | 'override'>
   builtins: BuiltinsDto
+  pages: PageDto[]
   /** settings/physics.json as written, if the world has it (for editing). */
   physicsSettings: Record<string, unknown> | null
   terrains: EntityDto[]
@@ -371,6 +372,19 @@ export interface PlanetProposal {
 // ---- Phase 4: cultures, polities, relations ----
 
 /** An entity's id, file and value (null when the file does not parse). */
+/** A page of the world's encyclopedia: an entity's article (written or not), or a free page under wiki/. */
+export interface PageDto {
+  path: string
+  title: string
+  /** The entity's kind label, or the page's folder under wiki/ ("" at the top). */
+  category: string
+  /** Whether the Markdown file exists (an entity's article may still be unwritten). */
+  exists: boolean
+  /** The entity the page is about, if any. */
+  kind: EditableKind | null
+  id: string | null
+}
+
 /** The built-in Solar System and known planets: what is on, and how many files stand in for built-ins. */
 export interface BuiltinsDto {
   solarSystem: boolean

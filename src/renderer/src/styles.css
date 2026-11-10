@@ -2228,3 +2228,212 @@ fieldset.plain {
 .map-legend .muted {
   color: #8f99aa;
 }
+
+/* ---- the encyclopedia: a page laid out like an encyclopedia article, always editable ---- */
+
+.wiki-nav input[type='search'] {
+  width: 100%;
+  margin: 6px 0;
+}
+
+.wiki-nav .page-group summary {
+  cursor: pointer;
+  font-weight: 600;
+  margin: 8px 0 4px;
+}
+
+.wiki-tools {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.wiki-nav .list-item.unwritten {
+  color: var(--muted);
+}
+
+.new-page {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  align-items: center;
+  margin: 6px 0 10px;
+}
+
+.new-page input {
+  flex: 1 1 120px;
+  min-width: 0;
+}
+
+.wiki-main {
+  flex: 1;
+  min-width: 0;
+  overflow: auto;
+}
+
+.wiki-page {
+  max-width: 960px;
+  margin: 0 auto;
+  padding: 16px clamp(16px, 3vw, 32px) 48px;
+}
+
+.wiki-bar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  align-items: center;
+  margin-bottom: 8px;
+}
+
+.wiki-title,
+.wiki-body h1 {
+  font-family: 'Linux Libertine', 'Georgia', 'Times New Roman', serif;
+  font-weight: normal;
+  font-size: 2em;
+  margin: 0.2em 0 0.4em;
+  padding-bottom: 0.15em;
+  border-bottom: 1px solid var(--border);
+}
+
+.wiki-body {
+  outline: none;
+  line-height: 1.6;
+  font-size: 15px;
+  min-height: 200px;
+  cursor: text;
+}
+
+.wiki-body h2 {
+  font-family: 'Linux Libertine', 'Georgia', 'Times New Roman', serif;
+  font-weight: normal;
+  font-size: 1.5em;
+  margin: 1em 0 0.4em;
+  padding-bottom: 0.1em;
+  border-bottom: 1px solid var(--border);
+}
+
+.wiki-body h3 {
+  font-size: 1.15em;
+  margin: 0.9em 0 0.3em;
+}
+
+.wiki-body p {
+  margin: 0.4em 0 0.6em;
+}
+
+.wiki-body blockquote {
+  margin: 0.6em 0;
+  padding-left: 12px;
+  border-left: 3px solid var(--border);
+  color: var(--muted);
+}
+
+.wiki-body a {
+  color: var(--accent);
+  text-decoration: none;
+  cursor: pointer;
+}
+
+.wiki-body a:hover {
+  text-decoration: underline;
+}
+
+/* A link to a page not written yet (and not about anything the world tracks). */
+.wiki-body .link-new,
+.wiki-body .link-new a {
+  color: var(--danger);
+}
+
+.wiki-body .link-external::after {
+  content: '↗';
+  font-size: 0.75em;
+  margin-left: 1px;
+  color: var(--muted);
+}
+
+.wiki-body p.is-editor-empty:first-child::before {
+  content: attr(data-placeholder);
+  color: var(--muted);
+  float: left;
+  height: 0;
+  pointer-events: none;
+}
+
+.infobox {
+  float: right;
+  clear: right;
+  width: min(260px, 40%);
+  margin: 0 0 12px 20px;
+  padding: 8px;
+  border: 1px solid var(--border);
+  background: var(--bg-raised);
+  font-size: 13px;
+}
+
+.infobox-title {
+  text-align: center;
+  font-weight: 600;
+  font-size: 1.1em;
+  padding: 4px 0 6px;
+  border-top: 4px solid transparent;
+}
+
+.infobox table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.infobox th {
+  text-align: left;
+  vertical-align: top;
+  padding: 3px 6px 3px 0;
+  width: 40%;
+}
+
+.infobox td {
+  padding: 3px 0;
+}
+
+.wiki-backlinks {
+  clear: both;
+  margin-top: 32px;
+  padding-top: 8px;
+  border-top: 1px solid var(--border);
+}
+
+.wiki-backlinks ul {
+  margin: 0;
+  padding-left: 18px;
+}
+
+.page-suggest {
+  position: fixed;
+  z-index: 50;
+  min-width: 240px;
+  max-width: 420px;
+  padding: 4px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--bg-raised);
+  box-shadow: 0 6px 18px rgb(0 0 0 / 0.35);
+}
+
+.page-option {
+  padding: 4px 8px;
+  border-radius: 4px;
+  cursor: pointer;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.page-option.on {
+  background: var(--accent);
+  color: var(--accent-text);
+}
+
+.page-option.on .muted {
+  color: inherit;
+  opacity: 0.8;
+}

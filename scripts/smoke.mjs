@@ -9,6 +9,7 @@
 import { _electron as electron } from 'playwright-core'
 import { promises as fs } from 'node:fs'
 import os from 'node:os'
+import { setTimeout as sleep } from 'node:timers/promises'
 import { execFileSync } from 'node:child_process'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
@@ -200,6 +201,14 @@ try {
   check(true, 'a recent world reopens from the welcome screen')
 
   // 11. Phase 2: the timeline, calendars, saving, undo, scripts, fork and compare.
+  /** Wait until a check in the page, which may be async, comes out true (waitForFunction does not await a promise). */
+  const until = async (fn, arg, what = 'a condition') => {
+    for (let k = 0; k < 150; k++) {
+      if (await page.evaluate(fn, arg)) return
+      await sleep(100)
+    }
+    throw new Error(`Timed out waiting for ${what}`)
+  }
   const tool = async (name) => {
     await page.locator('.tool-link', { hasText: name }).first().click()
     await page.waitForSelector(`[data-tool]`)
@@ -917,17 +926,95 @@ try {
   await page.screenshot({ path: path.join(shots, '25-builtins.png') })
   await page.locator('#tidyBuiltins').click()
   await page.locator('#unhideBuiltins').click()
-  await page.waitForFunction(async () => {
-    const s = await window.malevo.world.snapshot()
-    return s.origins['body/earth'] === 'builtin' && s.builtins.hidden === 0
-  })
+  await until(
+    async () => {
+      const s = await window.malevo.world.snapshot()
+      return s.origins['body/earth'] === 'builtin' && s.builtins.hidden === 0
+    },
+    null,
+    'the tidy and the unhide'
+  )
   check(true, 'tidying deletes the file and bringing them back restores Pluto')
   await page.locator('#builtinSol').uncheck()
-  await page.waitForFunction(async () => !(await window.malevo.world.snapshot()).systems.some((x) => x.id === 'sol'))
+  // Built-ins go (files that stand in for them stay: by now Sol's system has one).
+  await until(
+    async () => {
+      const s = await window.malevo.world.snapshot()
+      return !s.builtins.solarSystem && !s.systems.some((x) => x.bodies.some((b) => b.id === 'neptune'))
+    },
+    null,
+    'the built-in Solar System to go'
+  )
   await page.locator('#builtinSol').check()
-  await page.waitForFunction(async () => (await window.malevo.world.snapshot()).systems.some((x) => x.id === 'sol'))
+  await until(
+    async () => (await window.malevo.world.snapshot()).systems.some((x) => x.bodies.some((b) => b.id === 'neptune')),
+    null,
+    'the built-in Solar System to come back'
+  )
   check(true, 'the Solar System can be turned off and on again')
   await page.evaluate(() => window.malevo.world.discard())
+
+  // 26. The encyclopedia: pages written as typed, @ links to anything, links that follow renames.
+  await tool('Encyclopedia')
+  await page.waitForSelector('#pageSearch')
+  const pageText = (p) => page.evaluate((x) => window.malevo.pages.read(x), p)
+  const waitText = (p, re) =>
+    until(async ([x, src]) => new RegExp(src).test((await window.malevo.pages.read(x)) ?? ''), [p, re.source], `${p} to match ${re}`)
+  await page.locator('#newPage').click()
+  await page.locator('#newPageTitle').fill('Kativa Rhee')
+  await page.locator('#newPageFolder').fill('people')
+  await page.locator('#makePage').click()
+  await page.waitForSelector('[data-wiki-page="wiki/people/kativa-rhee.md"]')
+  check((await pageText('wiki/people/kativa-rhee.md')) === '# Kativa Rhee\n', 'a new page starts with just its title')
+  await page.locator('#pageSearch').fill('Earth')
+  await page.locator('[data-page="bodies/earth.md"]').click()
+  await page.waitForSelector('[data-wiki-page="bodies/earth.md"] #infobox')
+  check(
+    /Sol/.test((await page.locator('#infobox').textContent()) ?? '') && (await pageText('bodies/earth.md')) === null,
+    'an entity has an article waiting, with the facts from its files beside it, and opening it writes nothing'
+  )
+  await page.locator('.wiki-body').click()
+  await page.keyboard.type('Home of everyone, and of @Kat')
+  await page.waitForSelector('#pageSuggest .page-option.on')
+  await page.keyboard.press('Enter')
+  await page.keyboard.type('next door to @Mars')
+  await page.waitForSelector('#pageSuggest .page-option.on')
+  await page.keyboard.press('Enter')
+  await waitText('bodies/earth.md', /\[Mars\]\(mars\.md\)/)
+  check(
+    /^Home of everyone, and of \[Kativa Rhee\]\(\.\.\/wiki\/people\/kativa-rhee\.md\) next door to \[Mars\]\(mars\.md\)/.test(
+      (await pageText('bodies/earth.md')) ?? ''
+    ),
+    `typing @ links to any page, as a relative Markdown link (${JSON.stringify(await pageText('bodies/earth.md'))})`
+  )
+  await page.screenshot({ path: path.join(shots, '26-wiki.png') })
+  await page.locator('.wiki-body a', { hasText: 'Kativa Rhee' }).click()
+  await page.waitForSelector('[data-wiki-page="wiki/people/kativa-rhee.md"]')
+  await page.waitForFunction(() => /Earth/.test(document.querySelector('#backlinks')?.textContent ?? ''))
+  check(true, 'clicking a link follows it, and the page lists what links to it')
+  await page.locator('#movePage').click()
+  await page.locator('#moveTitle').fill('Kativa Voss')
+  await page.locator('#moveGo').click()
+  await page.waitForSelector('[data-wiki-page="wiki/people/kativa-voss.md"]')
+  await waitText('bodies/earth.md', /kativa-voss/)
+  check(
+    /\[Kativa Voss\]\(\.\.\/wiki\/people\/kativa-voss\.md\)/.test((await pageText('bodies/earth.md')) ?? '') &&
+      (await pageText('wiki/people/kativa-voss.md')) === '# Kativa Voss\n',
+    'renaming a page moves it, and the links to it (and their text) follow'
+  )
+  await page.evaluate(() => window.malevo.world.renameEntity('body', 'mars', 'barsoom'))
+  await waitText('bodies/earth.md', /barsoom\.md/)
+  check(true, "changing a planet's file name rewrites the links to its article")
+  await page.locator('.status-save').click()
+  await page.waitForFunction(() => document.querySelector('.status-saved') !== null)
+  const onDisk = (p) => fs.readFile(path.join(worldDir, p), 'utf8').catch(() => null)
+  check(
+    (await onDisk('wiki/people/kativa-voss.md')) === '# Kativa Voss\n' &&
+      /barsoom\.md/.test((await onDisk('bodies/earth.md')) ?? '') &&
+      (await onDisk('bodies/earth.json')) === null &&
+      (await onDisk('wiki/people/kativa-rhee.md')) === null,
+    'saving writes the pages, and nothing about Earth but its article'
+  )
 
   // 10. The update status reports a dev build.
   const status = await page.evaluate(() => window.malevo.updates.status())
