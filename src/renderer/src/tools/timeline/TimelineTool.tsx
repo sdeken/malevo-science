@@ -5,7 +5,7 @@ import type { ToolDefinition, ToolProps } from '../registry'
 import { EventEditor } from './EventEditor'
 import { TimelineCanvas, fitView, type View } from './TimelineCanvas'
 
-function TimelineView({ world, snapshot, now, setNow, displayCal }: ToolProps): React.JSX.Element {
+function TimelineView({ world, snapshot, now, setNow, displayCal, focus, params }: ToolProps): React.JSX.Element {
   const events = snapshot.events
   const [stored, setView] = useWorldPref<View | null>(world.root, 'timelineView', null)
   const view = stored ?? fitView(events, now)
@@ -18,6 +18,12 @@ function TimelineView({ world, snapshot, now, setNow, displayCal }: ToolProps): 
   const [query, setQuery] = useState('')
   const [type, setType] = useState<'' | 'event' | 'period' | 'story'>('')
   const [tag, setTag] = useState('')
+  /** Only events at this system (what the blade was opened on, until cleared). */
+  const [where, setWhere] = useState<string | null>(params.where ?? null)
+  useEffect(() => setWhere(params.where ?? null), [params.where])
+  useEffect(() => {
+    if (focus) setSelected(focus)
+  }, [focus])
 
   const allTags = useMemo(() => [...new Set(events.flatMap((e) => e.value?.tags ?? []))].sort(), [events])
   const shown = useMemo(
@@ -26,10 +32,11 @@ function TimelineView({ world, snapshot, now, setNow, displayCal }: ToolProps): 
         const v = e.value
         if (type && v?.type !== type) return false
         if (tag && !(v?.tags ?? []).includes(tag)) return false
+        if (where && v?.where !== where) return false
         if (query && !(v?.name ?? e.id).toLowerCase().includes(query.toLowerCase())) return false
         return true
       }),
-    [events, type, tag, query]
+    [events, type, tag, query, where]
   )
   const unplaced = shown.filter((e) => !e.start)
   const current = events.find((e) => e.id === selected) ?? null
@@ -89,6 +96,14 @@ function TimelineView({ world, snapshot, now, setNow, displayCal }: ToolProps): 
                 </option>
               ))}
             </select>
+          )}
+          {where && (
+            <span className="chip" id="timelineWhere" data-ref={`system:${where}`}>
+              In {snapshot.systems.find((s) => s.id === where)?.name ?? where}
+              <button className="link" onClick={() => setWhere(null)} title="Show every event">
+                ×
+              </button>
+            </span>
           )}
           <span className="muted small">
             {shown.length} of {events.length}

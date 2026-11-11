@@ -12,6 +12,7 @@ const CLASSES = [
   ['ice-giant', 'Ice giant'],
   ['gas-giant', 'Gas giant'],
   ['dwarf', 'Dwarf'],
+  ['comet', 'Comet'],
   ['belt', 'Belt']
 ] as const
 

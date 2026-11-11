@@ -196,7 +196,8 @@ export const systemsCheck: Check = {
       const groups = new Map<string | null, typeof info.bodies>()
       // Belts overlap by nature, and dwarf planets cross giants' orbits (Pluto crosses Neptune's).
       for (const b of info.bodies)
-        if (b.elements && b.cls !== 'belt' && b.cls !== 'dwarf') groups.set(b.parent, [...(groups.get(b.parent) ?? []), b])
+        if (b.elements && b.cls !== 'belt' && b.cls !== 'dwarf' && b.cls !== 'comet')
+          groups.set(b.parent, [...(groups.get(b.parent) ?? []), b])
       for (const list of groups.values()) {
         const sorted = [...list].sort((x, y) => x.elements!.a - y.elements!.a)
         for (let i = 1; i < sorted.length; i++) {

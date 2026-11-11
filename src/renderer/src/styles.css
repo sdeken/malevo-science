@@ -1172,6 +1172,10 @@ details.overrides summary {
   fill: #4f8fe0;
 }
 
+.ov-comet circle {
+  fill: #e9f4ff;
+}
+
 .ov-body.selected circle {
   stroke: var(--text);
   stroke-width: 2;
@@ -2436,4 +2440,307 @@ fieldset.plain {
 .page-option.on .muted {
   color: inherit;
   opacity: 0.8;
+}
+
+/* ---- blades: the open views, side by side ---- */
+
+.blades {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  overflow-x: auto;
+  overflow-y: hidden;
+  scroll-snap-type: x proximity;
+  background: var(--bg-sunken);
+  gap: 1px;
+}
+
+.blade {
+  flex: 0 0 auto;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  background: var(--bg);
+  border-right: 1px solid var(--border);
+  scroll-snap-align: end;
+}
+
+.blade.narrow {
+  width: 420px;
+}
+
+.blade.medium {
+  width: 680px;
+}
+
+.blade.wide {
+  width: min(1100px, 92%);
+}
+
+/* The last blade takes what is left; a blade on its own (or filling the window) takes it all. */
+.blade:last-child:not(.collapsed) {
+  flex: 1 0 auto;
+}
+
+.blade.only:not(.hidden) {
+  flex: 1 1 auto;
+  width: auto;
+  min-width: 0;
+}
+
+.blade.hidden {
+  display: none;
+}
+
+.blade.collapsed {
+  width: 34px;
+  flex: 0 0 34px;
+}
+
+.blade.collapsed .blade-head {
+  flex-direction: column;
+  height: 100%;
+  padding: 6px 0;
+  cursor: pointer;
+}
+
+.blade.collapsed .blade-title {
+  writing-mode: vertical-rl;
+  white-space: nowrap;
+}
+
+.blade-head {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 8px;
+  border-bottom: 1px solid var(--border);
+  background: var(--bg-raised);
+  min-height: 30px;
+  user-select: none;
+}
+
+.blade-title {
+  flex: 1;
+  font-weight: 600;
+  font-size: 13px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.blade-head button {
+  border: none;
+  background: none;
+  color: var(--muted);
+  padding: 0 4px;
+  font-size: 14px;
+  min-height: 0;
+}
+
+.blade-head button:hover {
+  color: var(--text);
+}
+
+.blade-body {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+}
+
+.blade-body[hidden] {
+  display: none;
+}
+
+/* ---- right-click menu ---- */
+
+.entity-menu-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 100;
+}
+
+.entity-menu {
+  position: fixed;
+  min-width: 220px;
+  max-width: 320px;
+  padding: 4px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--bg-raised);
+  box-shadow: 0 8px 24px rgb(0 0 0 / 0.4);
+  display: flex;
+  flex-direction: column;
+}
+
+.entity-menu-head {
+  padding: 4px 8px 6px;
+  border-bottom: 1px solid var(--border);
+  margin-bottom: 4px;
+}
+
+.entity-menu button {
+  text-align: left;
+  border: none;
+  background: none;
+  padding: 5px 8px;
+  border-radius: 4px;
+  color: var(--text);
+}
+
+.entity-menu button:hover {
+  background: var(--accent);
+  color: var(--accent-text);
+}
+
+.entity-menu button.primary-action {
+  font-weight: 600;
+}
+
+/* ---- pages about one thing ---- */
+
+.detail-page {
+  padding: 16px 24px 32px;
+}
+
+.detail-head {
+  display: flex;
+  gap: 14px;
+  align-items: center;
+}
+
+.detail-head h1 {
+  margin: 0;
+  font-family: 'Linux Libertine', 'Georgia', 'Times New Roman', serif;
+  font-weight: normal;
+  font-size: 1.9em;
+}
+
+.detail-head p {
+  margin: 2px 0 0;
+}
+
+.detail-dot {
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  flex: none;
+  background: radial-gradient(circle at 35% 35%, #c9d3e3, #6f7a8c);
+}
+
+.detail-dot.ov-ocean {
+  background: radial-gradient(circle at 35% 35%, #9fd0ff, #2e64a8);
+}
+.detail-dot.ov-gas-giant {
+  background: radial-gradient(circle at 35% 35%, #f3d9a6, #b07a3c);
+}
+.detail-dot.ov-ice-giant {
+  background: radial-gradient(circle at 35% 35%, #c8f1f4, #4b9fb0);
+}
+.detail-dot.ov-dwarf {
+  background: radial-gradient(circle at 35% 35%, #ddd5c8, #8a7f70);
+}
+.detail-dot.ov-belt {
+  background: radial-gradient(circle, transparent 40%, #8a7f70 42%, #8a7f70 60%, transparent 62%);
+}
+.detail-dot.ov-comet {
+  background: radial-gradient(circle at 70% 30%, #e9f4ff 15%, transparent 16%), linear-gradient(225deg, #bfe0ff55, transparent 70%);
+}
+.detail-dot.star {
+  background: radial-gradient(circle at 40% 40%, #fff7d6, #ffb347 70%);
+  box-shadow: 0 0 14px #ffb34788;
+}
+
+.detail-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 12px 0 16px;
+}
+
+.detail-columns {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(240px, 300px);
+  gap: 24px;
+  align-items: start;
+}
+
+@media (max-width: 900px) {
+  .detail-columns {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+.blade.narrow .detail-columns,
+.blade.medium .detail-columns {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.blade.medium .detail-facts,
+.blade.narrow .detail-facts {
+  order: -1;
+}
+
+.detail-facts {
+  background: var(--bg-raised);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 10px 12px;
+}
+
+.detail-facts .facts-group {
+  grid-column: 1;
+  margin-top: 8px;
+  font-weight: 600;
+  text-transform: uppercase;
+  font-size: 11px;
+  letter-spacing: 0.06em;
+  color: var(--muted);
+}
+
+.detail-article {
+  margin-bottom: 14px;
+}
+
+.article-lead {
+  white-space: pre-line;
+  line-height: 1.55;
+  margin: 0 0 6px;
+}
+
+.detail-list {
+  margin: 4px 0 14px;
+  padding-left: 18px;
+}
+
+.detail-foot {
+  margin-top: 20px;
+}
+
+.chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+.chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 1px 8px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  font-size: 12px;
+  cursor: context-menu;
+}
+
+.chip .swatch {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+}
+
+.link-like {
+  color: var(--accent);
+  cursor: pointer;
 }

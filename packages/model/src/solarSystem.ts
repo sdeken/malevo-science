@@ -397,6 +397,22 @@ export function solarSystem(systemId = 'sol'): { kind: KindDef; id: string; valu
       } satisfies BodyFile
     })
   }
+  // Halley's Comet (1P): elements from the Small-Body Database, its mean anomaly carried to J2000 from the
+  // 1986 perihelion; size and spin from Giotto and Vega (a 15 × 8 km nucleus, about 2.2 days).
+  out.push({
+    kind: bodyKind as KindDef,
+    id: 'halley',
+    value: {
+      name: "Halley's Comet",
+      system: systemId,
+      class: 'comet',
+      orbit: { a_au: 17.834, e: 0.96714, i_deg: 162.26, node_deg: 58.42, peri_deg: 111.33, meanAnomaly_deg: 66.4, epoch: { t_s: 0 } },
+      mass_mearth: Number((2.2e14 / M_EARTH_KG).toPrecision(6)),
+      radius_km: 5.5,
+      rotation: { period_h: 52.8, tilt_deg: 0 },
+      albedo: 0.04
+    } satisfies BodyFile
+  })
   for (const group of MOONS) {
     const pole = poles.get(group.parent)!
     const plane = planeOf(poleEcl(pole.ra, pole.dec))

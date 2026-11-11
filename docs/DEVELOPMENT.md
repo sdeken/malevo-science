@@ -28,8 +28,8 @@ npm run dev          # the app with hot reload
   updater.
 - **`src/preload`** is the typed bridge, exposed as `window.malevo`. The renderer never touches
   the file system.
-- **`src/renderer`** is the tool host: the welcome screen, sidebar, current-date bar and status
-  bar. Tools live in `src/renderer/src/tools/<id>/` and are listed in
+- **`src/renderer`** is the tool host: the welcome screen, sidebar, current-date bar, the blades
+  and the status bar. Tools live in `src/renderer/src/tools/<id>/` and are listed in
   `src/renderer/src/tools/index.ts`. The tools are Timeline, Stars, Systems, Terrain, Population, Routes, Sky, Approach, Cultures, History, Calendars,
   Fork & compare, Checks and World.
 - **The world session lives in main** (`src/main/world.ts`): the open world, its unsaved changes
@@ -53,6 +53,41 @@ npm run dev          # the app with hot reload
   fixtures.
 - **`packages/cli`** (`@malevo/cli`) is the `malevo` command. `npm run build` bundles it into
   `out/cli/malevo.mjs`.
+
+### Blades
+
+- **Views open side by side, as blades** (`src/renderer/src/blades/`). The sidebar starts a new
+  set from a tool; Shift-click adds the tool at the end. Opening something from a blade (a button,
+  a link, `navigate`, or a right-click action) puts it just to the right, in place of whatever was
+  to its right. If the blade there is the same tool, it is pointed at the new thing instead. The
+  strip scrolls to show it.
+- **Each blade** can fold to a strip (◂), fill the window (⤢, or double-click its title) and close
+  (×). The open blades, and what each is open on, are remembered per world.
+- **A blade is a tool, or a page about one thing:**
+  - `body`: a planet, moon, dwarf planet, belt or comet. It shows what it is, who holds its system
+    and who lives there now, the lead of its article, its moons and cities, and its physical,
+    orbital, day and light figures. It is read-only and opens the Systems tool to change things.
+  - `star`: the star's physics, where it is, and the systems on it.
+  - `route-to`: the quickest chain of legs to somewhere, from a system or station you pick, with
+    the time in the foam. "Keep it as a route" writes a route file.
+- **What a blade was opened on** comes to the view as `params` (`focus` among them, for older
+  callers). Tools read the ones that apply:
+  - Systems: `focus` (a system), `body`.
+  - Timeline: `where` (a system; a removable chip), `focus` (an event).
+  - Cultures: `focus` as `culture:id` or `polity:id`.
+  - Stars: `focus` (a system, or `star:id`), `colourBy`.
+  - Routes: `route`, `station`, `nebula`.
+  - Population, City planner, Terrain, Shipyard, Trip planner, Landings and Whereabouts
+    (`traveller:id`, `drifter:id`): `focus`.
+- **Right-click anything the world tracks** for what can be done with it (`entities.ts`). That
+  covers bodies, systems, stars, cities, cultures, polities, events, routes, stations, nebulae,
+  ships, travellers, drifters, landings and pages.
+  - An element says what it is about with `data-ref="kind:id"`. The menu also understands the
+    attributes tools already carry: `data-body`, `data-body-row`, `data-system`, `data-city`,
+    `data-event`, `data-star`, `data-node` and `data-page`.
+  - Views without elements (the 3D star map) call `showEntityMenu(ref, x, y, element)`.
+  - Typical actions: Details, Article, the tool that edits it, Events in its system, Route to it,
+    On the star map, Terrain, Territory on the star map, Go to its date.
 
 ### Adding a tool
 
@@ -614,6 +649,8 @@ module.exports = {
   - the eight planets, plus Pluto, from JPL's J2000 elements;
   - Ceres, Haumea, Makemake and Eris;
   - the Moon, and the regular moons of Mars, Jupiter, Saturn, Uranus and Pluto, plus Triton;
+  - Halley's Comet (bodies of class `comet` are exempt from the crossing-orbits check, like dwarf
+    planets);
   - the main belt and the Kuiper belt.
 
   It is astronomy, not a setting; change or delete any of it.

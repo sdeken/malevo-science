@@ -423,7 +423,7 @@ export const systemKind: KindDef<SystemFile> = {
   schema: systemSchema
 }
 
-export const BODY_CLASSES = ['rocky', 'ocean', 'ice-giant', 'gas-giant', 'dwarf', 'belt'] as const
+export const BODY_CLASSES = ['rocky', 'ocean', 'ice-giant', 'gas-giant', 'dwarf', 'belt', 'comet'] as const
 
 export const bodySchema = obj({
   name: name(),

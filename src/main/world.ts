@@ -502,7 +502,15 @@ export class WorldSession extends EventEmitter {
     for (const e of world.entities.values()) {
       if (e.kind.kind !== bodyKind.kind || e.value === undefined) continue
       const v = e.value as BodyFile
-      if (v.system !== sys.id || v.parent || v.lock?.gen?.startsWith('planets@') || v.class === 'belt' || v.class === 'dwarf') continue
+      if (
+        v.system !== sys.id ||
+        v.parent ||
+        v.lock?.gen?.startsWith('planets@') ||
+        v.class === 'belt' ||
+        v.class === 'dwarf' ||
+        v.class === 'comet'
+      )
+        continue
       const bd = band(v.orbit)
       if (bd) fixed.push({ name: v.name, band: bd })
     }

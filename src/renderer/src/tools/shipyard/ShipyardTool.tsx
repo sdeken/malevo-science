@@ -11,7 +11,7 @@ import {
   type ShipDesign,
   type ShipFile
 } from '@malevo/model'
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import type { WorldSnapshot } from '../../../../shared/types'
 import { NumberField, TextField, duration, sig } from '../../components/fields'
 import { slugId, useWorldPref } from '../../state'
@@ -26,8 +26,12 @@ const C_KMS = 299792.458
  * flying numbers (dry mass, propellant, engines, thrust, exhaust speed) follow
  * from the design, so the trip planner flies what you built.
  */
-function ShipyardView({ world, snapshot, navigate }: ToolProps): React.JSX.Element {
+function ShipyardView({ world, snapshot, navigate, focus }: ToolProps): React.JSX.Element {
   const [shipId, setShipId] = useWorldPref<string | null>(world.root, 'shipyardShip', null)
+  // Opened on one: select it.
+  useEffect(() => {
+    if (focus) setShipId(focus)
+  }, [focus]) // eslint-disable-line react-hooks/exhaustive-deps
   const ship = snapshot.ships.find((s) => s.id === shipId) ?? snapshot.ships[0] ?? null
   const physics = (snapshot.physicsSettings as unknown as PhysicsSettings | null) ?? null
   return (

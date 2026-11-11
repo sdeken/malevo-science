@@ -16,10 +16,20 @@ export interface ToolProps {
   /** The calendar dates are shown in. */
   displayCal: string | null
   setDisplayCal(id: string): void
-  /** Switch to another tool, optionally pointing it at something (a system id, a star id). */
+  /** Open another tool beside this one, optionally pointing it at something (a system id, a star id). */
   navigate(toolId: string, focus?: string): void
-  /** What another tool pointed this one at, if anything. */
+  /** What another tool pointed this one at, if anything (the blade's `focus` parameter). */
   focus: string | null
+  /** What this blade was opened on: its parameters (`focus` among them). */
+  params: Record<string, string>
+  /** Open a blade to the right of this one, in place of any already to its right. */
+  open(spec: BladeSpec): void
+}
+
+/** A view to open: a tool's id, or one of the detail views ("body", "star", "route-to"), and what it is about. */
+export interface BladeSpec {
+  type: string
+  params?: Record<string, string>
 }
 
 export interface ToolDefinition {

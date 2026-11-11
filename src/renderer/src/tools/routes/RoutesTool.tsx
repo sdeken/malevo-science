@@ -14,7 +14,7 @@ type Service = NonNullable<RouteFile['services']>[number]
 const nodeName = (snapshot: WorldSnapshot, id: string | null): string => (id ? (snapshot.nodes[id]?.name ?? id) : '(nothing)')
 const KIND_LABEL = { system: 'system', station: 'station', star: 'star' } as const
 
-function RoutesView({ world, snapshot, focus, navigate, now }: ToolProps): React.JSX.Element {
+function RoutesView({ world, snapshot, focus, navigate, now, params }: ToolProps): React.JSX.Element {
   const [tab, setTab] = useWorldPref<Tab>(world.root, 'routesTab', 'routes')
   const [selected, setSelected] = useState<Record<string, string | null>>({})
   const [creating, setCreating] = useState(false)
@@ -23,6 +23,20 @@ function RoutesView({ world, snapshot, focus, navigate, now }: ToolProps): React
   useEffect(() => {
     if (focus) setTab('balance')
   }, [focus]) // eslint-disable-line react-hooks/exhaustive-deps
+  // Opened on a route, station or nebula.
+  useEffect(() => {
+    const [t, id] = params.route
+      ? ['routes', params.route]
+      : params.station
+        ? ['stations', params.station]
+        : params.nebula
+          ? ['nebulae', params.nebula]
+          : [null, null]
+    if (!t || !id) return
+    setTab(t as Tab)
+    setCreating(false)
+    setSelected((s) => ({ ...s, [t]: id }))
+  }, [params.route, params.station, params.nebula]) // eslint-disable-line react-hooks/exhaustive-deps
 
   const list: { id: string; name: string; sub: string; color?: string }[] =
     tab === 'routes'
@@ -96,6 +110,7 @@ function RoutesView({ world, snapshot, focus, navigate, now }: ToolProps): React
                       select(x.id)
                     }}
                     data-entity={x.id}
+                    data-ref={`${tab === 'routes' ? 'route' : tab === 'stations' ? 'station' : 'nebula'}:${x.id}`}
                   >
                     <span>
                       {x.color && <span className="swatch" style={{ background: x.color }} />} {x.name}

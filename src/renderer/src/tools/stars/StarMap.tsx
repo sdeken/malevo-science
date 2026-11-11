@@ -4,6 +4,7 @@ import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js'
 import type { StarField } from '../../../../shared/types'
 import { starColour } from '../../components/fields'
 import { CONTESTED_COLOUR, claims, type Territory } from './territory'
+import { showEntityMenu } from '../../blades/EntityMenu'
 
 export interface MapSystem {
   id: string
@@ -183,6 +184,28 @@ export function StarMap({ field, focus, systems, selected, onPick, reach, routes
     const onDown = (e: PointerEvent): void => {
       down = { x: e.clientX, y: e.clientY }
     }
+    const hitAt = (e: MouseEvent): number | null => {
+      const stars = c.stars
+      if (!stars) return null
+      const rect = renderer.domElement.getBoundingClientRect()
+      const ndc = new THREE.Vector2(((e.clientX - rect.left) / rect.width) * 2 - 1, -((e.clientY - rect.top) / rect.height) * 2 + 1)
+      const ray = new THREE.Raycaster()
+      ray.setFromCamera(ndc, camera)
+      ray.params.Points = { threshold: camera.position.distanceTo(controls.target) * 0.012 }
+      const hits = ray.intersectObject(stars)
+      hits.sort((a, b) => (a.distanceToRay ?? 0) - (b.distanceToRay ?? 0))
+      return hits.length ? (hits[0].index ?? null) : null
+    }
+    // Right-click (not a right-drag, which pans) on a star: what can be done with it.
+    const onContext = (e: MouseEvent): void => {
+      e.preventDefault()
+      if (down && Math.hypot(e.clientX - down.x, e.clientY - down.y) > 4) return
+      const i = hitAt(e)
+      const f = latest.current.field
+      if (i === null || !f) return
+      showEntityMenu({ kind: 'star', id: f.ids[i] }, e.clientX, e.clientY, el)
+    }
+    renderer.domElement.addEventListener('contextmenu', onContext)
     const onUp = (e: PointerEvent): void => {
       if (!down || Math.hypot(e.clientX - down.x, e.clientY - down.y) > 4 || e.button !== 0) return
       down = null

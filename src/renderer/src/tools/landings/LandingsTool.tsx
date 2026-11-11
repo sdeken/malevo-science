@@ -11,8 +11,12 @@ import type { ToolDefinition, ToolProps } from '../registry'
  * ballute and chemical rockets, onto a pad or into the sea, then towed in and
  * beached on the tide. Works back from the touchdown time. Files: landings/<id>.json.
  */
-function LandingsView({ world, snapshot, now, displayCal }: ToolProps): React.JSX.Element {
+function LandingsView({ world, snapshot, now, displayCal, focus }: ToolProps): React.JSX.Element {
   const [sel, setSel] = useWorldPref<string | null>(world.root, 'landing', null)
+  // Opened on one: select it.
+  useEffect(() => {
+    if (focus) setSel(focus)
+  }, [focus]) // eslint-disable-line react-hooks/exhaustive-deps
   const landing = snapshot.landings.find((l) => l.id === sel) ?? snapshot.landings[0] ?? null
   const cal = displayCal ?? snapshot.calendars[0]?.id ?? 'gregorian'
   return (

@@ -194,7 +194,8 @@ const DEFAULT_ALBEDO: Record<BodyFile['class'], number> = {
   'ice-giant': 0.3,
   'gas-giant': 0.34,
   dwarf: 0.5,
-  belt: 0.1
+  belt: 0.1,
+  comet: 0.04
 }
 
 export function systemInfo(world: WorldData, env: WorldEnv, systemId: string): SystemInfo | null {

@@ -21,8 +21,12 @@ import type { ToolDefinition, ToolProps } from '../registry'
  * line from a place and a time; the tool says where they are at the current
  * date and which stars they pass. Files: travellers/<id>.json, drifters/<id>.json.
  */
-function WhereaboutsView({ world, snapshot, now, displayCal }: ToolProps): React.JSX.Element {
+function WhereaboutsView({ world, snapshot, now, displayCal, focus }: ToolProps): React.JSX.Element {
   const [sel, setSel] = useWorldPref<string | null>(world.root, 'whereabouts', null)
+  // Opened on one: select it.
+  useEffect(() => {
+    if (focus) setSel(focus)
+  }, [focus]) // eslint-disable-line react-hooks/exhaustive-deps
   const all = [
     ...snapshot.travellers.map((e) => ({ key: `traveller:${e.id}`, kind: 'traveller' as const, e })),
     ...snapshot.drifters.map((e) => ({ key: `drifter:${e.id}`, kind: 'drifter' as const, e }))

@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { placeholderNames, runGenerator } from '@malevo/gen'
 import {
   affinityAt,
@@ -24,10 +24,17 @@ function eventTimes(snapshot: WorldSnapshot): (id: string, from?: 'start' | 'end
 
 const COLORS = ['#4f8fe0', '#e0a43c', '#4fc1a6', '#d9604f', '#b07fe0', '#8bc34a', '#e07fb0', '#7f8cff']
 
-function CulturesView({ world, snapshot, now, navigate }: ToolProps): React.JSX.Element {
+function CulturesView({ world, snapshot, now, navigate, focus }: ToolProps): React.JSX.Element {
   const [tab, setTab] = useWorldPref<Tab>(world.root, 'culturesTab', 'cultures')
   const [selected, setSelected] = useState<string | null>(null)
   useFollowRenames(selected, setSelected)
+  // Opened on a culture or polity ("culture:id", "polity:id").
+  useEffect(() => {
+    const m = /^(culture|polity):(.+)$/.exec(focus ?? '')
+    if (!m) return
+    setTab(m[1] === 'culture' ? 'cultures' : 'polities')
+    setSelected(m[2])
+  }, [focus]) // eslint-disable-line react-hooks/exhaustive-deps
 
   const add = async (kind: 'culture' | 'polity'): Promise<void> => {
     const list = kind === 'culture' ? snapshot.cultures : snapshot.polities
@@ -77,6 +84,7 @@ function CulturesView({ world, snapshot, now, navigate }: ToolProps): React.JSX.
                     className={x.id === current?.id ? 'list-item is-current' : 'list-item'}
                     onClick={() => setSelected(x.id)}
                     data-entity={x.id}
+                    data-ref={`${tab === 'cultures' ? 'culture' : 'polity'}:${x.id}`}
                   >
                     <span>
                       <span className="swatch" style={{ background: String(x.value?.color ?? '#888') }} /> {String(x.value?.name ?? x.id)}

@@ -12,7 +12,7 @@ import { mapNebulae, mapRoutes, mapStations } from '../routes/mapData'
 
 const SOL = 'hyg.0'
 
-function StarsView({ world, snapshot, now, focus: navFocus, navigate }: ToolProps): React.JSX.Element {
+function StarsView({ world, snapshot, now, focus: navFocus, navigate, params }: ToolProps): React.JSX.Element {
   const systems = snapshot.systems
   const [focusId, setFocusId] = useWorldPref<string>(world.root, 'starsFocus', systems[0]?.starId ?? SOL)
   const [radius, setRadius] = useWorldPref<number>(world.root, 'starsRadius', 20)
@@ -31,9 +31,18 @@ function StarsView({ world, snapshot, now, focus: navFocus, navigate }: ToolProp
   // Another tool can point this one at a system's star.
   useEffect(() => {
     if (!navFocus) return
+    if (navFocus.startsWith('star:')) {
+      setFocusId(navFocus.slice(5))
+      return
+    }
     const sys = systems.find((s) => s.id === navFocus)
     if (sys) setFocusId(sys.starId)
   }, [navFocus]) // eslint-disable-line react-hooks/exhaustive-deps
+  // Opened to show territory: colour the map so.
+  useEffect(() => {
+    const c = params.colourBy
+    if (c === 'culture' || c === 'polity' || c === 'type') setColourBy(c)
+  }, [params.colourBy]) // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     let live = true

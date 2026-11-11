@@ -411,10 +411,10 @@ try {
     planetFile.lock?.gen === 'planets@1' && Number.isInteger(planetFile.lock.seed),
     'kept planets record the generator and seed that made them'
   )
-  await page.locator('[data-system="sol"]').click()
+  await page.locator('[data-tool="systems"] [data-system="sol"]').click()
   await page.waitForFunction(() => /Nearest drop → Earth/.test(document.querySelector('#torchTable')?.textContent ?? ''))
   check(true, 'the torch times give the warning from a drop at the collapse edge to Earth')
-  await page.locator('[data-system="proxima-centauri"]').click()
+  await page.locator('[data-tool="systems"] [data-system="proxima-centauri"]').click()
   await page.waitForSelector('[data-system-detail="proxima-centauri"]')
   // A planet-local calendar that follows the first planet (if it has a day to follow).
   const planetId = bodyFiles[0].replace(/\.json$/, '')
@@ -1015,6 +1015,62 @@ try {
       (await onDisk('wiki/people/kativa-rhee.md')) === null,
     'saving writes the pages, and nothing about Earth but its article'
   )
+
+  // 27. Blades: start from a system, right-click a planet for its page, follow a moon, filter the timeline, route somewhere.
+  await tool('Systems')
+  const blades = () => page.locator('.blade').count()
+  await page.locator('[data-tool="systems"] [data-system="sol"]').click()
+  await page.locator('[data-body-row="jupiter"]').click({ button: 'right' })
+  await page.waitForSelector('#entityMenu')
+  check(
+    /Jupiter/.test((await page.locator('#entityMenu').textContent()) ?? '') &&
+      (await page.locator('#entityMenu button', { hasText: 'Terrain' }).count()) === 1,
+    'right-clicking a planet offers what can be done with it'
+  )
+  await page.locator('#entityMenu button', { hasText: 'Details' }).click()
+  await page.waitForSelector('[data-detail="body:jupiter"]')
+  const jup = (await page.locator('[data-detail="body:jupiter"]').textContent()) ?? ''
+  check(
+    (await blades()) === 2 && /gas giant/.test(jup) && /Moons/.test(jup) && /Io/.test(jup),
+    `its page opens beside the system: what it is, its moons, its numbers (${await blades()} blades)`
+  )
+  await page.locator('[data-detail="body:jupiter"] button', { hasText: /^Io$/ }).click()
+  await page.waitForSelector('[data-detail="body:io"]')
+  check(
+    (await blades()) === 3 && /moon of Jupiter/.test((await page.locator('[data-detail="body:io"]').textContent()) ?? ''),
+    'a moon opens to the right'
+  )
+  await page.locator('[data-detail="body:io"] [data-ref="system:sol"]').first().click({ button: 'right' })
+  await page.locator('#entityMenu button', { hasText: 'Events in Sol' }).click()
+  await page.waitForSelector('[data-tool="timeline"] #timelineWhere')
+  check((await blades()) === 4, 'right-clicking the system offers its events: the timeline opens beside, filtered to it')
+  await page.screenshot({ path: path.join(shots, '27-blades.png') })
+  await page.locator('[data-blade="1"] .blade-fold').click()
+  check((await page.locator('.blade.collapsed').count()) === 1, 'a blade folds to a strip')
+  await page.locator('[data-tool="timeline"] .blade-close').click()
+  check((await blades()) === 3, 'and closes')
+  await page.locator('[data-tool="systems"] [data-body-row="halley"]').click({ button: 'right' })
+  await page.locator('#entityMenu button', { hasText: 'Details' }).click()
+  await page.waitForSelector('[data-detail="body:halley"]')
+  check(
+    /comet/.test((await page.locator('[data-detail="body:halley"]').textContent()) ?? ''),
+    "Halley's Comet is built in, and its page says what it is"
+  )
+  await page.locator('[data-tool="systems"] [data-system="proxima-centauri"]').click({ button: 'right' })
+  await page.locator('#entityMenu button', { hasText: 'Route to' }).click()
+  await page.waitForSelector('#routeToSummary', { timeout: 30_000 })
+  check(
+    /legs?, stopovers/.test((await page.locator('#routeToSummary').textContent()) ?? ''),
+    `route to: the quickest chain of legs (${await page.locator('#routeToSummary').textContent()})`
+  )
+  await page.locator('.tool-link', { hasText: 'Encyclopedia' }).click({ modifiers: ['Shift'] })
+  await page.waitForSelector('[data-tool="wiki"]')
+  check(
+    (await blades()) >= 3 && (await page.locator('[data-tool="systems"]').count()) === 1,
+    'Shift-clicking a tool adds it beside what is open'
+  )
+  await tool('Timeline')
+  check((await blades()) === 1, 'clicking a tool starts afresh from it')
 
   // 10. The update status reports a dev build.
   const status = await page.evaluate(() => window.malevo.updates.status())

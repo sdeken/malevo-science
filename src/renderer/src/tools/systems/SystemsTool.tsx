@@ -11,7 +11,7 @@ import { HistoryEditor } from './HistoryEditor'
 import { OrbitView, systemMasses, type Drawn } from './OrbitView'
 import { TorchTimes, type MeasurePoint } from './TorchTimes'
 
-function SystemsView({ world, snapshot, now, displayCal, navigate, focus }: ToolProps): React.JSX.Element {
+function SystemsView({ world, snapshot, now, displayCal, navigate, focus, params, open }: ToolProps): React.JSX.Element {
   const systems = snapshot.systems
   const [selectedId, setSelectedId] = useWorldPref<string | null>(world.root, 'system', systems[0]?.id ?? null)
   useEffect(() => {
@@ -82,6 +82,8 @@ function SystemsView({ world, snapshot, now, displayCal, navigate, focus }: Tool
           displayCal={displayCal}
           calendars={snapshot.calendars}
           navigate={navigate}
+          open={open}
+          focusBody={params.body ?? null}
           snapshot={snapshot}
           onRenamed={setSelectedId}
         />
@@ -97,10 +99,15 @@ function SystemDetail({
   displayCal,
   calendars,
   navigate,
+  open,
+  focusBody,
   snapshot,
   onRenamed
 }: {
   onRenamed(id: string): void
+  open: ToolProps['open']
+  /** A body to select (what the blade was opened on). */
+  focusBody: string | null
   snapshot: ToolProps['snapshot']
   system: SystemInfoDto
   snapshotVersion: number
@@ -109,8 +116,11 @@ function SystemDetail({
   calendars: ToolProps['snapshot']['calendars']
   navigate: ToolProps['navigate']
 }): React.JSX.Element {
-  const [selectedBody, setSelectedBody] = useState<string | null>(null)
+  const [selectedBody, setSelectedBody] = useState<string | null>(focusBody)
   useFollowRenames(selectedBody, setSelectedBody)
+  useEffect(() => {
+    if (focusBody) setSelectedBody(focusBody)
+  }, [focusBody])
   const [center, setCenter] = useState<string | null>(null)
   const [measuring, setMeasuring] = useState(false)
   const [isolines, setIsolines] = useState(false)
@@ -479,6 +489,18 @@ function SystemDetail({
         </div>
       </div>
 
+      {body && !proposal && displayCal && (
+        <p className="body-page-link">
+          <button
+            className="link"
+            data-ref={`body:${body.id}`}
+            onClick={() => open({ type: 'body', params: { id: body.id } })}
+            id="openBodyPage"
+          >
+            {body.name}: its page →
+          </button>
+        </p>
+      )}
       {body && !proposal && displayCal && (
         <BodyEditor
           key={body.id}

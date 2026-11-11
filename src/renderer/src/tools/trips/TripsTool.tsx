@@ -11,8 +11,12 @@ import type { ToolDefinition, ToolProps } from '../registry'
  * flying a charted route, leg by leg, against the route planner's idealized
  * times. Ships are world files, ships/<id>.json.
  */
-function TripsView({ world, snapshot, now }: ToolProps): React.JSX.Element {
+function TripsView({ world, snapshot, now, focus }: ToolProps): React.JSX.Element {
   const [shipId, setShipId] = useWorldPref<string | null>(world.root, 'tripShip', null)
+  // Opened on one: select it.
+  useEffect(() => {
+    if (focus) setShipId(focus)
+  }, [focus]) // eslint-disable-line react-hooks/exhaustive-deps
   const ship = snapshot.ships.find((s) => s.id === shipId) ?? snapshot.ships[0] ?? null
   return (
     <div className="split-tool trips">

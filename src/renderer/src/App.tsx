@@ -8,6 +8,9 @@ import { StatusBar } from './components/StatusBar'
 import { Welcome } from './components/Welcome'
 import { flushPendingWrites, readPref, typingInto, useSnapshot, useWorldPref, writePref } from './state'
 import { TOOLS } from './tools'
+import { BladeHost } from './blades/BladeHost'
+import { bladeDef } from './blades/index'
+import { append, fresh, sanitize, type Blade } from './blades/stack'
 
 const TOOL_KEY = 'malevo.selectedTool'
 
@@ -29,8 +32,11 @@ export function App(): React.JSX.Element {
   const [update, setUpdate] = useState<UpdateStatus | null>(null)
   const [dialog, setDialog] = useState<'new' | 'about' | null>(null)
   const [message, setMessage] = useState<{ kind: 'error' | 'ok'; text: string; open?: string } | null>(null)
-  const [toolId, setToolId] = useState(loadSelectedTool)
-  const [focus, setFocus] = useState<string | null>(null)
+  const [storedStack, setStack] = useWorldPref<Blade[]>(world?.root ?? '', 'blades', fresh({ type: loadSelectedTool() }))
+  const stack = useMemo(() => {
+    const s = sanitize(storedStack, (t) => Boolean(bladeDef(t)))
+    return s.length ? s : fresh({ type: TOOLS[0].id })
+  }, [storedStack])
   const snapshot = useSnapshot(world !== null)
 
   useEffect(() => {
@@ -126,15 +132,15 @@ export function App(): React.JSX.Element {
     return () => window.removeEventListener('keydown', onKey)
   }, [])
 
-  const selectTool = (id: string, to: string | null = null): void => {
-    setToolId(id)
-    setFocus(to)
+  /** The sidebar starts a new set of blades from a tool; with Shift, it adds the tool at the end. */
+  const selectTool = (id: string, add = false): void => {
+    setStack(add ? append(stack, { type: id }) : fresh({ type: id }))
     writePref(TOOL_KEY, id)
   }
 
   if (!loaded) return <div className="app" />
 
-  const tool = TOOLS.find((t) => t.id === toolId) ?? TOOLS[0]
+  const openTypes = new Set(stack.map((b) => b.type))
 
   return (
     <div className="app">
@@ -163,9 +169,9 @@ export function App(): React.JSX.Element {
               {TOOLS.map((t) => (
                 <li key={t.id}>
                   <button
-                    className={t.id === tool.id ? 'tool-link is-current' : 'tool-link'}
-                    title={t.description}
-                    onClick={() => selectTool(t.id)}
+                    className={openTypes.has(t.id) ? 'tool-link is-current' : 'tool-link'}
+                    title={`${t.description}. Shift-click to open it beside what is open.`}
+                    onClick={(e) => selectTool(t.id, e.shiftKey)}
                   >
                     {t.title}
                   </button>
@@ -174,7 +180,7 @@ export function App(): React.JSX.Element {
             </ul>
           </nav>
           {snapshot && snapshot.world.root === world.root ? (
-            <WorldPane snapshot={snapshot} world={world} toolId={tool.id} focus={focus} navigate={(id, to) => selectTool(id, to ?? null)} />
+            <WorldPane snapshot={snapshot} world={world} stack={stack} setStack={setStack} />
           ) : (
             <main className="tool-pane" />
           )}
@@ -194,7 +200,7 @@ export function App(): React.JSX.Element {
         update={update}
         onSave={() => void save()}
         onDiscard={() => window.confirm('Discard every unsaved change? (Ctrl+Z brings them back.)') && void window.malevo.world.discard()}
-        onShowChecks={() => selectTool('checks')}
+        onShowChecks={() => selectTool('checks', true)}
       />
       {dialog === 'new' && <NewWorldDialog onCancel={() => setDialog(null)} onCreate={create} />}
       {dialog === 'about' && <AboutDialog update={update} onClose={() => setDialog(null)} />}
@@ -202,19 +208,17 @@ export function App(): React.JSX.Element {
   )
 }
 
-/** The current date bar and the selected tool, for the open world. */
+/** The current date bar and the open blades, for the open world. */
 function WorldPane({
   snapshot,
   world,
-  toolId,
-  focus,
-  navigate
+  stack,
+  setStack
 }: {
   snapshot: WorldSnapshot
   world: WorldInfo
-  toolId: string
-  focus: string | null
-  navigate(toolId: string, focus?: string): void
+  stack: Blade[]
+  setStack(s: Blade[]): void
 }): React.JSX.Element {
   const usable = useMemo(() => snapshot.calendars.filter((c) => !c.error).map((c) => c.id), [snapshot.calendars])
   const [storedCal, setDisplayCal] = useWorldPref<string | null>(world.root, 'displayCalendar', null)
@@ -222,22 +226,19 @@ function WorldPane({
   const firstStory = snapshot.events.find((e) => e.value?.type === 'story' && e.start)?.start?.t
   const [storedNow, setNow] = useWorldPref<number | null>(world.root, 'now', null)
   const now = storedNow ?? firstStory ?? 0
-  const tool = TOOLS.find((t) => t.id === toolId) ?? TOOLS[0]
   return (
-    <main className="tool-pane" data-tool={tool.id}>
+    <main className="tool-pane">
       <DateBar snapshot={snapshot} now={now} setNow={setNow} displayCal={displayCal} setDisplayCal={setDisplayCal} />
-      <div className="tool-body">
-        <tool.View
-          world={world}
-          snapshot={snapshot}
-          now={now}
-          setNow={setNow}
-          displayCal={displayCal}
-          setDisplayCal={setDisplayCal}
-          navigate={navigate}
-          focus={focus}
-        />
-      </div>
+      <BladeHost
+        world={world}
+        snapshot={snapshot}
+        now={now}
+        setNow={setNow}
+        displayCal={displayCal}
+        setDisplayCal={setDisplayCal}
+        stack={stack}
+        setStack={setStack}
+      />
     </main>
   )
 }
