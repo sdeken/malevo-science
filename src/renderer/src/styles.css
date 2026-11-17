@@ -576,6 +576,58 @@ label.check {
   font-weight: 600;
 }
 
+.date-scrubber {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 3px 8px;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  cursor: ew-resize;
+  user-select: none;
+  touch-action: none;
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.date-scrubber:hover,
+.date-scrubber:focus-visible,
+.date-scrubber.dragging {
+  border-color: var(--now);
+  color: var(--text, inherit);
+}
+
+.date-scrubber .scrub-arrow {
+  color: var(--now);
+}
+
+.date-scrubber .scrub-current {
+  min-width: 9.5em;
+  text-align: center;
+}
+
+.scrub-ladder {
+  position: absolute;
+  left: 50%;
+  top: calc(100% + 4px);
+  transform: translateX(-50%);
+  z-index: 50;
+  display: grid;
+  padding: 4px 8px;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  background: var(--bg-raised);
+  box-shadow: 0 4px 14px rgb(0 0 0 / 25%);
+  white-space: nowrap;
+  pointer-events: none;
+}
+
+.scrub-ladder .on {
+  color: var(--now);
+  font-weight: 600;
+}
+
 .datebar-all {
   flex-basis: 100%;
   list-style: none;
@@ -2923,4 +2975,37 @@ input.tiny {
   stroke: #000;
   stroke-width: 1;
   vector-effect: non-scaling-stroke;
+}
+
+/* moons, in their planet's editor */
+.moons-editor {
+  display: grid;
+  gap: 8px;
+  justify-items: start;
+}
+
+.moon-row {
+  justify-self: stretch;
+  padding: 8px 10px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+}
+
+.moon-row .moon-facts {
+  margin: 4px 0;
+}
+
+.moon-row .warn {
+  color: var(--warn);
+}
+
+.moon-actions {
+  display: flex;
+  gap: 14px;
+}
+
+.moon-more {
+  margin-top: 8px;
+  padding-left: 10px;
+  border-left: 2px solid var(--border);
 }

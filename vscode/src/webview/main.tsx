@@ -1,7 +1,7 @@
 /**
  * A system or body editor in VS Code: the app's own screens, with the current date bar on top.
  */
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { createRoot } from 'react-dom/client'
 import type { WorldSnapshot } from '../../../src/shared/types'
 import { DateBar } from '../../../src/renderer/src/components/DateBar'
@@ -26,12 +26,19 @@ const boot = JSON.parse(document.getElementById('boot')!.textContent!) as Boot
 function Root(): React.JSX.Element {
   const snapshot = useSnapshot(true)
   const [st, setSt] = useState<HostState | null>(null)
+  // While the date is being scrubbed here, the host's echoes of earlier dates lag behind it: keep ours.
+  const local = useRef<{ now: number; until: number } | null>(null)
   useEffect(() => {
-    void call('host.state').then((s) => setSt(s as HostState))
-    return on('host.state', (s) => setSt(s as HostState))
+    const take = (s: HostState): void => {
+      const l = local.current
+      setSt(l && Date.now() < l.until ? { ...s, now: l.now } : s)
+    }
+    void call('host.state').then((s) => take(s as HostState))
+    return on('host.state', (s) => take(s as HostState))
   }, [])
   if (!snapshot || !st) return <p className="muted vs-loading">Opening…</p>
   const setNow = (t: number): void => {
+    local.current = { now: t, until: Date.now() + 400 }
     setSt({ ...st, now: t })
     void call('host.setNow', [t])
   }
@@ -111,8 +118,10 @@ function BodyPage({ snapshot, displayCal }: { snapshot: WorldSnapshot; displayCa
           version={snapshot.version}
           bodyIds={snapshot.systems.flatMap((s) => s.bodies.map((b) => b.id))}
           origin={snapshot.origins[`body/${body.id}`]}
+          origins={snapshot.origins}
           onDeleted={() => {}}
           onRenamed={() => {}}
+          onOpenBody={(id) => void call('host.openBody', [id])}
         />
       ) : (
         <p className="muted">This world has no usable calendar.</p>

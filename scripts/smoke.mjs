@@ -1197,6 +1197,69 @@ try {
   await page.screenshot({ path: path.join(shots, '29-hard-landing.png') })
   await page.evaluate(() => window.malevo.world.discard())
 
+  // 30. Scrubbing the date: drag sideways by days, up for hours, down for 30 days.
+  await tool('Timeline')
+  await page.locator('#currentDate').fill('2790-06-01 12:00')
+  await page.locator('#currentDate').press('Enter')
+  await until(() => document.querySelector('#currentDate')?.value === '2790-06-01 12:00', undefined, 'the date to be set')
+  const scrub = async (moves) => {
+    const box = await page.locator('#dateScrubber').boundingBox()
+    let x = box.x + box.width / 2
+    let y = box.y + box.height / 2
+    await page.mouse.move(x, y)
+    await page.mouse.down()
+    for (const [dx, dy] of moves) {
+      x += dx
+      y += dy
+      await page.mouse.move(x, y, { steps: 6 })
+    }
+    await page.mouse.up()
+  }
+  await scrub([[80, 0]])
+  await until(() => document.querySelector('#currentDate')?.value === '2790-06-11 12:00', undefined, 'ten days later')
+  check(true, 'dragging the date ten steps to the right goes ten days later')
+  await scrub([
+    [0, -40],
+    [24, 0]
+  ])
+  await until(() => document.querySelector('#currentDate')?.value === '2790-06-11 15:00', undefined, 'three hours later')
+  check(true, 'dragging up first scrubs by hours')
+  await scrub([
+    [0, 40],
+    [-8, 0]
+  ])
+  await until(() => document.querySelector('#currentDate')?.value === '2790-05-12 15:00', undefined, '30 days earlier')
+  check(true, 'dragging down first scrubs by 30 days, and left goes earlier')
+
+  // 31. Moons, edited in their planet's editor.
+  await tool('Systems')
+  await page.locator('[data-tool="systems"] [data-system="sol"]').first().click()
+  await page.locator('[data-tool="systems"] [data-body-row="earth"]').first().click()
+  await page.waitForSelector('[data-editing="earth"] #moonsEditor [data-moon-row="moon"]')
+  check(true, "Earth's editor lists its Moon")
+  await page.locator('[data-editing="earth"] #addMoon').click()
+  await page.waitForSelector('[data-moon-row="earth-ii"]')
+  const moonDist = page.locator('[data-moon-row="earth-ii"] label', { hasText: 'Distance, km' }).locator('input')
+  await moonDist.fill('900000')
+  await moonDist.press('Enter')
+  await until(
+    () =>
+      window.malevo.world
+        .snapshot()
+        .then((s) => s.systems.find((x) => x.id === 'sol')?.bodies.find((b) => b.id === 'earth-ii')?.value.orbit.a_km === 900000),
+    undefined,
+    'the new moon to move out'
+  )
+  check(
+    /Hill sphere/.test((await page.locator('[data-moon-row="earth-ii"]').textContent()) ?? ''),
+    'a moon added from the planet, moved out to 900,000 km, is warned about: past half its Hill sphere'
+  )
+  await page.locator('[data-moon-more="earth-ii"]').click()
+  await page.waitForSelector('[data-moon-row="earth-ii"] [data-editing="earth-ii"]')
+  check(true, "all of a moon's settings open in place")
+  await page.screenshot({ path: path.join(shots, '30-moons.png') })
+  await page.evaluate(() => window.malevo.world.discard())
+
   // 10. The update status reports a dev build.
   const status = await page.evaluate(() => window.malevo.updates.status())
   check(status.state === 'unavailable', 'an unpackaged build reports updates as unavailable')

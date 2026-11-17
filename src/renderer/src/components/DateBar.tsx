@@ -2,6 +2,7 @@ import { useState } from 'react'
 import type { WorldSnapshot } from '../../../shared/types'
 import { useFormattedOne } from '../state'
 import { DateInput } from './DateInput'
+import { DateScrubber, SCRUB_UNITS } from './DateScrubber'
 
 interface Props {
   snapshot: WorldSnapshot
@@ -14,7 +15,11 @@ interface Props {
 /** The global current date, which every tool follows, and the calendar dates are shown in. */
 export function DateBar({ snapshot, now, setNow, displayCal, setDisplayCal }: Props): React.JSX.Element {
   const [showAll, setShowAll] = useState(false)
-  const text = useFormattedOne(displayCal, now, 'minute', snapshot.version) ?? ''
+  const [scrubbing, setScrubbing] = useState<(typeof SCRUB_UNITS)[number]['name'] | null>(null)
+  const calUnits = snapshot.calendars.find((c) => c.id === displayCal)?.units ?? []
+  // Down to the second while scrubbing by seconds, if the calendar has them.
+  const precision = scrubbing === 'second' && calUnits.some((u) => u.name === 'second') ? 'second' : 'minute'
+  const text = useFormattedOne(displayCal, now, precision, snapshot.version) ?? ''
   const usable = snapshot.calendars.filter((c) => !c.error)
 
   return (
@@ -32,6 +37,7 @@ export function DateBar({ snapshot, now, setNow, displayCal, setDisplayCal }: Pr
       ) : (
         <span className="muted">This world has no usable calendar. Add one in Calendars.</span>
       )}
+      {displayCal && <DateScrubber now={now} setNow={setNow} onUnit={setScrubbing} />}
       {usable.length > 1 && (
         <button className="link" onClick={() => setShowAll((v) => !v)}>
           {showAll ? 'Hide other calendars' : 'In every calendar'}

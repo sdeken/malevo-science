@@ -5,6 +5,7 @@ import { DateInput } from '../../components/DateInput'
 import { NumberField, TextField, duration, sig } from '../../components/fields'
 import { FileName } from '../../components/FileName'
 import { useFormattedOne } from '../../state'
+import { MoonsEditor } from './MoonsEditor'
 
 const CLASSES = [
   ['rocky', 'Rocky'],
@@ -47,8 +48,14 @@ interface Props {
   /** Every body id in the world (body ids are shared across systems). */
   bodyIds: readonly string[]
   origin?: 'builtin' | 'override'
+  /** Every built-in body's origin, for its moons (`body/<id>` → builtin or override). */
+  origins?: Record<string, 'builtin' | 'override'>
   onDeleted(): void
   onRenamed(id: string): void
+  /** Open another body (a moon) on its own. */
+  onOpenBody?(id: string): void
+  /** Shown inside its planet's editor. */
+  nested?: boolean
 }
 
 /** Edit one body: what it is, its orbit, its spin; and what follows from them. Every change is unsaved until Save. */
@@ -60,8 +67,11 @@ export function BodyEditor({
   version,
   bodyIds,
   origin,
+  origins,
   onDeleted,
-  onRenamed
+  onRenamed,
+  onOpenBody,
+  nested
 }: Props): React.JSX.Element {
   const v = body.value as Value
   const save = (patch: Partial<Value>): void => {
@@ -92,7 +102,7 @@ export function BodyEditor({
   }
 
   return (
-    <div className="body-editor" data-editing={body.id}>
+    <div className={`body-editor${nested ? ' nested' : ''}`} data-editing={body.id}>
       <FileName kind="body" folder="bodies" id={body.id} name={v.name} taken={bodyIds} origin={origin} onRenamed={onRenamed} />
       <div className="field-row">
         <TextField label="Name" value={v.name} onCommit={(name) => name.trim() && save({ name: name.trim() })} id="bodyName" />
@@ -307,6 +317,19 @@ export function BodyEditor({
             The Sun's centre above the horizon, with an Earth-like atmosphere's refraction; the same in either hemisphere.
           </p>
         </>
+      )}
+
+      {v.class !== 'belt' && v.class !== 'comet' && (
+        <MoonsEditor
+          body={body}
+          system={system}
+          calendars={calendars}
+          displayCal={displayCal}
+          version={version}
+          bodyIds={bodyIds}
+          origins={origins ?? {}}
+          onOpenBody={onOpenBody}
+        />
       )}
 
       <div className="inspector-actions">

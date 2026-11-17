@@ -523,8 +523,10 @@ export function SystemDetail({
           version={snapshotVersion}
           bodyIds={snapshot.systems.flatMap((s) => s.bodies.map((b) => b.id))}
           origin={snapshot.origins[`body/${body.id}`]}
+          origins={snapshot.origins}
           onDeleted={() => setSelectedBody(null)}
           onRenamed={(id) => setSelectedBody(id)}
+          onOpenBody={(id) => setSelectedBody(id)}
         />
       )}
     </div>

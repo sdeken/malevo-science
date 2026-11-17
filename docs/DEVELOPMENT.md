@@ -104,6 +104,21 @@ npm run dev          # the app with hot reload
 - The system screen's **Where it is** panel switches between the three. It finds stars by name or
   id, or picks a random generated star within 40 ly of where the system is (or of Sol).
 
+### Scrubbing the date, and moons in their planet
+
+- **The date bar's scrubber** (`components/DateScrubber.tsx`): drag left or right to go earlier or
+  later, a step per 8 pixels. Every drag starts on days; drag up as well for hours, then minutes,
+  then seconds, or down for 30 days, then 360 days (Earth units, whatever the calendar), a unit
+  per 36 pixels. Steps are whole units, so scrubbing by days keeps the time of day. With the
+  keyboard: ← → step (Shift: ten), ↑ ↓ change the unit. Typing a date still works. The date is
+  sent at most once a frame; in VS Code the screen keeps its own date for a moment over the
+  host's echoes, so it doesn't jitter.
+- **A body's editor lists its moons** (`tools/systems/MoonsEditor.tsx`), innermost first: name,
+  kind, distance, eccentricity, mass, radius and spin in place, with its period, gravity and
+  density, and a warning past half the planet's Hill sphere. *All its settings…* opens the
+  moon's whole editor inside, *Open on its own* opens it by itself (its own tab in VS Code), and
+  *Add a moon* adds one outside the last (well within the Hill sphere), named for the planet.
+
 ### Is the system plausible?
 
 The checks (the Checks tool, and VS Code's Problems panel) flag systems that physics would argue
