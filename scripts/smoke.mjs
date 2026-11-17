@@ -1168,6 +1168,35 @@ try {
   void T28
   await page.evaluate(() => window.malevo.world.discard())
 
+  // 29. A hard landing: a rescue team's pod aimed into the ground, down in under half an hour, and when they can go.
+  await page.evaluate(() =>
+    window.malevo.world.setEntity('landing', 'drop', {
+      name: 'Drop',
+      body: 'earth',
+      touchdown: { t_s: 790 * 31_557_600 + 7200 },
+      mass_t: 4,
+      sections: 1,
+      orbit_km: 400,
+      ballute: { beta_kg_m2: 100, release_km: 8 },
+      hullBeta_kg_m2: 400,
+      rockets: { exhaust_kms: 3, thrust_g: 3, touchdown_ms: 3 },
+      mode: 'pad',
+      entry: { perigee_km: -500, noBallute: true, nose_m: 1 },
+      site: { lat_deg: 30, lon_deg: 60 },
+      track: { inclination_deg: 52, node_lon_deg: 0, arg_deg: 0, at: { t_s: 790 * 31_557_600 } }
+    })
+  )
+  await tool('Landings')
+  await page.locator('[data-landing="drop"]').click()
+  await page.waitForSelector('#landingChances')
+  const drop = await page.evaluate(() => window.malevo.landings.plan('drop'))
+  check(
+    !('error' in drop) && drop.descent_s < 35 * 60 && drop.peakDecel_g > 6 && drop.heatOn === 'shield' && drop.chances !== null,
+    `a pod aimed into the ground is down ${Math.round(drop.descent_s / 60)} min after its burn at ${drop.peakDecel_g?.toFixed(1)} g, with the chances from the ship's orbit (${drop.chances?.length})`
+  )
+  await page.screenshot({ path: path.join(shots, '29-hard-landing.png') })
+  await page.evaluate(() => window.malevo.world.discard())
+
   // 10. The update status reports a dev build.
   const status = await page.evaluate(() => window.malevo.updates.status())
   check(status.state === 'unavailable', 'an unpackaged build reports updates as unavailable')

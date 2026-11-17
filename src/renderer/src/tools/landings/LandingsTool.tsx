@@ -128,6 +128,16 @@ function LandingEditor({
     snapshot.version
   )
   const touchText = useFormatted(cal, [{ t: T, precision: 'minute' }], snapshot.version)[0]
+  const trackAt = useFormatted(cal, file.track ? [{ t: file.track.at.t_s, precision: 'minute' }] : [], snapshot.version)[0]
+  const orderAt = useFormatted(cal, file.track?.order ? [{ t: file.track.order.t_s, precision: 'minute' }] : [], snapshot.version)[0]
+  const chanceText = useFormatted(
+    cal,
+    (r?.chances ?? []).flatMap((c) => [
+      { t: c.burn, precision: 'minute' },
+      { t: c.touchdown, precision: 'minute' }
+    ]),
+    snapshot.version
+  )
   const pos = (f: (x: number) => void) => (x: number | undefined) => x !== undefined && x > 0 && f(x)
   return (
     <section className="landing" id="landingEditor">
@@ -264,13 +274,176 @@ function LandingEditor({
         </div>
       </details>
 
+      <details className="kit" open={Boolean(file.entry)} id="landingEntry">
+        <summary>How hard it comes in</summary>
+        <div className="field-row">
+          <NumberField
+            label="Aim the low point at, km"
+            value={file.entry?.perigee_km}
+            optional
+            placeholder="about 50 (gentle)"
+            onCommit={(x) => set({ entry: { ...file.entry, perigee_km: x } })}
+            hint="below zero: into the ground, steeper and faster"
+            id="landingPerigee"
+          />
+          <NumberField
+            label="Lift over drag"
+            value={file.entry?.lift}
+            optional
+            placeholder="0"
+            onCommit={(x) => set({ entry: { ...file.entry, lift: x === undefined ? undefined : Math.max(0, Math.min(3, x)) } })}
+            hint="0 falls like a stone; a capsule about 0.3"
+            id="landingLift"
+          />
+          <label className="check">
+            <input
+              type="checkbox"
+              checked={file.entry?.noBallute === true}
+              onChange={(e) => set({ entry: { ...file.entry, noBallute: e.target.checked || undefined } })}
+              id="landingPod"
+            />
+            No ballute: a pod with a heat shield
+          </label>
+          {file.entry?.noBallute && (
+            <NumberField
+              label="Shield nose radius, m"
+              value={file.entry?.nose_m}
+              optional
+              placeholder="1"
+              onCommit={(x) => set({ entry: { ...file.entry, nose_m: x !== undefined && x > 0 ? x : undefined } })}
+            />
+          )}
+        </div>
+      </details>
+
+      <details className="kit" open={Boolean(file.track)} id="landingTrackBox">
+        <summary>From the ship’s orbit: when can they go?</summary>
+        {file.track ? (
+          <>
+            <div className="field-row">
+              <NumberField
+                label="Orbit tilt to the equator, °"
+                value={file.track.inclination_deg}
+                onCommit={(x) => x !== undefined && x >= 0 && x <= 180 && set({ track: { ...file.track!, inclination_deg: x } })}
+                id="landingIncl"
+              />
+              <NumberField
+                label="Crosses the equator northbound at, ° east"
+                value={file.track.node_lon_deg}
+                onCommit={(x) => x !== undefined && set({ track: { ...file.track!, node_lon_deg: ((x % 360) + 360) % 360 } })}
+                id="landingNode"
+              />
+              <NumberField
+                label="Ship this far past the crossing, °"
+                value={file.track.arg_deg}
+                onCommit={(x) => x !== undefined && set({ track: { ...file.track!, arg_deg: ((x % 360) + 360) % 360 } })}
+                id="landingArg"
+              />
+            </div>
+            <div className="field-row">
+              <label className="field">
+                At
+                <DateInput
+                  calendars={snapshot.calendars as CalendarInfo[]}
+                  cal={file.track.at.cal ?? cal}
+                  text={file.track.at.text ?? trackAt ?? ''}
+                  onCommit={(d) => set({ track: { ...file.track!, at: { t_s: d.t, cal: d.cal, text: d.text } } })}
+                />
+              </label>
+              <label className="field">
+                The order comes
+                <DateInput
+                  calendars={snapshot.calendars as CalendarInfo[]}
+                  cal={file.track.order?.cal ?? cal}
+                  text={file.track.order?.text ?? orderAt ?? ''}
+                  onCommit={(d) => set({ track: { ...file.track!, order: { t_s: d.t, cal: d.cal, text: d.text } } })}
+                  id="landingOrder"
+                />
+              </label>
+              <NumberField
+                label="Can steer off the track, km"
+                value={file.track.reach_km}
+                optional
+                placeholder={String(Math.round(25 + 400 * (file.entry?.lift ?? 0)))}
+                onCommit={(x) => set({ track: { ...file.track!, reach_km: x } })}
+              />
+            </div>
+            <div className="field-row">
+              <NumberField
+                label="Site latitude, °"
+                value={file.site?.lat_deg}
+                optional
+                placeholder={file.city ? 'the city' : '—'}
+                onCommit={(x) =>
+                  set({ site: x === undefined ? undefined : { lat_deg: Math.max(-90, Math.min(90, x)), lon_deg: file.site?.lon_deg ?? 0 } })
+                }
+                id="landingSiteLat"
+              />
+              <NumberField
+                label="Site longitude, ° east"
+                value={file.site?.lon_deg}
+                optional
+                placeholder={file.city ? 'the city' : '—'}
+                onCommit={(x) => set({ site: x === undefined ? undefined : { lat_deg: file.site?.lat_deg ?? 0, lon_deg: x } })}
+                id="landingSiteLon"
+              />
+              <button className="link" onClick={() => set({ track: undefined })}>
+                Forget the orbit
+              </button>
+            </div>
+          </>
+        ) : (
+          <button
+            onClick={() =>
+              set({ track: { inclination_deg: 51.6, node_lon_deg: 0, arg_deg: 0, at: { t_s: file.touchdown.t_s - 3600, cal } } })
+            }
+            id="landingAddTrack"
+          >
+            Give the ship’s orbit
+          </button>
+        )}
+        {r?.chances && (
+          <table className="data small" id="landingChances">
+            <thead>
+              <tr>
+                <th>Burn</th>
+                <th>Down</th>
+                <th>Off the site</th>
+                <th />
+              </tr>
+            </thead>
+            <tbody>
+              {r.chances.map((c, i) => (
+                <tr key={c.burn}>
+                  <td>{chanceText[i * 2] ?? '…'}</td>
+                  <td>{chanceText[i * 2 + 1] ?? '…'}</td>
+                  <td>{sig(c.miss_km, 2)} km</td>
+                  <td>
+                    <button className="link" onClick={() => set({ touchdown: { t_s: Math.round(c.touchdown), cal } })}>
+                      Land then
+                    </button>
+                  </td>
+                </tr>
+              ))}
+              {!r.chances.length && (
+                <tr>
+                  <td colSpan={4} className="muted">
+                    No pass in the next two days{r.bestPass ? `; the closest misses by ${sig(r.bestPass.miss_km, 3)} km` : ''}.
+                  </td>
+                </tr>
+              )}
+            </tbody>
+          </table>
+        )}
+      </details>
+
       {report && 'error' in report && <p className="error">{report.error}</p>}
       {r && (
         <div className="landing-results" id="landingResults">
           <dl className="facts">
             <dt>Each section</dt>
             <dd>
-              {sig(r.section_t, 4)} t, with a ballute {sig(r.ballute_m, 3)} m across
+              {sig(r.section_t, 4)} t{r.heatOn === 'ballute' ? `, with a ballute ${sig(r.ballute_m, 3)} m across` : ', on its heat shield'}
             </dd>
             <dt>Rockets</dt>
             <dd>
@@ -279,8 +452,9 @@ function LandingEditor({
             </dd>
             <dt>The ride</dt>
             <dd>
-              peak {sig(r.peakDecel_g, 2)} g; peak heating on the ballute {sig(r.peakHeat_Wm2 / 1e4, 2)} W/cm²; {sig(r.release_ms, 3)} m/s
-              when it lets go
+              into the air {sig(r.entryAngle_deg, 2)}° down after {duration(r.coast_s)} of coasting; peak {sig(r.peakDecel_g, 2)} g; peak
+              heating on the {r.heatOn === 'ballute' ? 'ballute' : 'heat shield'} {sig(r.peakHeat_Wm2 / 1e4, 2)} W/cm²;{' '}
+              {sig(r.release_ms, 3)} m/s at {file.ballute.release_km} km; {duration(r.descent_s)} from the burn to the ground
             </dd>
             <dt>Orbit</dt>
             <dd>

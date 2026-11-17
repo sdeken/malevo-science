@@ -361,6 +361,24 @@ module.exports = {
   after they arrive (`conditionsAt`), and low water about half a tidal cycle later.
 - **The timeline** runs back from the touchdown time to the deorbit burn. A note says the orbit
   passes over a given spot only about twice a day, so touchdown times come in windows.
+- **Harder entries** (`entry`, all optional; without it, the gentle profile above):
+  - `perigee_km`: where to aim the orbit's low point. Below zero aims into the ground: a bigger
+    burn, a shorter coast and a steeper, faster entry with more deceleration and heat. From 400 km
+    on an Earth-like world, a 4 t pod without lift: −300 km, a 210 m/s burn, down 26 min after it
+    at 10 g; −500 km, 280 m/s, 23 min at 11 g; −1,000 km, 460 m/s, 18 min at 14 g.
+  - `lift`: lift over drag, held lift-up while it sinks and until the rockets light. It eases the
+    peak (−500 km with lift 0.3: 27 min at 4.5 g).
+  - `noBallute`: a pod with a heat shield on its own drag (`hullBeta`) the whole way; heating is on
+    the shield (`nose_m`, default 1 m), and the rockets may light below the ballute's release height.
+  - The notes grade the peak for a crew: over 8 g brutal but survivable in fitted couches, over
+    15 g only briefly and at real risk, over 25 g past survival.
+- **When they can go** (`track` and `site`): the ship's orbit (tilt to the equator, where it crosses
+  the equator northbound, how far past that crossing the ship is, at a time) and when the order
+  comes. Every 2 s for two days from the order, the landing point of a burn then is worked out (the
+  downrange of this descent along the orbit, the planet turning beneath during the descent) and its
+  miss from the site (the `site`, else the city). The passes that come within `reach_km` (default
+  25 km, plus 400 km per unit of lift) are the chances; "Land then" sets the touchdown to one. With
+  none, the closest pass is given.
 
 ### Whereabouts
 

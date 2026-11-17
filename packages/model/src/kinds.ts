@@ -1222,6 +1222,37 @@ export const landingSchema = obj({
   }),
   mode: oneOf(['pad', 'splash']),
   tow: opt(obj({ offshore_km: num({ min: 0, sig: 6 }), knots: num({ above: 0, sig: 6 }) })),
+  /** How hard it comes in. Without it: a gentle entry, the orbit's low point about six scale heights up. */
+  entry: opt(
+    obj({
+      /** Aim the orbit's low point here, km. Below zero aims into the ground: a bigger burn, a steeper, faster, harder entry. */
+      perigee_km: opt(num({ min: -20000, max: 100000, sig: 6 })),
+      /** Lift over drag, held lift-up while it sinks: 0 falls like a stone; a capsule about 0.3; a lifting body 1 or more. */
+      lift: opt(num({ min: 0, max: 3, sig: 4 })),
+      /** No ballute: a heat-shielded pod or capsule on its own drag the whole way (the ballute's numbers then go unused). */
+      noBallute: opt(bool()),
+      /** The heat shield's nose radius, m, for its heating (without a ballute). Default 1. */
+      nose_m: opt(num({ above: 0, sig: 4 }))
+    })
+  ),
+  /** Where it comes down, for the chances from the ship's orbit. Without it: the city's place. */
+  site: opt(obj({ lat_deg: num({ min: -90, max: 90, sig: 7 }), lon_deg: num({ min: -360, max: 360, sig: 8 }) })),
+  /**
+   * The ship's orbit, for when a burn can bring it down at the site: its tilt to the equator, where it crosses
+   * the equator northbound and where the ship is along it (degrees past that crossing), at a time; and when the
+   * order comes (the earliest a burn can be).
+   */
+  track: opt(
+    obj({
+      inclination_deg: num({ min: 0, max: 180, sig: 6 }),
+      node_lon_deg: num({ min: -360, max: 360, sig: 7 }),
+      arg_deg: num({ min: 0, max: 360, sig: 7 }),
+      at: instantSchema,
+      order: opt(instantSchema),
+      /** How far off the ground track it can steer, km. Default: 25 km, and more with lift. */
+      reach_km: opt(num({ min: 0, sig: 5 }))
+    })
+  ),
   note: opt(str({ max: 2000 }))
 })
 export type LandingFile = Infer<typeof landingSchema>
