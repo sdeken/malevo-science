@@ -392,6 +392,42 @@ module.exports = {
   plus the cone's spread there, over a given number of years, in order: when, how far out, and
   how close. A star inside the cone might be hit.
 
+### Itineraries
+
+- **An itinerary is someone's movements by the minute through one city, and down to it from
+  orbit:** `itineraries/<id>.json` (`packages/model/src/itinerary.ts`, the Itineraries tool). A
+  traveller (Whereabouts) works at the scale of worlds and stars; an itinerary works at the scale of
+  streets.
+- **Stops, in order.** A stop is a named point of the city's plan (or a spot in it), in orbit of a
+  body, or aboard a ship, with an optional label and encyclopedia page. Each stop can carry:
+  - **how she gets there** from the stop before:
+    - `walk`: a straight line times the plan's detour factor, at its walking speed;
+    - `city`: walking and riding the plan's lines, waiting for each one's real next departure and
+      keeping to its running hours (`cityTravel`);
+    - `lighter`: from orbit, the next launch window (every `windowGap_min` from local midnight),
+      the flight, then on from the lighter field;
+    - `landing`: a descent from the Landings tool, leaving orbit at its deorbit burn and down at its
+      touchdown;
+    - `fixed`: a number of minutes, for what the setting decides (a customs desk, a walk through the
+      port);
+    - `auto`, the default: the city's lines on the ground, a lighter from orbit to the ground (a
+      landing if one is chosen), a fixed time otherwise.
+  - **a pinned arrival** ("be there by"): she arrives on the dot, and the slack is shown, or how
+    late she would be;
+  - **a pinned departure**, and **the least time to stay**: a pinned departure that cuts the stay
+    short is flagged.
+- **The day is worked through forward as a timetable that never slips.** From each stop she leaves
+  as soon as she has stayed long enough (or at the pinned departure), and each leg takes what its
+  engine says. Local time of day comes from the city's position and its body's day.
+- **Positions** are in the plan's metres, piece by piece (`parts`), straight lines between points
+  for drawing. Legs off the plan (in orbit, on the lighter, coming down) have none. `positionAt`
+  interpolates; `encounters` finds when two people are within 30 m of each other, minute by minute.
+- **The tool** shows everyone's day as lanes (stays in each person's colour; walking, riding,
+  waiting, the lighter and the descent in theirs), and where people meet. Below are the selected
+  itinerary's stops, with each leg worked out (time and how), and the city's plan with everyone at the
+  current date. Click a lane or a stop's time to go there; Play runs the clock at 1 min/s, 10 min/s
+  or 1 h/s.
+
 ### Physics settings
 
 - **The World tool edits `settings/physics.json` in place:**

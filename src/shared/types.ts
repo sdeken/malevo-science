@@ -167,6 +167,7 @@ export interface WorldSnapshot {
   travellers: EntityDto[]
   drifters: EntityDto[]
   landings: EntityDto[]
+  itineraries: EntityDto[]
   /** Built-in entities ("builtin": no file) and files standing in for them ("override"), by "kind/id". */
   origins: Record<string, 'builtin' | 'override'>
   builtins: BuiltinsDto
@@ -247,6 +248,7 @@ export type EditableKind =
   | 'traveller'
   | 'drifter'
   | 'landing'
+  | 'itinerary'
 
 // ---- Phase 3: stars, systems, bodies ----
 

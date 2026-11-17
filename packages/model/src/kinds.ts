@@ -1228,6 +1228,70 @@ export type LandingFile = Infer<typeof landingSchema>
 
 export const landingKind: KindDef<LandingFile> = { kind: 'landing', label: 'landing', folder: 'landings', schema: landingSchema }
 
+// ---- itineraries ----
+
+/** Where someone is during an itinerary: a place in the city's plan, aboard a ship, or in orbit. */
+export const spotSchema = obj({
+  /** A named point in the city's plan. */
+  point: opt(PLAN_ID),
+  /** Or a position in the plan, m: [x, y]. */
+  pos: opt(arr(num({ sig: 8 }), { min: 2, max: 2 })),
+  /** Aboard a ship (in orbit or between worlds). */
+  ship: opt(ref('ship')),
+  /** In orbit of a body. */
+  orbit: opt(ref('body')),
+  /** What to call it ("the terrace"). */
+  label: opt(str({ max: 200 })),
+  /** Its page in the encyclopedia. */
+  page: opt(str({ max: 400 }))
+})
+export type SpotFile = Infer<typeof spotSchema>
+
+/** How someone gets from one stop to the next. */
+export const ITINERARY_BY = ['auto', 'walk', 'city', 'lighter', 'landing', 'fixed'] as const
+
+/**
+ * Someone's movements by the minute, through a city (and down to it from orbit): stops in order, each
+ * reached from the one before by walking, the city's lines, a lighter, a landing, or a fixed time (a customs
+ * desk); times pinned where the story needs them, and the least time spent at each stop.
+ */
+export const itinerarySchema = obj({
+  name: name(),
+  color: opt(COLOR),
+  /** The city whose plan the places are in. */
+  city: ref('city'),
+  /** The person's page in the encyclopedia. */
+  page: opt(str({ max: 400 })),
+  stops: arr(
+    obj({
+      place: spotSchema,
+      /** How to get here from the stop before. Default "auto": the city's lines on the ground, a lighter from orbit. */
+      by: opt(oneOf(ITINERARY_BY)),
+      /** For "landing": the descent (Landings) that brings her down. */
+      landing: opt(ref('landing')),
+      /** For "fixed", min (a customs desk, a walk through the port). */
+      minutes: opt(num({ min: 0, sig: 6 })),
+      /** Be here by this time. */
+      arrive: opt(instantSchema),
+      /** Leave at this time (not before). */
+      depart: opt(instantSchema),
+      /** Stay at least this long, min. */
+      stay_min: opt(num({ min: 0, sig: 6 })),
+      note: opt(str({ max: 400 }))
+    }),
+    { min: 1 }
+  ),
+  note: opt(str({ max: 2000 }))
+})
+export type ItineraryFile = Infer<typeof itinerarySchema>
+
+export const itineraryKind: KindDef<ItineraryFile> = {
+  kind: 'itinerary',
+  label: 'itinerary',
+  folder: 'itineraries',
+  schema: itinerarySchema
+}
+
 export const KINDS: readonly KindDef[] = [
   physicsKind as KindDef,
   starfieldKind as KindDef,
@@ -1251,5 +1315,6 @@ export const KINDS: readonly KindDef[] = [
   shipKind as KindDef,
   travellerKind as KindDef,
   drifterKind as KindDef,
-  landingKind as KindDef
+  landingKind as KindDef,
+  itineraryKind as KindDef
 ]

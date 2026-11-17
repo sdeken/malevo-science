@@ -8,6 +8,7 @@ import { tripsTool } from './trips/TripsTool'
 import { whereaboutsTool } from './whereabouts/WhereaboutsTool'
 import { shipyardTool } from './shipyard/ShipyardTool'
 import { landingsTool } from './landings/LandingsTool'
+import { itinerariesTool } from './itineraries/ItinerariesTool'
 import { skyTool } from './sky/SkyTool'
 import { approachTool } from './approach/ApproachTool'
 import { historyTool } from './history/HistoryTool'
@@ -34,6 +35,7 @@ export const TOOLS = defineTools([
   tripsTool,
   landingsTool,
   whereaboutsTool,
+  itinerariesTool,
   skyTool,
   approachTool,
   culturesTool,

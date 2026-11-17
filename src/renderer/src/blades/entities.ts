@@ -76,6 +76,8 @@ function entityList(snapshot: WorldSnapshot, kind: string): { id: string; value:
       return snapshot.drifters
     case 'landing':
       return snapshot.landings
+    case 'itinerary':
+      return snapshot.itineraries
     case 'city':
       return snapshot.cities
     case 'route':
@@ -228,6 +230,10 @@ export function entityActions(ref: Ref, snapshot: WorldSnapshot, setNow: (t: num
     case 'landing':
       add('In Landings', { type: 'landings', params: { focus: ref.id } }, true)
       add('Article', article('landing', ref.id))
+      break
+    case 'itinerary':
+      add('In Itineraries', { type: 'itineraries', params: { focus: ref.id } }, true)
+      add('Article', article('itinerary', ref.id))
       break
     case 'page':
       add('Open the page', { type: 'wiki', params: { focus: ref.id } }, true)

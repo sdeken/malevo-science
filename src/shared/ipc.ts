@@ -34,6 +34,7 @@ export const IPC = {
   whereTraveller: 'where:traveller',
   whereDrift: 'where:drift',
   landingPlan: 'landing:plan',
+  itineraries: 'itinerary:overview',
   worldSnapshot: 'world:snapshot',
   worldSetEntity: 'world:setEntity',
   worldRenameEntity: 'world:renameEntity',

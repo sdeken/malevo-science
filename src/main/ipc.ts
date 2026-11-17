@@ -56,7 +56,8 @@ const EDITABLE: readonly EditableKind[] = [
   'ship',
   'traveller',
   'drifter',
-  'landing'
+  'landing',
+  'itinerary'
 ]
 const asKind = (k: unknown): EditableKind => {
   if (!EDITABLE.includes(k as EditableKind)) throw new Error(`"${String(k)}" cannot be edited.`)
@@ -156,6 +157,7 @@ export function registerIpc(deps: IpcDeps): void {
   }
   ipcMain.handle(IPC.tripPlan, (_e, q: unknown) => world.planTrip(tripQuery(q)))
   ipcMain.handle(IPC.tripSize, (_e, q: unknown) => world.sizeShip(tripQuery(q)))
+  ipcMain.handle(IPC.itineraries, () => world.itineraries())
   ipcMain.handle(IPC.landingPlan, (_e, id: unknown) => world.landing(String(id)))
   ipcMain.handle(IPC.whereTraveller, (_e, id: unknown, now: unknown) => world.traveller(String(id), Number(now)))
   ipcMain.handle(IPC.whereDrift, (_e, id: unknown, now: unknown, horizon: unknown, within: unknown) =>

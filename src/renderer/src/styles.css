@@ -2744,3 +2744,183 @@ fieldset.plain {
   color: var(--accent);
   cursor: pointer;
 }
+
+/* ---- itineraries ---- */
+
+.itineraries {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  min-height: 0;
+}
+
+.itin-bar {
+  padding: 8px 12px;
+  flex-wrap: wrap;
+}
+
+.itin-bar button.on {
+  border-color: var(--accent);
+}
+
+.itin-lanes {
+  width: 100%;
+  height: auto;
+  max-height: 40%;
+  display: block;
+  cursor: crosshair;
+  border-bottom: 1px solid var(--border);
+  background: var(--bg-sunken);
+}
+
+.itin-lanes .lane-hour {
+  stroke: var(--border);
+  stroke-width: 1;
+  vector-effect: non-scaling-stroke;
+}
+
+.itin-lanes .lane-now {
+  stroke: var(--danger);
+  stroke-width: 2;
+  vector-effect: non-scaling-stroke;
+}
+
+.itin-lanes .lane-meet {
+  fill: #ffffff;
+  opacity: 0.12;
+}
+
+.itin-lanes .lane-name {
+  fill: var(--text);
+  font-size: 11px;
+  pointer-events: none;
+}
+
+.itin-lanes .lane.on rect {
+  stroke: var(--text);
+  stroke-width: 0.5;
+  vector-effect: non-scaling-stroke;
+}
+
+.itin-lanes .lane-problem {
+  fill: var(--danger);
+}
+
+.itin-split {
+  flex: 1;
+  min-height: 0;
+  display: grid;
+  grid-template-columns: minmax(380px, 1fr) minmax(300px, 1fr);
+}
+
+.itin-editor {
+  overflow: auto;
+  padding: 12px 16px;
+  border-right: 1px solid var(--border);
+}
+
+.itin-list {
+  list-style: none;
+  margin: 8px 0;
+  padding: 0;
+}
+
+.itin-list > li {
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 6px 8px;
+  margin-bottom: 6px;
+  background: var(--bg-raised);
+}
+
+.itin-list > li.has-problem {
+  border-color: var(--danger);
+}
+
+.itin-leg {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+  padding-bottom: 6px;
+  margin-bottom: 6px;
+  border-bottom: 1px dashed var(--border);
+}
+
+.itin-stop,
+.itin-times {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+}
+
+.itin-times {
+  margin-top: 4px;
+}
+
+.itin-num {
+  font-weight: 600;
+  width: 1.5em;
+}
+
+.itin-label {
+  width: 12em;
+}
+
+.itin-pin {
+  display: inline-flex;
+  gap: 4px;
+  align-items: center;
+}
+
+input.tiny {
+  width: 5em;
+}
+
+.itin-map {
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  padding: 8px;
+}
+
+.itin-map svg {
+  flex: 1;
+  min-height: 0;
+  width: 100%;
+  background: var(--bg-sunken);
+  border-radius: var(--radius);
+}
+
+.itin-map .map-water {
+  fill: #1d3550;
+}
+
+.itin-map .map-line {
+  fill: none;
+  stroke: #4a5160;
+}
+
+.itin-map .map-line.lightrail,
+.itin-map .map-line.heavyrail {
+  stroke: #6aa8ff;
+}
+
+.itin-map .map-line.funicular {
+  stroke: #c58bff;
+}
+
+.itin-map .map-point circle {
+  fill: var(--muted);
+}
+
+.itin-map .map-point text {
+  fill: var(--muted);
+}
+
+.itin-map .map-person circle {
+  stroke: #000;
+  stroke-width: 1;
+  vector-effect: non-scaling-stroke;
+}

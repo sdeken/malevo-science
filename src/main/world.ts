@@ -72,6 +72,10 @@ import {
   shipKind,
   travellerKind,
   landingKind,
+  itineraryKind,
+  itineraryOverview,
+  type ItineraryReport,
+  type Encounter,
   landingReport,
   type LandingFile,
   type LandingReport,
@@ -205,7 +209,8 @@ const KIND_DEFS: Record<EditableKind, KindDef> = {
   ship: shipKind as KindDef,
   traveller: travellerKind as KindDef,
   drifter: drifterKind as KindDef,
-  landing: landingKind as KindDef
+  landing: landingKind as KindDef,
+  itinerary: itineraryKind as KindDef
 }
 
 export class WorldSession extends EventEmitter {
@@ -355,6 +360,7 @@ export class WorldSession extends EventEmitter {
       travellers: entityDtos(world, travellerKind.kind),
       drifters: entityDtos(world, drifterKind.kind),
       landings: entityDtos(world, landingKind.kind),
+      itineraries: entityDtos(world, itineraryKind.kind),
       origins: Object.fromEntries([...world.entities.values()].filter((e) => e.origin).map((e) => [e.key, e.origin!])),
       builtins: builtinsDto(world, this.editor.files()),
       pages: pageIndex(world, this.editor.files()),
@@ -746,6 +752,11 @@ export class WorldSession extends EventEmitter {
     const e = this.world().entities.get(`${landingKind.kind}/${id}`)
     if (!e || e.value === undefined) return { error: `There is no landing "${id}" (or its file has errors).` }
     return landingReport(this.world(), this.env, e.value as LandingFile)
+  }
+
+  /** Every itinerary worked out, and when their people meet. */
+  itineraries(): { reports: ItineraryReport[]; encounters: Encounter[] } {
+    return itineraryOverview(this.world(), this.env)
   }
 
   /** Where a drifter is at `now`, and the stars it passes. */

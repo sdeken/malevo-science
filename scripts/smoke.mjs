@@ -1072,6 +1072,102 @@ try {
   await tool('Timeline')
   check((await blades()) === 1, 'clicking a tool starts afresh from it')
 
+  // 28. Itineraries: down from orbit by lighter, through customs, across Bluff by tram and on foot, against pinned times.
+  const T28 = await page.evaluate(async () => {
+    const snap = await window.malevo.world.snapshot()
+    const plan = snap.cityPlans.find((p) => p.id === 'bluff').value
+    const [x0, y0, x1, y1] = plan.extent
+    const cx = (x0 + x1) / 2
+    const cy = (y0 + y1) / 2
+    const span = Math.min(x1 - x0, y1 - y0) / 2
+    const pt = (id, name, fx, fy, kind = 'label') => ({ id, name, kind, pos: [cx + fx * span, cy + fy * span] })
+    await window.malevo.world.setEntity('cityPlan', 'bluff', {
+      ...plan,
+      lines: [
+        ...(plan.lines ?? []),
+        {
+          id: 'tram-x',
+          kind: 'lightrail',
+          pts: [
+            [cx - 0.9 * span, cy],
+            [cx + 0.9 * span, cy]
+          ],
+          service: { headway_s: 600, speed_ms: 12, accel_ms2: 1, dwell_s: 20, stopEvery_m: 400 }
+        }
+      ],
+      points: [
+        ...(plan.points ?? []).filter((p) => !['pfield', 'customs', 'hotel', 'terrace', 'flat'].includes(p.id)),
+        pt('pfield', 'Lighter field', 0.8, 0.5, 'field'),
+        pt('customs', 'Customs', 0.75, 0.45),
+        pt('hotel', 'The hotel', -0.8, 0.02),
+        pt('terrace', 'The terrace', -0.75, 0.1),
+        pt('flat', 'The flat', 0.1, 0.02)
+      ],
+      orbit: { field: 'pfield', flight_min: 40, windowGap_min: 90 }
+    })
+    const T = 790 * 31_557_600
+    const at = (h) => ({ t_s: T + h * 3600 })
+    await window.malevo.world.setEntity('itinerary', 'kay', {
+      name: 'Kay',
+      color: '#e8a33d',
+      city: 'bluff',
+      stops: [
+        { place: { orbit: 'earth' }, depart: at(0) },
+        { place: { point: 'pfield' }, by: 'lighter' },
+        { place: { point: 'customs' }, by: 'fixed', minutes: 40 },
+        { place: { point: 'hotel' }, stay_min: 30 },
+        { place: { point: 'terrace' }, by: 'walk', arrive: at(6), stay_min: 30 },
+        { place: { point: 'flat' }, stay_min: 300 },
+        { place: { point: 'hotel' }, arrive: at(18) }
+      ]
+    })
+    await window.malevo.world.setEntity('itinerary', 'ro', {
+      name: 'Ro',
+      color: '#4fb3d9',
+      city: 'bluff',
+      stops: [
+        { place: { point: 'flat' }, depart: at(5) },
+        { place: { point: 'terrace' }, arrive: at(6), stay_min: 20 }
+      ]
+    })
+    return T
+  })
+  await tool('Itineraries')
+  await page.waitForSelector('#itinEditor')
+  const o28 = await page.evaluate(() => window.malevo.itineraries.overview())
+  const kay = o28.reports.find((r) => r.id === 'kay')
+  check(
+    kay &&
+      kay.problems.length === 0 &&
+      kay.stops.every((s) => s.problems.length === 0) &&
+      kay.stops[1].leg.by === 'lighter' &&
+      /ride/.test(kay.stops[3].leg.summary) &&
+      kay.stops[4].slack > 0,
+    `an itinerary works out: lighter down, customs, the tram across town, early for the terrace (${kay?.stops.map((s) => s.leg?.summary ?? '').join(' | ')}; ${kay?.problems.join(' ')} ${kay?.stops.flatMap((s) => s.problems).join(' ')})`
+  )
+  check(
+    o28.encounters.some((e) => e.label === 'The terrace'),
+    'two people at the terrace at once are found together'
+  )
+  await page.waitForSelector('#itinLanes')
+  await page.locator('[data-stop="4"] .itin-times button').first().click()
+  await page.waitForSelector('#itinMap [data-person="kay"]')
+  check((await page.locator('#itinMap [data-person]').count()) === 2, 'at the terrace time, both are on the map of Bluff')
+  await page.screenshot({ path: path.join(shots, '28-itineraries.png') })
+  await page.locator('#itinMinutes-2').fill('600')
+  await page.locator('#itinMinutes-2').press('Tab')
+  await until(
+    async () => {
+      const o = await window.malevo.itineraries.overview()
+      return o.reports.find((r) => r.id === 'kay').stops[4].slack < 0
+    },
+    null,
+    'a ten-hour customs desk to make her late'
+  )
+  check(true, 'a ten-hour customs desk makes her late for the terrace, and says so')
+  void T28
+  await page.evaluate(() => window.malevo.world.discard())
+
   // 10. The update status reports a dev build.
   const status = await page.evaluate(() => window.malevo.updates.status())
   check(status.state === 'unavailable', 'an unpackaged build reports updates as unavailable')
