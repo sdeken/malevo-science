@@ -5,7 +5,8 @@
  */
 import {
   DEG,
-  G,
+  mutualHill,
+  tidalLockTime,
   M_SUN,
   R_EARTH,
   compareStrings,
@@ -222,7 +223,7 @@ export const systemsCheck: Check = {
           const b = sorted[i]
           const host = b.parent ? byId.get(b.parent)?.mass : info.star?.physics.mass != null ? info.star.physics.mass * M_SUN : null
           if (!host) continue
-          const rh = Math.cbrt((a.mass + b.mass) / (3 * host)) * ((inner.a + outer.a) / 2)
+          const rh = mutualHill(a.mass, b.mass, host, inner.a, outer.a)
           const spacing = (outer.a - inner.a) / rh
           const closest = (outer.a * (1 - outer.e) - inner.a * (1 + inner.e)) / rh
           if (closest < 2 * Math.sqrt(3))
@@ -295,8 +296,7 @@ function plausibility(
     const locked = (b.file.rotation as { locked?: boolean } | undefined)?.locked === true
     const host = b.parent ? byId.get(b.parent)?.mass : info.star?.physics.mass != null ? info.star.physics.mass * M_SUN : null
     if (!locked && host && b.elements && b.rotation && b.period && b.cls !== 'gas-giant' && b.cls !== 'ice-giant') {
-      const w = (2 * Math.PI) / (12 * 3600)
-      const t = (w * b.elements.a ** 6 * 0.4 * b.mass * b.radius ** 2 * 100) / (3 * G * host ** 2 * 0.3 * b.radius ** 5)
+      const t = tidalLockTime(b.mass, b.radius, b.elements.a, host)
       const ratio = b.period / Math.abs(b.rotation)
       const resonant = [1, 1.5, 2].some((r) => Math.abs(ratio - r) / r < 0.03)
       if (t < BILLION_YEARS && !resonant)

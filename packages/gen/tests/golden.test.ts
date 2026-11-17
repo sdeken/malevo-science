@@ -59,6 +59,24 @@ const CASES: Record<string, { seed: number; input: unknown }[]> = {
   'planets@1': [1, 42, 4242].flatMap((seed) =>
     STARS.flatMap((star, k) => [0, 1, 2].map((roll) => ({ seed, input: { system: `sys-${k}`, systemName: `System ${k}`, star, roll } })))
   ),
+  'planets@2': [1, 42, 4242].flatMap((seed) => [
+    ...STARS.flatMap((star, k) =>
+      [0, 1, 2].map((roll) => ({ seed, input: { system: `sys-${k}`, systemName: `System ${k}`, star, roll } }))
+    ),
+    ...[0, 1, 2].map((roll) => ({
+      seed,
+      input: {
+        system: 'sys-x',
+        systemName: 'System X',
+        star: STARS[1],
+        roll,
+        existing: [
+          { name: 'System X b', a_au: 0.0485, e: 0.02, mass_mearth: 1.07 },
+          { name: 'System X d', a_au: 0.029, e: 0, mass_mearth: 0.26 }
+        ]
+      }
+    }))
+  ]),
   'history@1': [1, 42].map((seed) => ({
     seed,
     input: syntheticInput(syntheticStars(500, 120, 9), {

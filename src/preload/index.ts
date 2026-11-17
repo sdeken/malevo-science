@@ -121,7 +121,7 @@ const api = {
     search: (text: string): Promise<StarSearchHit[]> => ipcRenderer.invoke(IPC.starsSearch, text)
   },
   systems: {
-    /** A planets@1 proposal for a system (nothing is written). */
+    /** A planets@2 proposal for a system (nothing is written). */
     roll: (id: string, roll: number): Promise<PlanetProposal> => ipcRenderer.invoke(IPC.systemsRoll, id, roll),
     /** Keep a roll as locked bodies, replacing an earlier kept roll. Unsaved, undoable. */
     keep: (id: string, roll: number): Promise<string[]> => ipcRenderer.invoke(IPC.systemsKeep, id, roll)

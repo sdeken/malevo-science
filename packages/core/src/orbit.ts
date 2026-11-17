@@ -227,3 +227,18 @@ export function findWindows(test: (t: Instant) => boolean, t0: Instant, t1: Inst
   if (start !== null) out.push([start, t1])
   return out
 }
+
+/**
+ * How long tides from a host take to stop a body's free spin, s (Gladman et al. 1996): a body of `mass` kg and
+ * `radius` m, `a` m from a host of `hostMass` kg, starting from a 12-hour day, with Q = 100, k₂ = 0.3 and a
+ * moment of inertia of 0.4·m·R² (rocky worlds; giants hold their spin far longer).
+ */
+export function tidalLockTime(mass: number, radius: number, a: number, hostMass: number): number {
+  const w = (2 * Math.PI) / (12 * 3600)
+  return (w * a ** 6 * 0.4 * mass * radius ** 2 * 100) / (3 * 6.6743e-11 * hostMass ** 2 * 0.3 * radius ** 5)
+}
+
+/** Two orbits' mutual Hill radius, m (or in the orbits' unit): how far apart neighbours need to be is counted in these. */
+export function mutualHill(m1: number, m2: number, hostMass: number, a1: number, a2: number): number {
+  return Math.cbrt((m1 + m2) / (3 * hostMass)) * ((a1 + a2) / 2)
+}

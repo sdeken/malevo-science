@@ -408,7 +408,7 @@ try {
   )
   const planetFile = JSON.parse(await fs.readFile(path.join(worldDir, 'bodies', bodyFiles[0]), 'utf8'))
   check(
-    planetFile.lock?.gen === 'planets@1' && Number.isInteger(planetFile.lock.seed),
+    planetFile.lock?.gen === 'planets@2' && Number.isInteger(planetFile.lock.seed),
     'kept planets record the generator and seed that made them'
   )
   await page.locator('[data-tool="systems"] [data-system="sol"]').click()

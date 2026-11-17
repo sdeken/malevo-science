@@ -20,7 +20,7 @@
  * - rotation: tidally locked inside 0.1·∛M AU, otherwise 8–18 h for giants
  *   and 10–200 h for the rest, 5% retrograde; tilts mostly modest.
  */
-import { keyedStream, normal, poisson, streamSeed, uniform, type Random } from '@malevo/core'
+import { keyedStream, normal, poisson, streamSeed, tidalLockTime, uniform, type Random } from '@malevo/core'
 import { defineGenerator } from './generator'
 
 export interface PlanetsInput {
@@ -143,3 +143,125 @@ export const planets = defineGenerator<PlanetsInput, { bodies: { id: string; val
 export function planetsStream(worldSeed: number, system: string, roll: number): Random {
   return keyedStream(worldSeed, 'planets', system, `roll:${roll}`)
 }
+
+/** A planet the system already has (a known planet, or the author's own): planets@2 leaves room around it. */
+export interface ExistingPlanet {
+  name: string
+  a_au: number
+  e: number
+  mass_mearth: number
+}
+
+export interface Planets2Input extends PlanetsInput {
+  /** Planets around the star that a roll must make room for, and whose letters it must not reuse. */
+  existing?: ExistingPlanet[]
+}
+
+/** Neighbours at least this many mutual Hill radii apart (long-lived systems are mostly 10 or more). */
+const SPACING = 10
+/** And at least this many at closest approach, with their eccentricities. */
+const CLOSEST = 6
+const LETTERS2 = 'bcdefghijklmnopq'
+
+/**
+ * planets@2: as planets@1, made to stand up to the plausibility checks, and around planets already there.
+ *
+ * What changed from planets@1 (the order of draws is part of this version's frozen contract):
+ * - each planet's eccentricity is drawn before its place, and neighbours are kept at least 10 mutual Hill radii
+ *   apart, and 6 at closest approach, from each other and from the system's existing planets (a slot that
+ *   would crowd one moves out past it);
+ * - rocky and ocean worlds are 0.05–3 Earth masses (under the radius valley, at a rocky density), ice giants
+ *   10–25 and gas giants 50–1000, so their densities are their kind's;
+ * - a planet is tidally locked when tides would have stopped its spin within a billion years;
+ * - letters already used by the system's planets are skipped.
+ */
+export const planets2 = defineGenerator<Planets2Input, { bodies: { id: string; value: PlanetFile }[] }>({
+  name: 'planets',
+  version: 2,
+  description: 'A plausible planetary system for a star, around the planets it already has: roll it, then keep it as locked bodies.',
+  frozen: true,
+  generate(input, ctx) {
+    const purpose = `roll:${input.roll}`
+    const r = ctx.stream(input.system, purpose)
+    const seed = streamSeed(ctx.worldSeed, 'planets', input.system, purpose)
+    const { mass_msun: M, luminosity_lsun: L, cls } = input.star
+    const Me = M * M_EARTH_PER_SUN
+    const sqrtL = Math.sqrt(Math.max(L, 1e-6))
+    const inner = Math.max(0.02, 0.04 * sqrtL)
+    const snow = 2.7 * sqrtL
+    const hz: [number, number] = [0.95 * sqrtL, 1.67 * sqrtL]
+    const outerLimit = 80 * Math.cbrt(M)
+    const existing = (input.existing ?? []).filter((p) => p.a_au > 0 && p.e >= 0 && p.e < 1 && p.mass_mearth > 0)
+    const used = new Set(existing.map((p) => /\s([a-z])$/.exec(p.name)?.[1]).filter(Boolean))
+    const letters = [...LETTERS2].filter((l) => !used.has(l))
+    const placed: { a: number; e: number; m: number }[] = existing.map((p) => ({ a: p.a_au, e: p.e, m: p.mass_mearth }))
+    const clear = (a: number, e: number, m: number): boolean =>
+      placed.every((p) => {
+        const [i, o] = p.a < a ? [p, { a, e, m }] : [{ a, e, m }, p]
+        const rh = (Math.cbrt((p.m + m) / (3 * Me)) * (i.a + o.a)) / 2
+        return (o.a - i.a) / rh >= SPACING && (o.a * (1 - o.e) - i.a * (1 + i.e)) / rh >= CLOSEST
+      })
+    const n = Math.min(letters.length, poisson(r, MEAN_COUNT[cls] ?? 3))
+    const bodies: { id: string; value: PlanetFile }[] = []
+    let a = inner * uniform(r, 1, 2.5)
+    for (let i = 0; i < n; i++) {
+      if (i > 0) a *= uniform(r, 1.4, 2.1)
+      const u = r()
+      const v = r()
+      let mass: number
+      let klass: PlanetFile['class']
+      if (a > snow) {
+        if (u < (GIANT_CHANCE[cls] ?? 0.2)) {
+          if (v < 0.6) {
+            mass = logUniform(r, 50, 1000)
+            klass = 'gas-giant'
+          } else {
+            mass = logUniform(r, 10, 25)
+            klass = 'ice-giant'
+          }
+        } else {
+          mass = logUniform(r, 0.01, 3)
+          klass = mass < 0.1 ? 'dwarf' : 'rocky'
+        }
+      } else {
+        mass = logUniform(r, 0.05, 3)
+        klass = a > hz[0] && a < hz[1] && v < 0.3 ? 'ocean' : 'rocky'
+      }
+      const e = Math.min(0.3, rayleigh(r, 0.05))
+      // Out from here until it crowds nothing.
+      for (let k = 0; k < 400 && !clear(a, e, mass); k++) a *= 1.02
+      if (a > outerLimit || !clear(a, e, mass)) break
+      const inc = Math.min(10, rayleigh(r, 1.5))
+      const node = r() * 360
+      const peri = r() * 360
+      const meanAnomaly = r() * 360
+      const giant = klass === 'gas-giant' || klass === 'ice-giant'
+      const radius_km = radiusFromMass(mass) * 6371
+      const lockTime = tidalLockTime(mass * M_EARTH_KG, radius_km * 1000, a * AU_M, M * M_SUN_KG)
+      const locked = !giant && lockTime < 1e9 * 365.25 * 86400
+      const spin = giant ? uniform(r, 8, 18) : logUniform(r, 10, 200)
+      const retro = r() < 0.05
+      const tilt = Math.min(180, Math.abs(normal(r, 0, 20)))
+      const letter = letters[bodies.length]
+      bodies.push({
+        id: `${input.system}-${letter}`,
+        value: {
+          name: `${input.systemName} ${letter}`,
+          system: input.system,
+          class: klass,
+          orbit: { a_au: a, e, i_deg: inc, node_deg: node, peri_deg: peri, meanAnomaly_deg: meanAnomaly, epoch: { t_s: 0 } },
+          mass_mearth: mass,
+          radius_km,
+          rotation: locked ? { locked: true, tilt_deg: retro ? 180 - tilt : tilt } : { period_h: retro ? -spin : spin, tilt_deg: tilt },
+          lock: { gen: 'planets@2', seed, inputs: {} }
+        }
+      })
+      placed.push({ a, e, m: mass })
+    }
+    return { bodies }
+  }
+})
+
+const AU_M = 149_597_870_700
+const M_EARTH_KG = 3.986004e14 / 6.6743e-11
+const M_SUN_KG = 1.3271244e20 / 6.6743e-11

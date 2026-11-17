@@ -340,10 +340,20 @@ module.exports = {
   - Each holding gets a faint bubble a leg across, in its colour. Where bubbles overlap they add
     up, so territory reads as coloured clouds with borders where they meet.
   - The key lists the groups by systems held.
-- **`planets@1`** proposes a planetary system for a star.
+- **`planets@2`** proposes a planetary system for a star (`planets@1` stays, for bodies kept
+  from it, but new rolls use `@2`).
   - Each roll number is its own keyed stream, so roll *n* of a system is always the same.
-  - Keeping a roll writes locked bodies, recording `planets@1` and the seed. It replaces bodies
-    kept from an earlier roll of that system; bodies you made or edited stay.
+  - Keeping a roll writes locked bodies, recording `planets@2` and the seed. It replaces bodies
+    kept from an earlier roll of that system (either version); bodies you made or edited stay.
+  - What `@2` changed, so its systems pass the plausibility checks (below): neighbours at least
+    10 mutual Hill radii apart and 6 at closest approach, including from the planets the system
+    already has (a slot that would crowd one moves out past it); rocky and ocean worlds of
+    0.05–3 Earth masses, ice giants 10–25, gas giants 50–1000, so each has its kind's density
+    and no rocky world sits above the radius valley; tidally locked whenever tides would have
+    stopped its spin within a billion years; and letters the system's planets already use are
+    skipped (around Proxima, no second "b").
+  - `packages/model/tests/plausible.test.ts` rolls it around six kinds of star and checks every
+    roll comes out clean.
   - Editing a kept body removes its lock: from then on it's yours.
 - **A planet-local calendar** can `follow` a body. Its day and year are then that body's solar
   day and the year of the planet it belongs to. A planet locked to its star has no solar day to
@@ -822,8 +832,9 @@ module.exports = {
   - Masses are minimum masses; radii are estimated from them.
   - Positions along the orbits at a date are not the real ones.
   - The inner planets are taken as tidally locked.
-- **Rolling planets** on such a star adds invented planets beside the known ones. A rolled
-  planet whose orbit would cross one the system already has (anything not from planets@1) is
+- **Rolling planets** on such a star adds invented planets beside the known ones, leaving room
+  around them and skipping their letters. A rolled
+  planet whose orbit would cross one the system already has (anything not from a planets@ roll) is
   greyed in the roll and left out when it is kept.
 
 ### Cultures, polities and relations

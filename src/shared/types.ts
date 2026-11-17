@@ -288,7 +288,7 @@ export interface BodyInfoDto {
   density: number
   insolation: number | null
   equilibriumTemp: number | null
-  /** Generated and kept (planets@1 and so on). */
+  /** Generated and kept (planets@2 and so on). */
   generatedBy: string | null
 }
 

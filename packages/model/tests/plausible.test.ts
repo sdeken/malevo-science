@@ -3,6 +3,8 @@ import { fileURLToPath } from 'node:url'
 import { beforeAll, describe, expect, it } from 'vitest'
 import { addBuiltins, readWorld, runChecks, templateFiles, type WorldEnv, type WorldFile } from '@malevo/model'
 import { loadCatalog, nodeEnvWith } from '@malevo/model/node'
+import { mainSequenceStar } from '@malevo/core'
+import { planets2, runGenerator } from '@malevo/gen'
 
 const CATALOG = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../../../assets/catalog/hyg-stars.json')
 let env: WorldEnv
@@ -75,5 +77,73 @@ describe('whether a system is like real ones', () => {
       'tidally-locked bodies/a.json'
     )
     expect(issues([planet('a', 'rocky', 0.6, 1, 6371)])).not.toContain('tidally-locked bodies/a.json')
+  })
+})
+
+describe('planets@2 makes systems that pass', () => {
+  const roll = (
+    spect: string,
+    seed: number,
+    n: number,
+    existing: { name: string; a_au: number; e: number; mass_mearth: number }[] = []
+  ) => {
+    const star = mainSequenceStar(spect)!
+    return runGenerator(
+      planets2,
+      {
+        system: 'altaris',
+        systemName: 'Altaris',
+        star: { mass_msun: star.physics.mass!, luminosity_lsun: star.physics.luminosity, cls: star.cls },
+        roll: n,
+        existing
+      },
+      seed
+    ).bodies.map((b) => json(`bodies/${b.id}.json`, b.value))
+  }
+  const sysFile = (spect: string): WorldFile => json('systems/altaris.json', { name: 'Altaris', spect })
+  const check = (spect: string, bodies: WorldFile[]) =>
+    runChecks(
+      addBuiltins(
+        readWorld([{ path: 'world.json', text: '{"format": 1, "name": "W", "seed": 1}' }, ...templateFiles(), sysFile(spect), ...bodies])
+      ),
+      env
+    )
+      .filter((i) => i.check === 'systems' && i.path?.startsWith('bodies/altaris') && i.code !== 'no-catalogue')
+      .map((i) => `${i.code} ${i.path}: ${i.message}`)
+
+  it('with no warnings or notes, around every kind of star', () => {
+    let planets = 0
+    for (const spect of ['A0V', 'F5V', 'G2V', 'K1V', 'M0V', 'M4.5V'])
+      for (const seed of [1, 7, 42])
+        for (let n = 0; n < 6; n++) {
+          const bodies = roll(spect, seed, n)
+          planets += bodies.length
+          expect(check(spect, bodies), `${spect} seed ${seed} roll ${n}`).toEqual([])
+        }
+    expect(planets).toBeGreaterThan(150)
+  })
+
+  it('around planets the system already has, skipping their letters', () => {
+    const own = [
+      { name: 'Altaris b', a_au: 0.05, e: 0.1, mass_mearth: 1.1 },
+      { name: 'Altaris d', a_au: 0.3, e: 0.05, mass_mearth: 8 }
+    ]
+    const files = own.map((p, k) =>
+      json(`bodies/altaris-own-${k}.json`, {
+        name: p.name,
+        system: 'altaris',
+        class: 'rocky',
+        orbit: orbit(p.a_au, p.e),
+        mass_mearth: p.mass_mearth,
+        radius_km: k ? 9000 : 6600,
+        rotation: { locked: true, tilt_deg: 0 }
+      })
+    )
+    for (let n = 0; n < 12; n++) {
+      const bodies = roll('M4.5V', 3, n, own)
+      expect(bodies.some((b) => / [bd]"/.test(b.text ?? ''))).toBe(false)
+      const found = check('M4.5V', [...files, ...bodies]).filter((i) => !i.includes('altaris-own-'))
+      expect(found, `roll ${n}`).toEqual([])
+    }
   })
 })

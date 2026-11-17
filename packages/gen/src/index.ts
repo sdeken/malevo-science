@@ -5,12 +5,21 @@ import { bands } from './bands'
 import { clouds } from './clouds'
 import { cityplan } from './cityplan'
 import { placeholderNames } from './names'
-import { planets } from './planets'
+import { planets, planets2 } from './planets'
 import { starfield } from './starfield'
 
 export * from './generator'
 export { PALETTES, nameFrom, placeholderNames, type NamesInput } from './names'
-export { planets, planetsStream, radiusFromMass, type PlanetFile, type PlanetsInput } from './planets'
+export {
+  planets,
+  planets2,
+  planetsStream,
+  radiusFromMass,
+  type ExistingPlanet,
+  type PlanetFile,
+  type PlanetsInput,
+  type Planets2Input
+} from './planets'
 export { starfield, type StarfieldInput } from './starfield'
 export {
   cityplan,
@@ -56,6 +65,7 @@ export const GENERATORS: readonly Generator<never, unknown>[] = [
   placeholderNames as Generator<never, unknown>,
   starfield as Generator<never, unknown>,
   planets as Generator<never, unknown>,
+  planets2 as Generator<never, unknown>,
   history as Generator<never, unknown>,
   history2 as Generator<never, unknown>,
   terrain as Generator<never, unknown>,

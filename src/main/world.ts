@@ -23,7 +23,7 @@ import {
   type Calendar,
   type StarRecord
 } from '@malevo/core'
-import { planets, runGenerator } from '@malevo/gen'
+import { planets2, runGenerator } from '@malevo/gen'
 import {
   WorldError,
   bodyKind,
@@ -499,7 +499,7 @@ export class WorldSession extends EventEmitter {
       .slice(0, limit)
   }
 
-  // ---- planets@1: roll, then keep ----
+  // ---- planets@2: roll, then keep ----
 
   roll(systemId: string, roll: number): PlanetProposal {
     const world = this.world()
@@ -513,15 +513,14 @@ export class WorldSession extends EventEmitter {
       star: { mass_msun: p.mass, luminosity_lsun: p.luminosity, cls: sys.star.record.cls },
       roll: Math.max(0, Math.trunc(roll))
     }
-    const out = runGenerator(planets, input, world.manifest!.seed)
-    // Bodies the system keeps whatever the roll (anything not from planets@): a rolled planet whose orbit crosses
-    // one of theirs is left out, as the crossing-orbits check would flag it.
+    // Bodies the system keeps whatever the roll (anything not from planets@): the roll makes room for them, and a
+    // rolled planet whose orbit still crosses one of theirs is left out, as the crossing-orbits check would flag it.
     const AU_KM = 1.495978707e8
     const band = (o: { a_au?: number; a_km?: number; e: number }): [number, number] | null => {
       const a = o.a_au ?? (o.a_km !== undefined ? o.a_km / AU_KM : null)
       return a === null ? null : [a * (1 - o.e), a * (1 + o.e)]
     }
-    const fixed: { name: string; band: [number, number] }[] = []
+    const fixed: { name: string; band: [number, number]; a: number; e: number; mass: number }[] = []
     for (const e of world.entities.values()) {
       if (e.kind.kind !== bodyKind.kind || e.value === undefined) continue
       const v = e.value as BodyFile
@@ -535,8 +534,13 @@ export class WorldSession extends EventEmitter {
       )
         continue
       const bd = band(v.orbit)
-      if (bd) fixed.push({ name: v.name, band: bd })
+      if (bd) fixed.push({ name: v.name, band: bd, a: (bd[0] + bd[1]) / 2, e: v.orbit.e, mass: v.mass_mearth })
     }
+    const out = runGenerator(
+      planets2,
+      { ...input, existing: fixed.map((f) => ({ name: f.name, a_au: f.a, e: f.e, mass_mearth: f.mass })) },
+      world.manifest!.seed
+    )
     const clashes: { id: string; with: string }[] = []
     for (const b of out.bodies) {
       const bd = band(b.value.orbit)
@@ -550,7 +554,7 @@ export class WorldSession extends EventEmitter {
     }
   }
 
-  /** Keep a roll: write its bodies, replacing bodies kept from an earlier roll of planets@1. One undoable, unsaved step. */
+  /** Keep a roll: write its bodies, replacing bodies kept from an earlier roll (planets@1 or @2). One undoable, unsaved step. */
   keep(systemId: string, roll: number): string[] {
     const world = this.world()
     const proposal = this.roll(systemId, roll)
