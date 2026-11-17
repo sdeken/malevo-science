@@ -1,0 +1,9 @@
+{
+  "extends": "./tsconfig.node.json",
+  "compilerOptions": {
+    "types": ["node", "vscode"],
+    "composite": false
+  },
+  "include": ["vscode/src/host/**/*", "src/main/world.ts", "src/shared/**/*"],
+  "exclude": []
+}

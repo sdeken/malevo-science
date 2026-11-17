@@ -8,6 +8,9 @@ cities. Every tool works from one shared model, so details stay consistent from 
 The app contains no setting and knows nothing about git. It reads and writes plain world folders
 of JSON and Markdown. The author decides what is canon and commits it by hand to a repository of their own.
 
+A VS Code extension (`vscode/`), meant in time to replace the app, opens a world's systems and
+bodies in editors of their own, over VS Code's documents.
+
 The Encyclopedia holds the canon in the author's own words: an article for anything the world
 tracks, and pages of their own for people, organizations and places, linked with `@`. The app
 writes only what the author types, and keeps links working when pages move.

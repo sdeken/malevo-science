@@ -8,6 +8,7 @@ import { FileName } from '../../components/FileName'
 import type { ToolDefinition, ToolProps } from '../registry'
 import { BodyEditor } from './BodyEditor'
 import { HistoryEditor } from './HistoryEditor'
+import { StarPlacement } from './StarPlacement'
 import { OrbitView, systemMasses, type Drawn } from './OrbitView'
 import { TorchTimes, type MeasurePoint } from './TorchTimes'
 
@@ -92,7 +93,8 @@ function SystemsView({ world, snapshot, now, displayCal, navigate, focus, params
   )
 }
 
-function SystemDetail({
+/** One system: its star, its bodies on the orbit view, and what follows. Used by the Systems tool, and by VS Code. */
+export function SystemDetail({
   system,
   snapshotVersion,
   now,
@@ -102,9 +104,12 @@ function SystemDetail({
   open,
   focusBody,
   snapshot,
-  onRenamed
+  onRenamed,
+  onOpenBody
 }: {
   onRenamed(id: string): void
+  /** Open a body elsewhere (its own tab, in VS Code) instead of editing it here. */
+  onOpenBody?: (id: string) => void
   open: ToolProps['open']
   /** A body to select (what the blade was opened on). */
   focusBody: string | null
@@ -116,10 +121,11 @@ function SystemDetail({
   calendars: ToolProps['snapshot']['calendars']
   navigate: ToolProps['navigate']
 }): React.JSX.Element {
-  const [selectedBody, setSelectedBody] = useState<string | null>(focusBody)
-  useFollowRenames(selectedBody, setSelectedBody)
+  const [selectedBody, setSelectedBodyHere] = useState<string | null>(focusBody)
+  useFollowRenames(selectedBody, setSelectedBodyHere)
+  const setSelectedBody = (id: string | null): void => (id && onOpenBody ? onOpenBody(id) : setSelectedBodyHere(id))
   useEffect(() => {
-    if (focusBody) setSelectedBody(focusBody)
+    if (focusBody) setSelectedBodyHere(focusBody)
   }, [focusBody])
   const [center, setCenter] = useState<string | null>(null)
   const [measuring, setMeasuring] = useState(false)
@@ -242,15 +248,21 @@ function SystemDetail({
         </div>
       </div>
 
+      <StarPlacement system={system} save={save} />
+
       {system.starError ? (
         <p className="error">{system.starError}</p>
       ) : (
         star && (
           <>
             <p className="star-line">
-              <strong>{star.name ?? 'Unnamed star'}</strong> <code className="muted small">{star.id}</code> · {star.spect || 'unknown type'}{' '}
-              · {sig(Math.hypot(...star.pos), 4)} ly from Sol · {sig(star.teff, 4)} K · {sig(star.luminosity, 3)} L☉ ·{' '}
-              {star.mass === null ? 'mass unknown' : `${sig(star.mass, 3)} M☉`} · {sig(star.radius, 3)} R☉
+              <strong>{star.name ?? (system.placement === 'detached' ? 'Its star' : 'Unnamed star')}</strong>{' '}
+              {star.id && <code className="muted small">{star.id}</code>} · {star.spect || 'unknown type'} ·{' '}
+              {system.placement === 'detached'
+                ? 'not placed among the stars'
+                : `${sig(Math.hypot(...star.pos), 4)} ly from Sol${system.placement === 'stand-in' ? ' (stand-in)' : ''}`}{' '}
+              · {sig(star.teff, 4)} K · {sig(star.luminosity, 3)} L☉ · {star.mass === null ? 'mass unknown' : `${sig(star.mass, 3)} M☉`} ·{' '}
+              {sig(star.radius, 3)} R☉
               {star.overridden.length > 0 && (
                 <span className="muted"> (overridden: {star.overridden.map((k) => k.split('_')[0]).join(', ')})</span>
               )}

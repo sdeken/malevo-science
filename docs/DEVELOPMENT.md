@@ -54,6 +54,56 @@ npm run dev          # the app with hot reload
 - **`packages/cli`** (`@malevo/cli`) is the `malevo` command. `npm run build` bundles it into
   `out/cli/malevo.mjs`.
 
+### VS Code
+
+- **The extension** (`vscode/`) is meant to replace the app, a piece at a time. So far it opens a
+  world's systems (`systems/*.json`) and bodies (`bodies/*.json`) in editors of their own, with the
+  app's screens in a webview. "Reopen With… → Text Editor" shows the file. A world is the nearest
+  folder above the file with `world.json`.
+- **The world session runs in the extension, unchanged** (`src/main/world.ts`, attached with
+  `WorldSession.attach`). Its files come from a `SessionEditor` (`vscode/src/host/editor.ts`):
+  - the disk, with every open document's text on top, saved or not;
+  - edits become VS Code workspace edits, so unsaved changes, undo, Save and the git diff are VS
+    Code's own, and the extension never writes the disk itself;
+  - a file watcher and document changes make it work everything out again.
+- **The screens talk to the extension through messages** (`vscode/src/webview/bridge.ts`): the
+  app's `window.malevo.<area>.<call>()` becomes a message the extension answers from
+  `vscode/src/host/dispatch.ts`, and `onX` subscribes to an event it pushes (`world.snapshot`,
+  `world.renamed`, `host.state`). The dispatch table knows nothing of VS Code. What only the host
+  can do (ask before a delete, open a tab, the current date) comes in as hooks.
+- **A system's editor** is the Systems tool's `SystemDetail`. Clicking a body opens it in its own
+  tab (`onOpenBody`). A body's editor is `BodyEditor`, with its system a click away.
+- **The current date** is one per world, kept in the workspace's state: the date bar on top of
+  every editor and the status bar item (click it, or *Malevo: Set the current date…*). Every editor
+  of the world follows it.
+- **Commands:** *Malevo: New system…* (detached with a spectral type, or on a star found by name or
+  id), *Malevo: Set the current date…*.
+- **Building:** `npm run vscode:build` bundles the extension (Node, CommonJS), the screens (for the
+  browser) and their styles (the app's, with colours taken from the VS Code theme) into
+  `vscode/dist`, with the star catalogue. `npm run vscode:package` also makes
+  `release/malevo-science-<version>.vsix`. CI builds it and attaches it to every release. Install
+  it with *Extensions: Install from VSIX…*.
+- **Testing without VS Code:** `vscode/test/editor.test.ts` runs the editor against a stand-in for
+  the `vscode` module. `scripts/vscode-harness.mjs` drives the built screens in Chromium against
+  the real world session, through a stand-in for the message bridge: a detached system, a
+  stand-in star, a body opening in its own tab, an edit, and the shared current date.
+
+### Systems not yet placed
+
+- **A system's star is optional** (`star`). Without one it is detached: its own star is described
+  by `spect`, a main-sequence type (`K1V`, `M4.5V`; `mainSequenceStar` in `@malevo/core`, after
+  Pecaut & Mamajek). Its mass, brightness, temperature and size are that type's typical values,
+  and `starOverrides` still apply.
+- **A detached system** works out its bodies as usual. Its sky has no stars but its own (no
+  position), no routes reach it, and the history generator can't settle from it.
+- **On a stand-in** (`star` with `provisional: true`): it borrows that star's place, for its sky
+  and its distances. With `spect` it keeps its own star; without it, it takes the stand-in's.
+  Swap the stand-in any time.
+- **Placed** (`star`, no `provisional`): as before. With `spect`, its own star still wins over the
+  catalogue's estimate.
+- The system screen's **Where it is** panel switches between the three. It finds stars by name or
+  id, or picks a random generated star within 40 ly of where the system is (or of Sol).
+
 ### Blades
 
 - **Views open side by side, as blades** (`src/renderer/src/blades/`). The sidebar starts a new

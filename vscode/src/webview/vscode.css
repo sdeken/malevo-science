@@ -1,0 +1,61 @@
+/* In VS Code: the app's colours come from the editor's theme, light or dark. */
+body.vscode-host {
+  --bg: var(--vscode-editor-background, #1e1e1e);
+  --bg-raised: var(--vscode-editorWidget-background, var(--vscode-editor-background));
+  --bg-sunken: var(--vscode-sideBar-background, var(--vscode-editor-background));
+  --border: var(--vscode-widget-border, var(--vscode-panel-border, rgba(128, 128, 128, 0.35)));
+  --text: var(--vscode-foreground, #cccccc);
+  --muted: var(--vscode-descriptionForeground, #9d9d9d);
+  --accent: var(--vscode-textLink-foreground, #4daafc);
+  --accent-text: var(--vscode-button-foreground, #ffffff);
+  --danger: var(--vscode-errorForeground, #f48771);
+  --ok: var(--vscode-testing-iconPassed, #7dd3a3);
+  margin: 0;
+  padding: 0;
+  height: auto;
+  min-height: 100vh;
+  overflow: auto;
+  font-family: var(--vscode-font-family, system-ui, 'Segoe UI', sans-serif);
+  font-size: var(--vscode-font-size, 13px);
+}
+
+body.vscode-host input,
+body.vscode-host select,
+body.vscode-host textarea {
+  background: var(--vscode-input-background);
+  color: var(--vscode-input-foreground);
+  border-color: var(--vscode-input-border, var(--border));
+}
+
+body.vscode-host button.primary {
+  background: var(--vscode-button-background);
+  color: var(--vscode-button-foreground, #ffffff);
+}
+
+.vs-page .datebar {
+  position: sticky;
+  top: 0;
+  z-index: 5;
+}
+
+.vs-body .tool-page {
+  max-width: none;
+}
+
+.vs-loading {
+  padding: 1em;
+}
+
+.vs-crumb {
+  margin: 0 0 8px;
+}
+
+.star-placement .seg {
+  margin: 6px 0;
+}
+
+.placement-hits {
+  list-style: none;
+  padding: 0;
+  margin: 4px 0;
+}

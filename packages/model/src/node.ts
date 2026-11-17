@@ -190,7 +190,7 @@ export async function addMissingTemplateFiles(root: string): Promise<string[]> {
 
 // ---- running world code ----
 
-export { WorldEditor, assertWorldPath, entityText, type FileChange } from './editor'
+export { WorldEditor, assertWorldPath, entityText, type FileChange, type SessionEditor } from './editor'
 export { renamePlan, fieldPath, type RenamePlan } from './rename'
 export { ScriptError, sandboxedCalendar } from './sandbox'
 

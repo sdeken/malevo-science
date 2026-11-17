@@ -132,6 +132,7 @@ import {
 } from '@malevo/model'
 import {
   WorldEditor,
+  type SessionEditor,
   addMissingTemplateFiles,
   applyFixes,
   createWorld,
@@ -215,7 +216,7 @@ const KIND_DEFS: Record<EditableKind, KindDef> = {
 
 export class WorldSession extends EventEmitter {
   private current: OpenWorld | null = null
-  private editor: WorldEditor | null = null
+  private editor: SessionEditor | null = null
   private version = 0
 
   /** Script sandbox and star catalogue (see index.ts). */
@@ -253,6 +254,22 @@ export class WorldSession extends EventEmitter {
     // once, here, and never changes (docs/PLAN.md §3.2).
     const seed = randomInt(0, 2 ** 32)
     return this.attempt(() => createWorld(dir, name, seed))
+  }
+
+  /** Use a world opened elsewhere, with its own editor (VS Code's documents). */
+  attach(opened: OpenWorld, editor: SessionEditor): WorldInfo {
+    this.current = opened
+    this.editor = editor
+    this.version++
+    const info = toInfo(opened)
+    this.emit('changed', info)
+    this.emit('snapshot')
+    return info
+  }
+
+  /** The editor's files changed underneath (typing in another editor, the disk): work everything out again. */
+  refresh(): void {
+    this.changed()
   }
 
   close(): void {

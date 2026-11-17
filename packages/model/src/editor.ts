@@ -28,7 +28,28 @@ export interface FileChange {
 
 type Pending = Map<string, string | null>
 
-export class WorldEditor {
+/**
+ * What a world session needs from whatever holds the world's files and their unsaved changes: this
+ * WorldEditor in the app; in VS Code, its open documents.
+ */
+export interface SessionEditor {
+  readonly root: string
+  load(): Promise<void>
+  world(): WorldData
+  files(): WorldFile[]
+  readonly dirty: string[]
+  readonly canUndo: boolean
+  readonly canRedo: boolean
+  edit(changes: readonly FileChange[]): void
+  setEntity<T>(kind: KindDef<T>, id: string, value: T): void
+  squash(): void
+  undo(): void
+  redo(): void
+  discard(): void
+  save(): Promise<string[]>
+}
+
+export class WorldEditor implements SessionEditor {
   private disk = new Map<string, string | null>()
   private pending: Pending = new Map()
   private past: Pending[] = []

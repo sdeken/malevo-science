@@ -58,6 +58,16 @@ jobs:
       - run: npm run build
       - name: Smoke test the built app
         run: xvfb-run -a --server-args="-screen 0 1280x800x24" npm run smoke:ci
+      # The VS Code extension: packaged, and its editors driven in Chromium against the real world session.
+      - run: npm run vscode:package
+      - run: npx playwright-core install --with-deps chromium
+      - name: Drive the VS Code editors
+        run: node scripts/vscode-harness.mjs
+      - uses: actions/upload-artifact@v4
+        with:
+          name: malevo-science-vscode-${{ needs.version.outputs.version }}
+          path: release/*.vsix
+          if-no-files-found: error
 
   windows:
     name: Package (Windows)
@@ -87,7 +97,7 @@ jobs:
   release:
     name: GitHub release
     runs-on: ubuntu-latest
-    needs: [version, windows]
+    needs: [version, test, windows]
     if: needs.version.outputs.release == 'true'
     permissions:
       contents: write

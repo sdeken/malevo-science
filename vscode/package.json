@@ -1,0 +1,59 @@
+{
+  "name": "malevo-science",
+  "displayName": "Malevo Science",
+  "description": "Systems and bodies of a hard science fiction world, with the physics worked out: edit them in VS Code.",
+  "version": "0.0.0",
+  "publisher": "sdeken",
+  "private": true,
+  "license": "UNLICENSED",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/sdeken/malevo-science"
+  },
+  "engines": {
+    "vscode": "^1.95.0"
+  },
+  "categories": [
+    "Other"
+  ],
+  "main": "./dist/extension.js",
+  "activationEvents": [
+    "workspaceContains:**/world.json"
+  ],
+  "contributes": {
+    "customEditors": [
+      {
+        "viewType": "malevo.system",
+        "displayName": "Malevo system",
+        "selector": [
+          {
+            "filenamePattern": "**/systems/*.json"
+          }
+        ],
+        "priority": "default"
+      },
+      {
+        "viewType": "malevo.body",
+        "displayName": "Malevo body",
+        "selector": [
+          {
+            "filenamePattern": "**/bodies/*.json"
+          }
+        ],
+        "priority": "default"
+      }
+    ],
+    "commands": [
+      {
+        "command": "malevo.newSystem",
+        "title": "New system…",
+        "category": "Malevo"
+      },
+      {
+        "command": "malevo.setDate",
+        "title": "Set the current date…",
+        "category": "Malevo"
+      }
+    ]
+  }
+}
