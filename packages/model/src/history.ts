@@ -104,6 +104,7 @@ export function historyInput(world: WorldData, env: WorldEnv, seedOverride?: num
   const originSys = world.entities.get(`${systemKind.kind}/${s.origin}`)?.value as SystemFile | undefined
   if (!originSys) return { error: `The origin system "${s.origin}" does not exist.` }
   const stars = worldStars(world, env)
+  if (!originSys.star) return { error: `The origin system "${s.origin}" is not placed among the stars yet.` }
   const originStar = stars.get(originSys.star)
   if (!originStar) return { error: `The origin system's star ${originSys.star} cannot be found.` }
 
@@ -130,13 +131,15 @@ export function historyInput(world: WorldData, env: WorldEnv, seedOverride?: num
   const systemsByStar = new Map<string, { id: string; file: SystemFile }>()
   const fixed: FixedSettlement[] = []
   for (const e of [...entitiesOf(world, systemKind)].sort((a, b) => compareStrings(a.id, b.id))) {
-    if (systemsByStar.has(e.value.star)) continue
-    systemsByStar.set(e.value.star, { id: e.id, file: e.value })
+    // A detached system is nowhere among the stars yet, so the run can't settle around it.
+    const star = e.value.star
+    if (!star || systemsByStar.has(star)) continue
+    systemsByStar.set(star, { id: e.id, file: e.value })
     const h = systemHistory(e.value, resolver).filter((x) => x.t !== null)
     const first = h[0]
     const withPolity = [...h].reverse().find((x) => x.polity !== null)
     fixed.push({
-      star: e.value.star,
+      star,
       year: first ? yearOf(first.t!) : null,
       polity: withPolity ? withPolity.polity : undefined,
       mix: first && first.cultures.length ? Object.fromEntries(first.cultures.map((c) => [c.culture, c.share])) : null,

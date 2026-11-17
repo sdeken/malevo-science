@@ -308,7 +308,7 @@ export function driftReport(
   const within = opts.passWithin_ly ?? 1
   const length = horizon * lyPerYear
   const systemsByStar = new Map<string, { id: string; name: string }>()
-  for (const e of entitiesOf(world, systemKind)) systemsByStar.set(e.value.star, { id: e.id, name: e.value.name })
+  for (const e of entitiesOf(world, systemKind)) if (e.value.star) systemsByStar.set(e.value.star, { id: e.id, name: e.value.name })
   const found = new Map<string, DriftPass>()
   const maxSteps = 4000
   const step = Math.max(within, length / maxSteps)

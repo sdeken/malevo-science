@@ -299,3 +299,41 @@ export function starPhysics(s: Pick<StarRecord, 'absmag' | 'ci' | 'spect' | 'cls
 export function starDistance(a: StarRecord, b: StarRecord): number {
   return Math.hypot(a.pos[0] - b.pos[0], a.pos[1] - b.pos[1], a.pos[2] - b.pos[2])
 }
+
+/**
+ * Typical main-sequence (dwarf) stars by spectral type, after Pecaut & Mamajek's table:
+ * [type index (O0 = 0, B0 = 10, A0 = 20, … M0 = 60), effective temperature K, absolute visual magnitude,
+ * B−V colour, mass in solar masses].
+ */
+const DWARFS: readonly (readonly number[])[] = [
+  [9, 31900, -4.2, -0.31, 18],
+  [10, 31400, -3.4, -0.3, 17.5],
+  [15, 15700, -1.2, -0.16, 4.2],
+  [20, 9700, 1.11, 0.0, 2.34],
+  [25, 8100, 1.94, 0.15, 1.86],
+  [30, 7220, 2.51, 0.3, 1.61],
+  [35, 6510, 3.4, 0.44, 1.33],
+  [40, 5920, 4.24, 0.59, 1.15],
+  [42, 5772, 4.83, 0.65, 1.0],
+  [45, 5660, 5.1, 0.68, 0.98],
+  [50, 5280, 5.86, 0.82, 0.88],
+  [55, 4440, 7.2, 1.15, 0.69],
+  [60, 3850, 8.91, 1.43, 0.57],
+  [65, 3060, 12.73, 1.82, 0.16],
+  [69, 2400, 18.6, 2.1, 0.08]
+]
+const TYPE_INDEX: Record<string, number> = { O: 0, B: 10, A: 20, F: 30, G: 40, K: 50, M: 60 }
+
+/** A typical main-sequence star of a spectral type ("K1V", "G2", "M4.5V"), or null if it can't be read. */
+export function mainSequenceStar(spect: string): { absmag: number; ci: number; cls: string; physics: StarPhysics } | null {
+  const m = /^([OBAFGKM])(\d(?:\.\d)?)V?$/.exec(spect.trim())
+  if (!m) return null
+  const x = TYPE_INDEX[m[1]] + Number(m[2])
+  const teff = interpolate(DWARFS, x, 1)
+  const absmag = interpolate(DWARFS, x, 2)
+  const ci = interpolate(DWARFS, x, 3)
+  const mass = interpolate(DWARFS, x, 4)
+  const luminosity = Math.pow(10, -0.4 * (absmag + bolometricCorrection(teff) - MBOL_SUN))
+  const radius = Math.sqrt(luminosity) / (teff / 5772) ** 2
+  return { absmag, ci, cls: m[1], physics: { teff, luminosity, radius, mass, massSource: 'main sequence' } }
+}

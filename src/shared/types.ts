@@ -313,7 +313,10 @@ export interface SystemInfoDto {
   id: string
   path: string
   name: string
-  starId: string
+  /** The star it is on (null: detached, not placed among the stars). */
+  starId: string | null
+  /** "stand-in": the star is provisional; "detached": no place yet (no sky, no distances). */
+  placement: 'placed' | 'stand-in' | 'detached' | null
   value: Record<string, unknown>
   star: StarInfoDto | null
   starError: string | null

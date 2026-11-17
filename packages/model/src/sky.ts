@@ -156,6 +156,9 @@ export interface SkyStars {
 export function skyStars(world: WorldData, env: WorldEnv, systemId: string, maxMag = 7, nearLy = 40): SkyStars | null {
   const sys = systemInfo(world, env, systemId)
   if (!sys?.star) return null
+  // Not placed among the stars yet: no stars to show but its own.
+  if (sys.star.placement === 'detached')
+    return { ids: [], dir: new Float32Array(0), mag: new Float32Array(0), ci: new Float32Array(0), names: {} }
   const here = sys.star.record.pos
   const frame = systemFrame(sys.file)
   const stars = worldStars(world, env)
@@ -445,6 +448,8 @@ function approachSetup(world: WorldData, env: WorldEnv, q: Pick<ApproachQuery, '
   let back: Vec3
   if (typeof q.from === 'string') {
     const p = routeWorld(world, env).node(q.from).pos
+    if (sys.star.placement === 'detached')
+      return { error: 'The system is not placed among the stars yet, so ships have nowhere to come from.' }
     const here = sys.star.record.pos
     if (!p) return { error: `"${q.from}" has no position.` }
     const g: Vec3 = [p[0] - here[0], p[1] - here[1], p[2] - here[2]]

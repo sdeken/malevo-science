@@ -30,6 +30,7 @@ import {
   solarDayLength,
   solarDeclination,
   starPhysics,
+  mainSequenceStar,
   stateAt,
   SOL,
   type OrbitalElements,
@@ -115,21 +116,50 @@ export function worldStars(world: WorldData, env: WorldEnv = {}): WorldStars {
 }
 
 export interface StarInfo {
+  /** The star: the catalogue's or a generated one (for a system with its own spectral type, that type's typical star, placed there). */
   record: StarRecord
-  /** Estimates from the catalogue, with the system's overrides applied. */
+  /** Estimates (from the catalogue, or typical of the system's spectral type), with the system's overrides applied. */
   physics: StarPhysics
   /** Which values are overrides. */
   overridden: string[]
+  /** Whether it has a place among the stars ("stand-in": a provisional one); "detached": none yet, so no sky or distances. */
+  placement: 'placed' | 'stand-in' | 'detached'
 }
 
 export function systemStar(system: SystemFile, stars: WorldStars): StarInfo | { error: string } {
-  const record = stars.get(system.star)
-  if (!record) {
-    if (!parseGeneratedId(system.star) && !stars.catalogAvailable) return { error: 'The star catalogue is not available here.' }
-    if (parseGeneratedId(system.star) && !stars.params) return { error: 'Generated stars need settings/stars.json.' }
-    return { error: `Star "${system.star}" does not exist${parseGeneratedId(system.star) ? ' with the current star field settings' : ''}.` }
+  let placed: StarRecord | null = null
+  if (system.star) {
+    placed = stars.get(system.star) ?? null
+    if (!placed) {
+      if (!parseGeneratedId(system.star) && !stars.catalogAvailable) return { error: 'The star catalogue is not available here.' }
+      if (parseGeneratedId(system.star) && !stars.params) return { error: 'Generated stars need settings/stars.json.' }
+      return {
+        error: `Star "${system.star}" does not exist${parseGeneratedId(system.star) ? ' with the current star field settings' : ''}.`
+      }
+    }
   }
-  const est = starPhysics(record)
+  let record: StarRecord
+  let est: StarPhysics
+  if (system.spect) {
+    const ms = mainSequenceStar(system.spect)
+    if (!ms) return { error: `"${system.spect}" is not a main-sequence spectral type this can read.` }
+    record = {
+      id: placed?.id ?? '',
+      pos: placed?.pos ?? [0, 0, 0],
+      absmag: ms.absmag,
+      mag: placed ? ms.absmag + 5 * Math.log10(Math.max(1e-6, Math.hypot(...placed.pos) / 3.26156) / 10) : ms.absmag,
+      spect: system.spect,
+      ci: ms.ci,
+      name: placed?.name ?? null,
+      generated: placed?.generated ?? false,
+      cls: ms.cls,
+      mass: ms.physics.mass
+    }
+    est = ms.physics
+  } else if (placed) {
+    record = placed
+    est = starPhysics(placed)
+  } else return { error: 'A system not placed on a star needs its own spectral type (spect, like "K1V").' }
   const o = system.starOverrides ?? {}
   const physics: StarPhysics = {
     teff: o.teff_k ?? est.teff,
@@ -138,7 +168,12 @@ export function systemStar(system: SystemFile, stars: WorldStars): StarInfo | { 
     mass: o.mass_msun ?? est.mass,
     massSource: o.mass_msun !== undefined ? 'given' : est.massSource
   }
-  return { record, physics, overridden: Object.keys(o).filter((k) => (o as Record<string, unknown>)[k] !== undefined) }
+  return {
+    record,
+    physics,
+    overridden: Object.keys(o).filter((k) => (o as Record<string, unknown>)[k] !== undefined),
+    placement: !placed ? 'detached' : system.provisional ? 'stand-in' : 'placed'
+  }
 }
 
 // ---- bodies ----

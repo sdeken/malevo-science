@@ -169,7 +169,7 @@ export function entityActions(ref: Ref, snapshot: WorldSnapshot, setNow: (t: num
       const s = snapshot.systems.find((x) => x.id === ref.id)
       if (!s) break
       add('Open the system', { type: 'systems', params: { focus: ref.id } }, true)
-      add(`The star${s.star?.name ? `, ${s.star.name}` : ''}`, { type: 'star', params: { id: s.starId } })
+      if (s.starId) add(`The star${s.star?.name ? `, ${s.star.name}` : ''}`, { type: 'star', params: { id: s.starId } })
       add('Article', article('system', ref.id))
       add('Approach', { type: 'approach', params: { focus: `system:${ref.id}` } })
       systemActions(ref.id, `in ${s.name}`)

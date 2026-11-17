@@ -111,7 +111,7 @@ export function routeWorld(world: WorldData, env: WorldEnv = {}): RouteWorld {
   const stars = worldStars(world, env)
   const systemsByStar = new Map<string, string>()
   for (const e of [...entitiesOf(world, systemKind)].sort((a, b) => compareStrings(a.id, b.id)))
-    if (!systemsByStar.has(e.value.star)) systemsByStar.set(e.value.star, e.id)
+    if (e.value.star && !systemsByStar.has(e.value.star)) systemsByStar.set(e.value.star, e.id)
   const nodes = new Map<string, NodeInfo>()
   const accel = physics ? torchSettings(physics).cruiseAccel : null
 
@@ -123,7 +123,8 @@ export function routeWorld(world: WorldData, env: WorldEnv = {}): RouteWorld {
   const systemNode = (id: string, node: string): NodeInfo => {
     const info = systemInfo(world, env, id)
     const file = info?.file
-    const pos = info?.star ? info.star.record.pos : null
+    // A detached system has no place among the stars, so no routes reach it.
+    const pos = info?.star && info.star.placement !== 'detached' ? info.star.record.pos : null
     let dist: number | null = null
     if (info?.star && info.collapse !== null) {
       let port: number | null = null

@@ -370,8 +370,18 @@ export const STAR_ID = /^(?:hip|hyg)\.\d+$|^g\.-?\d+_-?\d+_-?\d+\.\d+$/
 
 export const systemSchema = obj({
   name: name(),
-  /** The star the system is built on. */
-  star: str({ pattern: STAR_ID, patternHint: 'is not a star id (hip.N, hyg.N or a generated g.… id)' }),
+  /**
+   * The star the system is on: a real star or a generated one. Absent: the system is detached, not yet
+   * placed among the stars (its own star is described by `spect`).
+   */
+  star: opt(str({ pattern: STAR_ID, patternHint: 'is not a star id (hip.N, hyg.N or a generated g.… id)' })),
+  /** The star is only a stand-in: where the system might be, for now (its sky and distances follow it). */
+  provisional: opt(bool()),
+  /**
+   * The system's own star, by spectral type ("K1V", "G2V", "M4.5V"): its mass, brightness, temperature and
+   * size are typical main-sequence values for it (each can be overridden), whatever star it is placed on.
+   */
+  spect: opt(str({ pattern: /^[OBAFGKM]\d(\.\d)?V?$/, patternHint: 'is not a main-sequence spectral type like "K1V" or "M4.5V"' })),
   /** Values that replace the estimates made from the catalogue. */
   starOverrides: opt(
     obj({

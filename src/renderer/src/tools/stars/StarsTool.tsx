@@ -36,7 +36,7 @@ function StarsView({ world, snapshot, now, focus: navFocus, navigate, params }: 
       return
     }
     const sys = systems.find((s) => s.id === navFocus)
-    if (sys) setFocusId(sys.starId)
+    if (sys?.starId) setFocusId(sys.starId)
   }, [navFocus]) // eslint-disable-line react-hooks/exhaustive-deps
   // Opened to show territory: colour the map so.
   useEffect(() => {
@@ -205,7 +205,7 @@ function StarsView({ world, snapshot, now, focus: navFocus, navigate, params }: 
             <li key={s.id}>
               <button
                 className={s.starId === focusId ? 'list-item is-current' : 'list-item'}
-                onClick={() => setFocusId(s.starId)}
+                onClick={() => s.starId && setFocusId(s.starId)}
                 data-system={s.id}
               >
                 <span>{s.name}</span>

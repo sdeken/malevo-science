@@ -47,7 +47,7 @@ function builtinCandidates(world: WorldData): Candidate[] {
     (e): e is Entity & { value: SystemFile } => e.kind.kind === systemKind.kind && e.value !== undefined
   )
   const out: Candidate[] = []
-  const systems: { id: string; star: string }[] = fileSystems.map((e) => ({ id: e.id, star: e.value.star }))
+  const systems: { id: string; star: string }[] = fileSystems.flatMap((e) => (e.value.star ? [{ id: e.id, star: e.value.star }] : []))
 
   if (settings.solarSystem !== false) {
     // The bodies join whatever system sits on the Sun; without one, the built-in Sol (unless it was deleted or its id is taken).
