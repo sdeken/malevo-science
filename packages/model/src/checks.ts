@@ -5,6 +5,9 @@
  */
 import {
   DEG,
+  G,
+  M_SUN,
+  R_EARTH,
   compareStrings,
   formatInstant,
   formatSpan,
@@ -192,6 +195,7 @@ export const systemsCheck: Check = {
             path
           })
       }
+      out.push(...plausibility(info, byId, e.path))
       // Neighbouring orbits around the same host that cross.
       const groups = new Map<string | null, typeof info.bodies>()
       // Belts overlap by nature, and dwarf planets cross giants' orbits (Pluto crosses Neptune's).
@@ -211,12 +215,101 @@ export const systemsCheck: Check = {
               message: `Its orbit crosses ${sorted[i - 1].name}'s; that rarely lasts.`,
               path: `bodies/${sorted[i].id}.json`
             })
+            continue
           }
+          // Room between neighbours, in their mutual Hill radius: the reach of their own gravity together.
+          const a = sorted[i - 1]
+          const b = sorted[i]
+          const host = b.parent ? byId.get(b.parent)?.mass : info.star?.physics.mass != null ? info.star.physics.mass * M_SUN : null
+          if (!host) continue
+          const rh = Math.cbrt((a.mass + b.mass) / (3 * host)) * ((inner.a + outer.a) / 2)
+          const spacing = (outer.a - inner.a) / rh
+          const closest = (outer.a * (1 - outer.e) - inner.a * (1 + inner.e)) / rh
+          if (closest < 2 * Math.sqrt(3))
+            out.push({
+              severity: 'warning',
+              check: 'systems',
+              code: 'too-close',
+              message: `At its closest it comes within ${closest.toFixed(1)} mutual Hill radii of ${a.name}: close encounters would soon scatter one of them (two planets need at least about 3.5, and more to last; a less eccentric orbit, or more room, mends it).`,
+              path: `bodies/${b.id}.json`
+            })
+          else if (spacing < 7)
+            out.push({
+              severity: 'info',
+              check: 'systems',
+              code: 'tightly-packed',
+              message: `Only ${spacing.toFixed(1)} mutual Hill radii from ${a.name}: systems packed this tightly seldom last billions of years unless locked in a resonance (about 10 or more is comfortable).`,
+              path: `bodies/${b.id}.json`
+            })
         }
       }
     }
     return out
   }
+}
+
+/** Plausible densities for a planet of each kind, g/cm³. */
+const DENSITY: Partial<Record<string, [number, number, string]>> = {
+  rocky: [3, 9, 'rocky planet'],
+  ocean: [1.5, 7, 'ocean world'],
+  'ice-giant': [0.8, 2.5, 'ice giant'],
+  'gas-giant': [0.2, 2.5, 'gas giant'],
+  dwarf: [0.8, 4, 'dwarf planet']
+}
+
+/** Rocky planets above about this radius mostly have thick envelopes of gas (the "radius valley"), Earth radii. */
+const ROCKY_LIMIT_RE = 1.7
+const BILLION_YEARS = 1e9 * 365.25 * 86400
+
+/**
+ * Whether what's been set is like real worlds: a planet's density for its kind, a rocky planet too big to stay
+ * bare rock, and a spin that tides would have stopped long ago.
+ */
+function plausibility(
+  info: NonNullable<ReturnType<typeof systemInfo>>,
+  byId: Map<string, (typeof info.bodies)[number]>,
+  _sys: string
+): Issue[] {
+  const out: Issue[] = []
+  for (const b of info.bodies) {
+    const path = `bodies/${b.id}.json`
+    if (b.error || b.cls === 'belt' || b.cls === 'comet') continue
+    const range = DENSITY[b.cls]
+    if (!b.parent && range && (b.density < range[0] || b.density > range[1]))
+      out.push({
+        severity: 'warning',
+        check: 'systems',
+        code: 'implausible-density',
+        message: `Its density, ${b.density.toFixed(2)} g/cm³, is unlike a ${range[2]}'s (about ${range[0]}–${range[1]}): check its mass and radius together.`,
+        path
+      })
+    if (!b.parent && (b.cls === 'rocky' || b.cls === 'ocean') && b.radius / R_EARTH > ROCKY_LIMIT_RE)
+      out.push({
+        severity: 'info',
+        check: 'systems',
+        code: 'radius-valley',
+        message: `At ${(b.radius / R_EARTH).toFixed(1)} Earth radii, most planets are wrapped in thick hydrogen and helium (above about ${ROCKY_LIMIT_RE}); a bare ${b.cls === 'ocean' ? 'ocean world' : 'rocky world'} this big is unusual.`,
+        path
+      })
+    // Tides: how long the host takes to stop a free spin (Gladman et al. 1996: Q = 100, k₂ = 0.3, from a 12-hour day).
+    const locked = (b.file.rotation as { locked?: boolean } | undefined)?.locked === true
+    const host = b.parent ? byId.get(b.parent)?.mass : info.star?.physics.mass != null ? info.star.physics.mass * M_SUN : null
+    if (!locked && host && b.elements && b.rotation && b.period && b.cls !== 'gas-giant' && b.cls !== 'ice-giant') {
+      const w = (2 * Math.PI) / (12 * 3600)
+      const t = (w * b.elements.a ** 6 * 0.4 * b.mass * b.radius ** 2 * 100) / (3 * G * host ** 2 * 0.3 * b.radius ** 5)
+      const ratio = b.period / Math.abs(b.rotation)
+      const resonant = [1, 1.5, 2].some((r) => Math.abs(ratio - r) / r < 0.03)
+      if (t < BILLION_YEARS && !resonant)
+        out.push({
+          severity: 'info',
+          check: 'systems',
+          code: 'tidally-locked',
+          message: `Tides from ${b.parent ? (byId.get(b.parent)?.name ?? 'its planet') : 'the star'} would have stopped its spin in about ${t / BILLION_YEARS < 0.01 ? `${Math.max(1, Math.round((t / BILLION_YEARS) * 1000))} million` : `${(t / BILLION_YEARS).toFixed(2)} billion`} years: it is likely locked (one face to it), or caught in a spin–orbit resonance as Mercury is (3 turns every 2 orbits).`,
+          path
+        })
+    }
+  }
+  return out
 }
 
 export const calendarsCheck: Check = {

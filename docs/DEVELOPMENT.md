@@ -104,6 +104,29 @@ npm run dev          # the app with hot reload
 - The system screen's **Where it is** panel switches between the three. It finds stars by name or
   id, or picks a random generated star within 40 ly of where the system is (or of Sol).
 
+### Is the system plausible?
+
+The checks (the Checks tool, and VS Code's Problems panel) flag systems that physics would argue
+with. None of them stops anything: a warning is "this probably wouldn't last", a note is "worth a
+second look". The real Solar System raises none of them.
+
+- **`too-close`** (warning): two neighbours (planets around the star, or moons of the same planet)
+  come within 2√3 mutual Hill radii at closest approach (the inner one's aphelion against the outer
+  one's perihelion), so an eccentric giant counts for where it swings in, not just its average.
+  Below that, two planets can't stay out of each other's way. Dwarf planets, belts and comets are left
+  out, as they are from the crossing-orbits check.
+- **`tightly-packed`** (note): neighbours under 7 mutual Hill radii apart. Packed systems like
+  that tend to go unstable over billions of years. (Jupiter and Saturn are about 8.)
+- **`implausible-density`** (warning): a planet's density outside its class's range, in g/cm³:
+  rocky 3–9, ocean 1.5–7, ice giant 0.8–2.5, gas giant 0.2–2.5, dwarf 0.8–4. Moons aren't checked.
+- **`radius-valley`** (note): a rocky or ocean planet over 1.7 Earth radii. Few planets are found
+  between about 1.5 and 2 Earth radii; bigger ones usually keep thick gas envelopes.
+- **`tidally-locked`** (note): a planet or moon that isn't marked as locked, but whose host would
+  have locked it within a billion years (Gladman et al., with Q = 100, k₂ = 0.3 and a 12-hour
+  starting day). A day in a 1:1, 3:2 or 2:1 ratio with its year (as Mercury's is) counts as locked.
+  Giants aren't checked.
+- **`moon-unbound`** (as before): a moon beyond half its planet's Hill sphere.
+
 ### Blades
 
 - **Views open side by side, as blades** (`src/renderer/src/blades/`). The sidebar starts a new
