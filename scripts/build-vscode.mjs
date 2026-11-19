@@ -1,6 +1,6 @@
 /**
  * Builds the VS Code extension into vscode/dist: the extension (Node, CommonJS), the editors' screens (the
- * app's React screens, for the webview), their styles, and the star catalogue. `--package` then makes the
+ * app's React screens, for the webview; and the scene timeline's), their styles, and the star catalogue. `--package` then makes the
  * .vsix in release/.
  */
 import { build } from 'esbuild'
@@ -36,6 +36,18 @@ await build({
   minify: true,
   define: { 'process.env.NODE_ENV': '"production"' },
   alias: { '@renderer': path.join(root, 'src/renderer/src') },
+  logLevel: 'warning'
+})
+await build({
+  entryPoints: [path.join(ext, 'src/webview/timeline.tsx')],
+  outfile: path.join(dist, 'timeline.js'),
+  bundle: true,
+  platform: 'browser',
+  format: 'iife',
+  target: 'chrome120',
+  jsx: 'automatic',
+  minify: true,
+  define: { 'process.env.NODE_ENV': '"production"' },
   logLevel: 'warning'
 })
 const css = await fs.readFile(path.join(root, 'src/renderer/src/styles.css'), 'utf8')

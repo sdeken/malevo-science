@@ -1,7 +1,7 @@
 {
   "name": "malevo-science",
   "displayName": "Malevo Science",
-  "description": "Systems and bodies of a hard science fiction world, with the physics worked out: edit them in VS Code.",
+  "description": "Systems and bodies of a hard science fiction world, with the physics worked out, and scene timelines: edit them in VS Code.",
   "version": "0.0.0",
   "publisher": "sdeken",
   "private": true,
@@ -18,7 +18,9 @@
   ],
   "main": "./dist/extension.js",
   "activationEvents": [
-    "workspaceContains:**/world.json"
+    "workspaceContains:**/world.json",
+    "onCustomEditor:malevo.sceneTimeline",
+    "onCommand:malevo.newTimeline"
   ],
   "contributes": {
     "customEditors": [
@@ -41,6 +43,16 @@
           }
         ],
         "priority": "default"
+      },
+      {
+        "viewType": "malevo.sceneTimeline",
+        "displayName": "Scene timeline",
+        "selector": [
+          {
+            "filenamePattern": "*.timeline.json"
+          }
+        ],
+        "priority": "default"
       }
     ],
     "commands": [
@@ -52,6 +64,11 @@
       {
         "command": "malevo.setDate",
         "title": "Set the current date…",
+        "category": "Malevo"
+      },
+      {
+        "command": "malevo.newTimeline",
+        "title": "New scene timeline…",
         "category": "Malevo"
       }
     ]

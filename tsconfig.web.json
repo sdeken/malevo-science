@@ -18,5 +18,12 @@
       "@renderer/*": ["src/renderer/src/*"]
     }
   },
-  "include": ["src/renderer/**/*", "src/shared/**/*", "src/preload/index.d.ts", "packages/viz/src/**/*", "vscode/src/webview/**/*"]
+  "include": [
+    "src/renderer/**/*",
+    "src/shared/**/*",
+    "src/preload/index.d.ts",
+    "packages/viz/src/**/*",
+    "vscode/src/webview/**/*",
+    "vscode/src/timeline/**/*"
+  ]
 }

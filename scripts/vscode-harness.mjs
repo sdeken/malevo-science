@@ -154,6 +154,91 @@ await sys
     () => check(false, 'the current date set in one editor moves the other')
   )
 await body2.screenshot({ path: path.join(shots, 'body.png'), fullPage: true })
+
+// A scene timeline: no world, just its file's text, which a stand-in for VS Code holds.
+const tlJs = await fs.readFile(path.join(root, 'vscode/dist/timeline.js'), 'utf8')
+const tl = await browser.newPage({ viewport: { width: 1300, height: 800 } })
+tl.on('pageerror', (e) => {
+  console.log('  [pageerror]', e.message)
+  failures++
+})
+let doc = JSON.stringify(
+  {
+    format: 1,
+    title: 'Down to Bluff',
+    clocks: [{ id: 'ship', name: 'Ship time', kind: 'ship', start: '2d 23h 50m 0s' }],
+    events: [
+      { id: 'brief', name: 'Briefing', duration: '0d 0h 10m 0s' },
+      { id: 'burn', name: 'Deorbit burn', duration: '0d 0h 4m 0s' }
+    ]
+  },
+  null,
+  2
+)
+const toPage = (m) => tl.evaluate((x) => window.postMessage(x, '*'), m)
+const fromPage = []
+await tl.exposeFunction('__toHost', async (m) => {
+  fromPage.push(m)
+  if (m.type === 'ready') await toPage({ type: 'doc', text: doc })
+  if (m.type === 'edit') {
+    doc = m.text
+    await toPage({ type: 'doc', text: doc })
+  }
+  if (m.type === 'confirm') await toPage(m.then)
+})
+await tl.setContent(`<!doctype html><html><head><style>${css}</style></head><body class="vscode-host"><div id="root"></div>
+<script>window.acquireVsCodeApi = () => ({ postMessage: (m) => window.__toHost(m) })</script>
+<script>${tlJs.replace(/<\/script/g, '<\\/script')}</script></body></html>`)
+await tl.waitForSelector('#timelineTable', { timeout: 10_000 })
+const cellText = (ev, col) => tl.locator(`[data-event="${ev}"] td`).nth(col).textContent()
+check((await cellText('burn', 4)) === '3d 00:00:00', 'a timeline opens: the ship clock reads 3d 00:00:00 as the burn starts')
+// A local clock with 1.5-hour hours, a countdown started by the burn's end.
+await tl.locator('[data-add-clock="local"]').click()
+await tl.locator('[data-add-clock="countdown"]').click()
+await sleep(300)
+const local = tl.locator('.timeline-clock').nth(1)
+await local.locator('input[aria-label="Local hour"]').fill('1.5')
+await local.locator('input[aria-label="Local hour"]').press('Enter')
+const cd = tl.locator('.timeline-clock').nth(2)
+await cd.locator('select').nth(1).selectOption('burn')
+await cd.locator('select').nth(2).selectOption('end')
+await sleep(400)
+check(
+  (await cellText('burn', 5)) === '0d 12:06:40' && /T−0d 0h 30m 0s/.test((await tl.locator('tfoot').textContent()) ?? ''),
+  `local time runs at its own hour, and a countdown starts at the burn's end (${await cellText('burn', 5)})`
+)
+// An event's duration, typed loosely, is written the file's way.
+const dur = tl.locator('[data-event="brief"] input[aria-label="Lasts"]')
+await dur.fill('1h 30m')
+await dur.press('Enter')
+await sleep(400)
+const saved = JSON.parse(doc)
+check(
+  saved.events[0].duration === '0d 1h 30m 0s' &&
+    saved.clocks[2].startedBy === 'burn' &&
+    saved.clocks[2].at === 'end' &&
+    saved.clocks[1].hour_h === 1.5,
+  'every change goes to the file, durations written as 0d 1h 30m 0s'
+)
+// Slide the ship clock: a drag right by days.
+const slider = tl.locator('#slide-ship')
+const box = await slider.boundingBox()
+await tl.mouse.move(box.x + box.width / 2, box.y + box.height / 2)
+await tl.mouse.down()
+await tl.mouse.move(box.x + box.width / 2 + 16, box.y + box.height / 2, { steps: 4 })
+await tl.mouse.up()
+await sleep(400)
+check(JSON.parse(doc).clocks[0].start === '4d 23h 50m 0s', `sliding the ship clock two days later (${JSON.parse(doc).clocks[0].start})`)
+// A change in the text editor comes back.
+doc = doc.replace('Deorbit burn', 'The burn')
+await toPage({ type: 'doc', text: doc })
+await sleep(200)
+check((await tl.locator('[data-event="burn"] input[aria-label="Event"]').inputValue()) === 'The burn', 'and an edit to the text shows here')
+await tl.locator('#exportMarkdown').click()
+await sleep(200)
+const md = fromPage.find((m) => m.type === 'export')?.text ?? ''
+check(/\| 2 \| The burn \| 0d 0h 4m 0s \|/.test(md) && md.startsWith('## Down to Bluff'), 'it exports a Markdown table')
+await tl.screenshot({ path: path.join(shots, 'timeline.png'), fullPage: true })
 await browser.close()
 console.log(`\nscreenshots: ${shots}`)
 console.log(failures ? `\n${failures} check(s) failed` : '\nharness passed')

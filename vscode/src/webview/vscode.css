@@ -59,3 +59,129 @@ body.vscode-host button.primary {
   padding: 0;
   margin: 4px 0;
 }
+
+/* ---- scene timeline ---- */
+.timeline-page h3 {
+  margin: 18px 0 8px;
+}
+
+.timeline-head {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.timeline-title {
+  flex: 1 1 260px;
+  font-size: 1.4em;
+  font-weight: 600;
+  background: transparent;
+  border: 1px solid transparent;
+}
+
+.timeline-title:hover,
+.timeline-title:focus {
+  border-color: var(--border);
+}
+
+.timeline-actions {
+  display: flex;
+  gap: 8px;
+}
+
+.timeline-clocks {
+  display: grid;
+  gap: 8px;
+}
+
+.timeline-clock {
+  padding: 6px 10px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+}
+
+.timeline-clock .field-row {
+  align-items: end;
+}
+
+.timeline-add .link {
+  margin-right: 10px;
+}
+
+.timeline-table-wrap {
+  overflow-x: auto;
+}
+
+.timeline-table {
+  border-collapse: collapse;
+  min-width: 100%;
+}
+
+.timeline-table th,
+.timeline-table td {
+  padding: 3px 6px;
+  border-bottom: 1px solid var(--border);
+  text-align: left;
+  vertical-align: middle;
+  white-space: nowrap;
+}
+
+.timeline-table th {
+  font-size: 12px;
+  color: var(--muted);
+  font-weight: 600;
+}
+
+.timeline-table .num {
+  text-align: right;
+  color: var(--muted);
+}
+
+.timeline-table .center {
+  text-align: center;
+}
+
+.timeline-table .clock-col {
+  background: color-mix(in srgb, var(--accent) 6%, transparent);
+}
+
+.timeline-table tfoot td {
+  border-bottom: none;
+}
+
+.mono {
+  font-family: var(--vscode-editor-font-family, ui-monospace, monospace);
+  font-variant-numeric: tabular-nums;
+}
+
+.timeline-cell {
+  width: 100%;
+  min-width: 8em;
+  background: transparent;
+  border: 1px solid transparent;
+}
+
+.timeline-cell:hover,
+.timeline-cell:focus {
+  border-color: var(--border);
+}
+
+.timeline-cell.invalid {
+  border-color: var(--vscode-inputValidation-errorBorder, #f14c4c);
+}
+
+.timeline-starts {
+  display: block;
+  color: var(--now, var(--accent));
+  padding-left: 4px;
+}
+
+.row-actions {
+  display: inline-flex;
+  gap: 8px;
+}
+
+.timeline-cell.mono {
+  min-width: 11em;
+}

@@ -26,6 +26,11 @@ interface Props {
   setNow(t: number): void
   /** The unit being scrubbed by, as it changes (to show the date that finely). */
   onUnit?(unit: (typeof SCRUB_UNITS)[number]['name'] | null): void
+  /** A day's length in the scrubbed seconds, if not 86,400 (a local day): days, 30 and 360 of them scale with it. */
+  day?: number
+  /** Its accessible name, if not the current date's. */
+  label?: string
+  id?: string
 }
 
 /**
@@ -33,7 +38,7 @@ interface Props {
  * for coarser (30 days, 360 days); it starts on days. With the keyboard: ← and → step, ↑ and ↓ change the
  * step. Steps are whole units, so scrubbing by days keeps the time of day.
  */
-export function DateScrubber({ now, setNow, onUnit }: Props): React.JSX.Element {
+export function DateScrubber({ now, setNow, onUnit, day, label, id }: Props): React.JSX.Element {
   const [level, setLevel] = useState(START)
   const [dragging, setDragging] = useState(false)
   const drag = useRef<{ x: number; y: number; t: number; acc: number; startLevel: number; level: number } | null>(null)
@@ -41,7 +46,8 @@ export function DateScrubber({ now, setNow, onUnit }: Props): React.JSX.Element 
   const frame = useRef(0)
   const nowRef = useRef(now)
   nowRef.current = now
-  const unit = SCRUB_UNITS[level]
+  const units = day && day !== 86400 ? SCRUB_UNITS.map((u) => (u.s >= 86400 ? { ...u, s: (u.s / 86400) * day } : u)) : SCRUB_UNITS
+  const unit = units[level]
 
   useEffect(() => () => cancelAnimationFrame(frame.current), [])
 
@@ -82,7 +88,7 @@ export function DateScrubber({ now, setNow, onUnit }: Props): React.JSX.Element 
     const steps = Math.trunc(d.acc / PX_PER_STEP)
     if (!steps) return
     d.acc -= steps * PX_PER_STEP
-    d.t += steps * SCRUB_UNITS[lv].s
+    d.t += steps * units[lv].s
     push(d.t)
   }
   const end = (): void => {
@@ -105,10 +111,10 @@ export function DateScrubber({ now, setNow, onUnit }: Props): React.JSX.Element 
   return (
     <div
       className={`date-scrubber${dragging ? ' dragging' : ''}`}
-      id="dateScrubber"
+      id={id ?? 'dateScrubber'}
       role="slider"
       tabIndex={0}
-      aria-label={`Scrub the date ${unit.by}`}
+      aria-label={`${label ?? 'Scrub the date'} ${unit.by}`}
       aria-valuetext={`${unit.label} steps`}
       data-unit={unit.name}
       title="Drag left or right to go earlier or later. Drag up for finer steps (hour, minute, second), down for coarser (30 days, 360 days). Keys: ← → step (Shift: ten), ↑ ↓ change the step."

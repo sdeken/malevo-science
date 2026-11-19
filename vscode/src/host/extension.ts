@@ -6,6 +6,7 @@
 import { existsSync } from 'node:fs'
 import * as path from 'node:path'
 import * as vscode from 'vscode'
+import { TIMELINE_VIEW, TimelineEditorProvider, newTimelineCommand } from './timeline'
 import { bodyKind, slugify, systemKind, uniqueSlug, type WorldEnv } from '@malevo/model'
 import { loadCatalog, nodeEnvWith, openWorld } from '@malevo/model/node'
 import { WorldSession } from '../../../src/main/world'
@@ -341,7 +342,11 @@ export async function activate(ctx: vscode.ExtensionContext): Promise<void> {
       webviewOptions: { retainContextWhenHidden: true }
     }),
     vscode.commands.registerCommand('malevo.setDate', setDateCommand),
-    vscode.commands.registerCommand('malevo.newSystem', newSystemCommand)
+    vscode.commands.registerCommand('malevo.newSystem', newSystemCommand),
+    vscode.window.registerCustomEditorProvider(TIMELINE_VIEW, new TimelineEditorProvider(ctx), {
+      webviewOptions: { retainContextWhenHidden: true }
+    }),
+    vscode.commands.registerCommand('malevo.newTimeline', newTimelineCommand)
   )
 }
 

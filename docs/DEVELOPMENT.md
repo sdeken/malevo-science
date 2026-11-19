@@ -88,6 +88,28 @@ npm run dev          # the app with hot reload
   the real world session, through a stand-in for the message bridge: a detached system, a
   stand-in star, a body opening in its own tab, an edit, and the shared current date.
 
+### Scene timelines (VS Code)
+
+A small timeline for a scene, apart from the world: any `*.timeline.json` opens in the *Scene
+timeline* editor (`vscode/src/webview/timeline.tsx`; the working-out is `vscode/src/timeline/model.ts`).
+It needs no world.json. *Malevo: New scene timeline…* makes one next to the file open now.
+
+- **Events** run one after another, each lasting a duration written `0d 0h 4m 0s` (60-minute hours,
+  24-hour days; `4m`, `1h 30m`, `90s`, `2.5h` and `14:05` are read too, and written back the
+  file's way). *With the one before* starts an event when the one before it starts, not ends.
+- **Clocks**, read as each event starts (hover for its end), and once more where the last ends:
+  - *Ship time*: 60-minute hours; *reads at the start* sets it, and *Slide it* drags it like the
+    date bar's scrubber (up for finer steps, down for coarser).
+  - *Local time*: its hour is any length in standard hours (1.5, 1.0412…), with sixtieths for its
+    minutes and seconds, and any number of hours a day. It slides in its own units.
+  - *Duration*: time since an event's start or end (or the first event's start).
+  - *Countdown*: from a length, started the same way; `T−…`, then `T+…` once it's past zero.
+- **The file** is VS Code's: each change is an edit to it (unsaved until Save, undone with Undo),
+  and edits to its text show in the editor. A file that doesn't read says why.
+- **Markdown:** *Copy as Markdown* puts a table on the clipboard; *Save as Markdown…* writes it
+  to a file you choose (next to the timeline by default). The table has each event, how long it
+  lasts, every clock as it starts, and its notes.
+
 ### Systems not yet placed
 
 - **A system's star is optional** (`star`). Without one it is detached: its own star is described
