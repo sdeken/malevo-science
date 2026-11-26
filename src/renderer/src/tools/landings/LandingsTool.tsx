@@ -138,6 +138,17 @@ function LandingEditor({
     ]),
     snapshot.version
   )
+  const climbFrom = useFormatted(cal, file.climb?.from ? [{ t: file.climb.from.t_s, precision: 'minute' }] : [], snapshot.version)[0]
+  const slotText = useFormatted(
+    cal,
+    (r?.slots ?? []).flatMap((x) => [
+      { t: x.open, precision: 'minute' },
+      { t: x.best, precision: 'minute' },
+      { t: x.close, precision: 'minute' },
+      { t: x.best + x.alongside_s, precision: 'minute' }
+    ]),
+    snapshot.version
+  )
   const pos = (f: (x: number) => void) => (x: number | undefined) => x !== undefined && x > 0 && f(x)
   return (
     <section className="landing" id="landingEditor">
@@ -436,6 +447,104 @@ function LandingEditor({
           </table>
         )}
       </details>
+
+      {file.track && (
+        <details className="kit" open={Boolean(file.climb)} id="landingClimbBox">
+          <summary>Going back up: when can a lighter launch to the ship?</summary>
+          {file.climb ? (
+            <>
+              <div className="field-row">
+                <label className="field">
+                  Not before
+                  <DateInput
+                    calendars={snapshot.calendars as CalendarInfo[]}
+                    cal={file.climb.from?.cal ?? cal}
+                    text={file.climb.from?.text ?? climbFrom ?? touchText ?? ''}
+                    onCommit={(d) => set({ climb: { ...file.climb!, from: { t_s: d.t, cal: d.cal, text: d.text } } })}
+                    id="climbFrom"
+                  />
+                </label>
+                <NumberField
+                  label="Velocity to spare for the turn, m/s"
+                  value={file.climb.spare_ms}
+                  optional
+                  placeholder="100"
+                  hint="More spare, longer slots."
+                  onCommit={(x) => set({ climb: { ...file.climb!, spare_ms: x } })}
+                  id="climbSpare"
+                />
+                <NumberField
+                  label="Climb to orbit, min"
+                  value={file.climb.ascent_min}
+                  optional
+                  placeholder="10"
+                  onCommit={(x) => set({ climb: { ...file.climb!, ascent_min: x !== undefined && x > 0 ? x : undefined } })}
+                />
+                <NumberField
+                  label="Drops this far below the ship to catch it, km"
+                  value={file.climb.phasing_km}
+                  optional
+                  placeholder={String(Math.round(Math.min(150, file.orbit_km * 0.4)))}
+                  onCommit={(x) => set({ climb: { ...file.climb!, phasing_km: x !== undefined && x > 0 ? x : undefined } })}
+                />
+                <button className="link" onClick={() => set({ climb: undefined })}>
+                  Forget it
+                </button>
+              </div>
+              {r?.slots && (
+                <table className="data small" id="launchSlots">
+                  <thead>
+                    <tr>
+                      <th>Opens</th>
+                      <th>Best</th>
+                      <th>Closes</th>
+                      <th>Heading</th>
+                      <th>Turn at best</th>
+                      <th>The ship</th>
+                      <th>Alongside</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {r.slots.map((x, i) => (
+                      <tr key={x.best}>
+                        <td>{slotText[i * 4] ?? '…'}</td>
+                        <td>{slotText[i * 4 + 1] ?? '…'}</td>
+                        <td>{slotText[i * 4 + 2] ?? '…'}</td>
+                        <td>{x.heading}</td>
+                        <td>{x.dv_ms < 1 ? 'none' : `${sig(x.dv_ms, 2)} m/s`}</td>
+                        <td>
+                          {Math.abs(x.phase_deg) < 1
+                            ? 'right there'
+                            : `${sig(Math.abs(x.phase_deg), 2)}° ${x.phase_deg > 0 ? 'ahead' : 'behind'}`}
+                        </td>
+                        <td>
+                          {slotText[i * 4 + 3] ?? '…'} <span className="muted">({duration(x.alongside_s)} after liftoff)</span>
+                        </td>
+                      </tr>
+                    ))}
+                    {!r.slots.length && (
+                      <tr>
+                        <td colSpan={7} className="muted">
+                          No slot in the next three days.
+                        </td>
+                      </tr>
+                    )}
+                  </tbody>
+                </table>
+              )}
+              <p className="muted small">
+                A slot is open while the site is near enough the ship’s orbital plane for the spare velocity to turn into it. Launching at
+                its best moment, the lighter reaches orbit with the ship somewhere ahead or behind, and catches it in a lower orbit (or lets
+                it catch up from a higher one); “alongside” adds half an hour to come up to it.
+              </p>
+            </>
+          ) : (
+            <button onClick={() => set({ climb: {} })} id="landingAddClimb">
+              Find the launch slots back up
+            </button>
+          )}
+        </details>
+      )}
 
       {report && 'error' in report && <p className="error">{report.error}</p>}
       {r && (

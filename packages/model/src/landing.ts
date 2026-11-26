@@ -35,6 +35,22 @@ export interface LandingChance {
   miss_km: number
 }
 
+/** A launch slot back up to the ship: when the site is close enough to the ship's orbital plane to launch into it. */
+export interface LaunchSlot {
+  /** When it opens and closes (the lighter's spare velocity covers the plane change between), and the best moment. */
+  open: number
+  best: number
+  close: number
+  /** Launching northward or southward to meet the plane. */
+  heading: 'north' | 'south'
+  /** The plane change still needed at the best moment, m/s (0 when the site passes right through the plane). */
+  dv_ms: number
+  /** Launching at the best moment: how far ahead of the lighter the ship is when it reaches orbit, degrees (negative: behind). */
+  phase_deg: number
+  /** From liftoff to alongside the ship: the climb, catching up (or letting the ship catch up), and the approach, s. */
+  alongside_s: number
+}
+
 export interface LandingEvent {
   /** Seconds before (negative) or after the first touchdown. */
   t: number
@@ -78,6 +94,8 @@ export interface LandingReport {
   chances: LandingChance[] | null
   /** The closest any pass comes in the next two days, if none is close enough. */
   bestPass: LandingChance | null
+  /** With the ship's orbit and the climb given: the next launch slots back up to it. */
+  slots: LaunchSlot[] | null
   tow: { duration_s: number; arrive: number; nextHigh: number | null; dry: number | null } | null
   notes: string[]
 }
@@ -348,6 +366,34 @@ export function landingReport(world: WorldData, env: WorldEnv, f: LandingFile): 
       if (!body.rotation_h) notes.push(`${body.name} is taken as not turning (no rotation period given), so the chances ignore its spin.`)
     }
   }
+  let slots: LaunchSlot[] | null = null
+  if (f.track && f.climb) {
+    const city = f.city ? (world.entities.get(`city/${f.city}`)?.value as { lat_deg?: number; lon_deg?: number } | undefined) : undefined
+    const site =
+      f.site ?? (city?.lat_deg !== undefined && city.lon_deg !== undefined ? { lat_deg: city.lat_deg, lon_deg: city.lon_deg } : null)
+    if (site) {
+      slots = launchSlots({
+        radius: R,
+        mu,
+        rotation_h: body.rotation_h,
+        orbit_km: f.orbit_km,
+        site,
+        track: f.track,
+        from: f.climb.from?.t_s ?? f.touchdown.t_s,
+        spare_ms: f.climb.spare_ms ?? 100,
+        ascent_min: f.climb.ascent_min ?? 10,
+        phasing_km: f.climb.phasing_km
+      })
+      if (!slots.length)
+        notes.push(
+          `No launch slot back up in the next three days: the site never comes close enough to the ship's orbital plane for ${Math.round(f.climb.spare_ms ?? 100)} m/s of plane change. Tilt the orbit more than the site's latitude.`
+        )
+      else if (slots.length > 1) {
+        const gaps = slots.slice(1, 4).map((x, i) => ((x.best - slots![i].best) / 3600).toFixed(1))
+        notes.push(`Launch slots back up come ${gaps.join(' h, then ')} h apart.`)
+      }
+    }
+  }
   if (body.rotation_h && !f.track)
     notes.push(
       `Her orbit passes over a given spot only about twice a day (the ground track shifts ${((period / 3600 / body.rotation_h) * 360).toFixed(0)}° west each orbit), so touchdown times come in windows.`
@@ -376,8 +422,134 @@ export function landingReport(world: WorldData, env: WorldEnv, f: LandingFile): 
     heatOn: pod ? 'shield' : 'ballute',
     chances,
     bestPass,
+    slots,
     tow,
     notes
+  }
+}
+
+export interface LaunchSlotsInput {
+  /** The body's radius, m, and GM, m³/s². */
+  radius: number
+  mu: number
+  /** Its rotation period, h (null: not turning). */
+  rotation_h: number | null
+  /** The ship's orbit: its height, km, and its plane and place at a time (as a landing's track). */
+  orbit_km: number
+  site: { lat_deg: number; lon_deg: number }
+  track: { inclination_deg: number; node_lon_deg: number; arg_deg: number; at: { t_s: number } }
+  /** The earliest liftoff. */
+  from: number
+  /** The lighter's velocity to spare for turning its orbit into the ship's, m/s: how wide each slot is. */
+  spare_ms: number
+  /** From liftoff to orbit, min. */
+  ascent_min: number
+  /** How far below (or above) the ship's orbit it can drop to catch up, km. Default: 150, or 40% of the orbit's height if less. */
+  phasing_km?: number
+  /** How far ahead to look, s. Default three days. */
+  horizon_s?: number
+}
+
+/**
+ * When a lighter can launch from a site to the ship's orbit. The site rides through the orbit's plane as the
+ * planet turns: twice a day if it is nearer the equator than the orbit's tilt (once heading north, once south,
+ * unevenly spaced), once a day near the tilt, never beyond it (unless the spare velocity reaches). Off the plane,
+ * the lighter has to turn its orbit: about the orbital speed times the angle, 2·v·sin(δ/2). A slot is open while
+ * that is within the spare.
+ *
+ * Then the ship has to be caught: the lighter reaches orbit somewhere behind or ahead of it, and closes the gap in
+ * a lower (faster) or higher (slower) orbit, at 1.5·n·Δh/r radians a second; plus half an hour to come alongside.
+ * The plane's slow drift from the planet's oblateness is left out, as it is for the descents.
+ */
+export function launchSlots(p: LaunchSlotsInput): LaunchSlot[] {
+  const D = Math.PI / 180
+  const r0 = p.radius + p.orbit_km * 1000
+  const n0 = Math.sqrt(p.mu / r0 ** 3)
+  const v0 = n0 * r0
+  const spin = p.rotation_h ? (2 * Math.PI) / (p.rotation_h * 3600) : 0
+  const inc = p.track.inclination_deg * D
+  const tA = p.track.at.t_s
+  const phi = p.site.lat_deg * D
+  const nrm = [0, -Math.sin(inc), Math.cos(inc)]
+  const pAx = [1, 0, 0]
+  const qAx = [0, Math.cos(inc), Math.sin(inc)]
+  /** The site in a frame fixed to the orbit's plane (its northbound node along x). */
+  const siteAt = (t: number): number[] => {
+    const lam = (p.site.lon_deg - p.track.node_lon_deg) * D + spin * (t - tA)
+    return [Math.cos(phi) * Math.cos(lam), Math.cos(phi) * Math.sin(lam), Math.sin(phi)]
+  }
+  const dot = (a: number[], b: number[]): number => a[0] * b[0] + a[1] * b[1] + a[2] * b[2]
+  const offPlane = (t: number): number => Math.abs(Math.asin(Math.max(-1, Math.min(1, dot(siteAt(t), nrm)))))
+  const dvAt = (t: number): number => 2 * v0 * Math.sin(offPlane(t) / 2)
+  const ascent = p.ascent_min * 60
+  const dh = (p.phasing_km ?? Math.min(150, p.orbit_km * 0.4)) * 1000
+  const rate = (1.5 * n0 * dh) / r0
+  const horizon = p.horizon_s ?? 3 * 86400
+  const edge = (a: number, b: number): number => {
+    // Where dvAt crosses the spare, between a (inside) and b (outside).
+    for (let k = 0; k < 40; k++) {
+      const m = (a + b) / 2
+      if (dvAt(m) <= p.spare_ms) a = m
+      else b = m
+    }
+    return a
+  }
+  const out: LaunchSlot[] = []
+  const step = 20
+  // Already in a slot, past its best moment: it is still open now.
+  if (dvAt(p.from) <= p.spare_ms && offPlane(p.from + step) > offPlane(p.from)) add(p.from)
+  let t2 = p.from
+  let t1 = p.from + step
+  let f2 = offPlane(t2)
+  let f1 = offPlane(t1)
+  for (let t = p.from + 2 * step; t <= p.from + horizon && out.length < 8; t += step) {
+    const f0 = offPlane(t)
+    if (f1 <= f2 && f1 < f0 && dvAt(t1) <= p.spare_ms) {
+      // A closest approach to the plane, near enough: refine it, and find the slot's edges.
+      let lo = t2
+      let hi = t
+      for (let k = 0; k < 40; k++) {
+        const m1 = lo + (hi - lo) / 3
+        const m2 = hi - (hi - lo) / 3
+        if (offPlane(m1) < offPlane(m2)) hi = m2
+        else lo = m1
+      }
+      add((lo + hi) / 2)
+    }
+    t2 = t1
+    f2 = f1
+    t1 = t
+    f1 = f0
+  }
+  return out
+
+  /** A slot around its best moment. */
+  function add(best: number): void {
+    const open = Math.max(p.from, walk(best, -1))
+    const close = walk(best, 1)
+    const s = siteAt(best)
+    const u = Math.atan2(dot(s, qAx), dot(s, pAx))
+    // Into orbit downrange of the site: about half the orbital motion over the climb.
+    const uLighter = u + 0.5 * n0 * ascent
+    const uShip = p.track.arg_deg * D + n0 * (best + ascent - tA)
+    let lead = (((uShip - uLighter) % (2 * Math.PI)) + 2 * Math.PI) % (2 * Math.PI)
+    if (lead > Math.PI) lead -= 2 * Math.PI
+    out.push({
+      open: Math.min(open, best),
+      best,
+      close: Math.max(close, best),
+      heading: Math.cos(u) >= 0 ? 'north' : 'south',
+      dv_ms: dvAt(best),
+      phase_deg: lead / D,
+      alongside_s: ascent + Math.abs(lead) / rate + 1800
+    })
+  }
+
+  /** From inside a slot, walk out (back or on) to where the spare no longer covers the turn. */
+  function walk(t: number, dir: 1 | -1): number {
+    let a = t
+    while (dvAt(a + dir * step) <= p.spare_ms && Math.abs(a - t) < 6 * 3600) a += dir * step
+    return edge(a, a + dir * step)
   }
 }
 

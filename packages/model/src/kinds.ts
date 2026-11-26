@@ -1263,6 +1263,22 @@ export const landingSchema = obj({
       reach_km: opt(num({ min: 0, sig: 5 }))
     })
   ),
+  /**
+   * Going back up: when a lighter can launch from the site to the ship's orbit (the track). From the earliest
+   * liftoff (default: the touchdown), with this much velocity to spare for turning into the ship's plane, which
+   * sets how long each slot stays open.
+   */
+  climb: opt(
+    obj({
+      from: opt(instantSchema),
+      /** m/s. Default 100. */
+      spare_ms: opt(num({ min: 0, sig: 6 })),
+      /** From liftoff to orbit, min. Default 10. */
+      ascent_min: opt(num({ above: 0, sig: 4 })),
+      /** How far below or above the ship's orbit it may go to catch up, km. Default 150 (less for low orbits). */
+      phasing_km: opt(num({ above: 0, sig: 6 }))
+    })
+  ),
   note: opt(str({ max: 2000 }))
 })
 export type LandingFile = Infer<typeof landingSchema>

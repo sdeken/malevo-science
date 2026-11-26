@@ -499,6 +499,21 @@ module.exports = {
   miss from the site (the `site`, else the city). The passes that come within `reach_km` (default
   25 km, plus 400 km per unit of lift) are the chances; "Land then" sets the touchdown to one. With
   none, the closest pass is given.
+- **Going back up** (`climb`, with `track`; `launchSlots` in `landing.ts`): when a lighter can
+  launch from the site to the ship's orbit, from `climb.from` (default the touchdown), for three days.
+  - A slot is open while the site is near enough the orbit's plane for `spare_ms` (default
+    100 m/s) to turn into it, at 2·v·sin(δ/2) for δ off the plane. On Earth from 400 km that is
+    about 134 m/s a degree, about 21 m/s a minute late at 28.5°: 100 m/s is a slot of about
+    ten minutes.
+  - Twice a day nearer the equator than the orbit's tilt, once heading north and once south,
+    unevenly (8.6 h then 15.4 h at 28.5° under 51.6°; 5 h then 19 h at 45°); once a day near the
+    tilt; beyond it only if the spare reaches. The notes give the gaps.
+  - Launching at the best moment, the lighter reaches orbit (after `ascent_min`, default 10, half
+    the orbital motion of the climb downrange) with the ship some way ahead or behind; it closes
+    the gap `phasing_km` (default 150, or 40% of the orbit's height) below or above it, at
+    1.5·n·Δh/r, then half an hour to come alongside.
+  - Like the descents, it leaves out the plane's slow drift from the planet's oblateness (about 5°
+    a day for Earth at 400 km), so slots days ahead come tens of minutes off.
 
 ### Whereabouts
 

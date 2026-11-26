@@ -1194,6 +1194,19 @@ try {
     !('error' in drop) && drop.descent_s < 35 * 60 && drop.peakDecel_g > 6 && drop.heatOn === 'shield' && drop.chances !== null,
     `a pod aimed into the ground is down ${Math.round(drop.descent_s / 60)} min after its burn at ${drop.peakDecel_g?.toFixed(1)} g, with the chances from the ship's orbit (${drop.chances?.length})`
   )
+  // Going back up: the launch slots from the site to the ship's orbit.
+  await page.locator('#landingClimbBox summary').click()
+  await page.locator('#landingAddClimb').click()
+  await page.waitForSelector('#launchSlots tbody tr td:nth-child(2)')
+  const up = await page.evaluate(() => window.malevo.landings.plan('drop'))
+  const upGaps = (up.slots ?? []).slice(1, 3).map((x, i) => (x.best - up.slots[i].best) / 3600)
+  check(
+    up.slots?.length >= 4 &&
+      new Set(up.slots.slice(0, 2).map((x) => x.heading)).size === 2 &&
+      upGaps.every((g) => g > 5 && g < 19) &&
+      (await page.locator('#launchSlots tbody tr').count()) === up.slots.length,
+    `the launch slots back up come twice a day, unevenly (${upGaps.map((g) => g.toFixed(1)).join(' h, ')} h)`
+  )
   await page.screenshot({ path: path.join(shots, '29-hard-landing.png') })
   await page.evaluate(() => window.malevo.world.discard())
 
