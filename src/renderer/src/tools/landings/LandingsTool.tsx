@@ -4,6 +4,7 @@ import type { CalendarInfo, WorldSnapshot } from '../../../../shared/types'
 import { DateInput } from '../../components/DateInput'
 import { NumberField, TextField, duration, sig } from '../../components/fields'
 import { slugId, useFormatted, useWorldPref } from '../../state'
+import { RideChart, RideFacts, fmtT } from './RideChart'
 import type { ToolDefinition, ToolProps } from '../registry'
 
 /**
@@ -448,9 +449,9 @@ function LandingEditor({
         )}
       </details>
 
-      {file.track && (
+      {
         <details className="kit" open={Boolean(file.climb)} id="landingClimbBox">
-          <summary>Going back up: when can a lighter launch to the ship?</summary>
+          <summary>Going back up: the climb, and when a lighter can launch to the ship</summary>
           {file.climb ? (
             <>
               <div className="field-row">
@@ -474,10 +475,11 @@ function LandingEditor({
                   id="climbSpare"
                 />
                 <NumberField
-                  label="Climb to orbit, min"
+                  label="Liftoff to orbit, min"
                   value={file.climb.ascent_min}
                   optional
-                  placeholder="10"
+                  placeholder={r?.climb && !r.climb.error ? String(Math.round(r.climb.toOrbit_s / 60)) : '10'}
+                  hint="Leave blank to use the climb below."
                   onCommit={(x) => set({ climb: { ...file.climb!, ascent_min: x !== undefined && x > 0 ? x : undefined } })}
                 />
                 <NumberField
@@ -491,6 +493,62 @@ function LandingEditor({
                   Forget it
                 </button>
               </div>
+              <div className="field-row">
+                <NumberField
+                  label="Thrust over weight at liftoff"
+                  value={file.climb.thrust_g}
+                  optional
+                  placeholder="1.5"
+                  onCommit={(x) => set({ climb: { ...file.climb!, thrust_g: x !== undefined && x > 0 ? x : undefined } })}
+                  id="climbThrust"
+                />
+                <NumberField
+                  label="Throttles back to hold, g"
+                  value={file.climb.max_g}
+                  optional
+                  placeholder="3"
+                  hint="Crewed rockets keep to about 3 to 4 g."
+                  onCommit={(x) => set({ climb: { ...file.climb!, max_g: x !== undefined && x > 0 ? x : undefined } })}
+                  id="climbMaxG"
+                />
+                <NumberField
+                  label="Exhaust speed, km/s"
+                  value={file.climb.exhaust_kms}
+                  optional
+                  placeholder="4.4"
+                  hint="Hydrogen and oxygen 4.4; kerosene 3.3."
+                  onCommit={(x) => set({ climb: { ...file.climb!, exhaust_kms: x !== undefined && x > 0 ? x : undefined } })}
+                />
+                <NumberField
+                  label="Mass per drag area, fuelled, kg/m²"
+                  value={file.climb.beta_kg_m2}
+                  optional
+                  placeholder="50000"
+                  hint="Lower is blunter or lighter: more drag, more shaking low down."
+                  onCommit={(x) => set({ climb: { ...file.climb!, beta_kg_m2: x !== undefined && x > 0 ? x : undefined } })}
+                />
+              </div>
+              {r?.climb && !r.climb.error && (
+                <>
+                  <dl className="facts" id="climbFacts">
+                    <RideFacts ride={r.climb} />
+                    <dt>The climb</dt>
+                    <dd>
+                      engines off at {fmtT(r.climb.meco_s)}
+                      {r.climb.coast_s > 1 ? `, then ${duration(r.climb.coast_s)} weightless, coasting up to the orbit` : ''}
+                      {r.climb.circ_s > 0.5 ? `, and a last burn of ${duration(r.climb.circ_s)} to match the ship` : ''}; in orbit at{' '}
+                      {fmtT(r.climb.toOrbit_s)}
+                    </dd>
+                    <dt>What it takes</dt>
+                    <dd>
+                      {sig(r.climb.dv_ms / 1000, 3)} km/s from the engines, burning {Math.round(r.climb.propellantShare * 100)}% of the
+                      lighter’s liftoff mass
+                    </dd>
+                  </dl>
+                  <RideChart ride={r.climb} label="Going up: the push and the shaking, from liftoff" id="climbRide" />
+                </>
+              )}
+              {!file.track && <p className="muted small">Give the ship’s orbit (above) for the launch slots.</p>}
               {r?.slots && (
                 <table className="data small" id="launchSlots">
                   <thead>
@@ -540,11 +598,11 @@ function LandingEditor({
             </>
           ) : (
             <button onClick={() => set({ climb: {} })} id="landingAddClimb">
-              Find the launch slots back up
+              Plan the climb back up
             </button>
           )}
         </details>
-      )}
+      }
 
       {report && 'error' in report && <p className="error">{report.error}</p>}
       {r && (
@@ -565,12 +623,14 @@ function LandingEditor({
               heating on the {r.heatOn === 'ballute' ? 'ballute' : 'heat shield'} {sig(r.peakHeat_Wm2 / 1e4, 2)} W/cm²;{' '}
               {sig(r.release_ms, 3)} m/s at {file.ballute.release_km} km; {duration(r.descent_s)} from the burn to the ground
             </dd>
+            <RideFacts ride={r.ride} />
             <dt>Orbit</dt>
             <dd>
               {sig(r.orbitSpeed / 1000, 3)} km/s, once around every {duration(r.orbitPeriod)}; deorbit burn {sig(r.deorbit_ms, 3)} m/s,{' '}
               {sig(r.downrange_km, 3)} km uprange
             </dd>
           </dl>
+          <RideChart ride={r.ride} label="Coming down: the push and the shaking, from the deorbit burn" id="descentRide" />
           <table className="data small" id="landingTimeline">
             <thead>
               <tr>

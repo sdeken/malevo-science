@@ -1207,6 +1207,16 @@ try {
       (await page.locator('#launchSlots tbody tr').count()) === up.slots.length,
     `the launch slots back up come twice a day, unevenly (${upGaps.map((g) => g.toFixed(1)).join(' h, ')} h)`
   )
+  await page.waitForSelector('#climbRide svg path.ride-g')
+  check(
+    (await page.locator('#descentRide svg path.ride-g').count()) >= 1 &&
+      !up.climb.error &&
+      up.climb.peak_g > 2.5 &&
+      up.climb.maxQ_kPa > 5 &&
+      /max-Q|shaking|rumble/.test((await page.locator('#climbFacts').textContent()) ?? ''),
+    `the ride down and the climb up are charted: the climb peaks at ${up.climb.peak_g.toFixed(1)} g, ${up.climb.maxQ_kPa.toFixed(0)} kPa at max-Q, in orbit after ${Math.round(up.climb.toOrbit_s / 60)} min`
+  )
+  await page.locator('#climbRide').scrollIntoViewIfNeeded()
   await page.screenshot({ path: path.join(shots, '29-hard-landing.png') })
   await page.evaluate(() => window.malevo.world.discard())
 

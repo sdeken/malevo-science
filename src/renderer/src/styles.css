@@ -3009,3 +3009,75 @@ input.tiny {
   padding-left: 10px;
   border-left: 2px solid var(--border);
 }
+
+/* the ride: push and shaking over time */
+.ride-chart {
+  margin: 8px 0 12px;
+  max-width: 760px;
+}
+
+.ride-chart svg {
+  width: 100%;
+  height: auto;
+  display: block;
+}
+
+.ride-grid {
+  stroke: var(--border);
+  stroke-width: 1;
+}
+
+.ride-axis {
+  font-size: 10px;
+  fill: var(--muted);
+}
+
+.ride-g {
+  fill: none;
+  stroke: var(--accent);
+  stroke-width: 2;
+}
+
+.ride-q {
+  fill: color-mix(in srgb, var(--warn) 35%, transparent);
+  stroke: var(--warn);
+  stroke-width: 1;
+}
+
+.ride-shake {
+  fill: color-mix(in srgb, var(--now) 12%, transparent);
+}
+
+.ride-mach {
+  stroke: var(--muted);
+  stroke-dasharray: 3 3;
+}
+
+.ride-break {
+  fill: none;
+  stroke: var(--muted);
+}
+
+.ride-key-g,
+.ride-key-q,
+.ride-key-shake {
+  display: inline-block;
+  width: 14px;
+  height: 8px;
+  vertical-align: middle;
+  margin-right: 3px;
+}
+
+.ride-key-g {
+  height: 2px;
+  background: var(--accent);
+}
+
+.ride-key-q {
+  background: color-mix(in srgb, var(--warn) 35%, transparent);
+  border: 1px solid var(--warn);
+}
+
+.ride-key-shake {
+  background: color-mix(in srgb, var(--now) 12%, transparent);
+}

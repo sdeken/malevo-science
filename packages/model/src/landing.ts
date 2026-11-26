@@ -21,6 +21,7 @@
  * it down at the site are found (the planet turning beneath).
  */
 import { G, G0, M_EARTH } from '@malevo/core'
+import { RideLog, climbRide, type Climb, type Ride } from './ascent'
 import { conditionsAt } from './cities'
 import type { WorldEnv } from './env'
 import type { LandingFile } from './kinds'
@@ -96,6 +97,10 @@ export interface LandingReport {
   bestPass: LandingChance | null
   /** With the ship's orbit and the climb given: the next launch slots back up to it. */
   slots: LaunchSlot[] | null
+  /** What it feels like coming down: the push and the shaking, from the deorbit burn. */
+  ride: Ride
+  /** And going back up, with the climb given. */
+  climb: Climb | null
   tow: { duration_s: number; arrive: number; nextHigh: number | null; dry: number | null } | null
   notes: string[]
 }
@@ -192,6 +197,9 @@ export function landingReport(world: WorldData, env: WorldEnv, f: LandingFile): 
   const ve = f.rockets.exhaust_kms * 1000
   let rocketDv = 0
   const dt = 0.1
+  const sound = body.atm ? Math.sqrt(1.4 * g * H) : null
+  const log = new RideLog(sound)
+  log.coast(0, coast, f.orbit_km * 1000, he, vc, vE)
   for (let i = 0; i < 2e6; i++) {
     const h = r - R
     const v = Math.hypot(vr, vt)
@@ -229,6 +237,7 @@ export function landingReport(world: WorldData, env: WorldEnv, f: LandingFile): 
     const L = lift > 0 && ignite === null && vr < 0 ? lift * drag : 0
     const decel = Math.hypot(drag, L) + thrustAcc
     if (decel / G0 > peakDecel && ignite === null) peakDecel = decel / G0
+    log.add(coast + t, dt, Math.hypot(drag + thrustAcc, L) / G0, 0.5 * dens * v * v, h, v, dens > 0)
     // Polar equations of motion with drag and thrust against the velocity, and lift square to it.
     const ar = -gl + (vt * vt) / r - (drag + thrustAcc) * ux + L * uy
     const at = -(vr * vt) / r - (drag + thrustAcc) * uy - L * ux
@@ -366,6 +375,25 @@ export function landingReport(world: WorldData, env: WorldEnv, f: LandingFile): 
       if (!body.rotation_h) notes.push(`${body.name} is taken as not turning (no rotation period given), so the chances ignore its spin.`)
     }
   }
+  let climb: Climb | null = null
+  if (f.climb) {
+    climb = climbRide({
+      mu,
+      radius: R,
+      rho,
+      sound,
+      orbit_km: f.orbit_km,
+      thrust_g: f.climb.thrust_g ?? 1.5,
+      max_g: f.climb.max_g ?? 3,
+      exhaust_kms: f.climb.exhaust_kms ?? 4.4,
+      beta_kg_m2: f.climb.beta_kg_m2 ?? 50_000
+    })
+    if (climb.error) notes.push(`Going back up: ${climb.error}`)
+    else if (climb.propellantShare > 0.9)
+      notes.push(
+        `Going back up burns ${(climb.propellantShare * 100).toFixed(0)}% of the lighter's liftoff mass: too much for one stage to carry and still have a hull. A higher exhaust speed, or a lower orbit.`
+      )
+  }
   let slots: LaunchSlot[] | null = null
   if (f.track && f.climb) {
     const city = f.city ? (world.entities.get(`city/${f.city}`)?.value as { lat_deg?: number; lon_deg?: number } | undefined) : undefined
@@ -381,7 +409,8 @@ export function landingReport(world: WorldData, env: WorldEnv, f: LandingFile): 
         track: f.track,
         from: f.climb.from?.t_s ?? f.touchdown.t_s,
         spare_ms: f.climb.spare_ms ?? 100,
-        ascent_min: f.climb.ascent_min ?? 10,
+        ascent_min: f.climb.ascent_min ?? (climb && !climb.error ? climb.toOrbit_s / 60 : 10),
+        downrange_rad: f.climb.ascent_min === undefined && climb && !climb.error ? climb.downrange_rad : undefined,
         phasing_km: f.climb.phasing_km
       })
       if (!slots.length)
@@ -423,6 +452,8 @@ export function landingReport(world: WorldData, env: WorldEnv, f: LandingFile): 
     chances,
     bestPass,
     slots,
+    ride: log.done(),
+    climb,
     tow,
     notes
   }
@@ -444,6 +475,8 @@ export interface LaunchSlotsInput {
   spare_ms: number
   /** From liftoff to orbit, min. */
   ascent_min: number
+  /** How far round the planet it reaches orbit, radians (default: half the orbital motion over the climb). */
+  downrange_rad?: number
   /** How far below (or above) the ship's orbit it can drop to catch up, km. Default: 150, or 40% of the orbit's height if less. */
   phasing_km?: number
   /** How far ahead to look, s. Default three days. */
@@ -530,7 +563,7 @@ export function launchSlots(p: LaunchSlotsInput): LaunchSlot[] {
     const s = siteAt(best)
     const u = Math.atan2(dot(s, qAx), dot(s, pAx))
     // Into orbit downrange of the site: about half the orbital motion over the climb.
-    const uLighter = u + 0.5 * n0 * ascent
+    const uLighter = u + (p.downrange_rad ?? 0.5 * n0 * ascent)
     const uShip = p.track.arg_deg * D + n0 * (best + ascent - tA)
     let lead = (((uShip - uLighter) % (2 * Math.PI)) + 2 * Math.PI) % (2 * Math.PI)
     if (lead > Math.PI) lead -= 2 * Math.PI

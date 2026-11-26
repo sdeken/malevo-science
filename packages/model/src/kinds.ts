@@ -1273,10 +1273,17 @@ export const landingSchema = obj({
       from: opt(instantSchema),
       /** m/s. Default 100. */
       spare_ms: opt(num({ min: 0, sig: 6 })),
-      /** From liftoff to orbit, min. Default 10. */
+      /** From liftoff to orbit, min. Default: as the climb works out. */
       ascent_min: opt(num({ above: 0, sig: 4 })),
       /** How far below or above the ship's orbit it may go to catch up, km. Default 150 (less for low orbits). */
-      phasing_km: opt(num({ above: 0, sig: 6 }))
+      phasing_km: opt(num({ above: 0, sig: 6 })),
+      /** The lighter: thrust over weight at liftoff (default 1.5), the push it throttles back to (default 3 g). */
+      thrust_g: opt(num({ above: 0, sig: 4 })),
+      max_g: opt(num({ above: 0, sig: 4 })),
+      /** Exhaust speed, km/s (default 4.4, hydrogen and oxygen). */
+      exhaust_kms: opt(num({ above: 0, sig: 4 })),
+      /** Mass per drag area, fuelled, kg/m² (default 50,000: a rocket's). */
+      beta_kg_m2: opt(num({ above: 0, sig: 6 }))
     })
   ),
   note: opt(str({ max: 2000 }))

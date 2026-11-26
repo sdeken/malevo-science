@@ -515,6 +515,25 @@ module.exports = {
   - Like the descents, it leaves out the plane's slow drift from the planet's oblateness (about 5°
     a day for Earth at 400 km), so slots days ahead come tens of minutes off.
 
+- **The ride** (`packages/model/src/ascent.ts`), going down and coming back up, charted moment by
+  moment in the Landings tool:
+  - *The push*: the acceleration felt, g: thrust, drag and lift, never gravity (weightless in a
+    coast). Its peak, and the time spent over 2 g and over 4 g.
+  - *The shaking*: dynamic pressure, ½ρv², which sets the buffeting; its peak (max-Q), when it is
+    over half that (the hardest shaking), and the sound barrier (speed of sound √(1.4·g·H) from
+    the air's scale height: 331 m/s for Earth). In words: under 2 kPa barely any, a rumble to 10,
+    hard shaking to 25, violent to 45 (Earth's rockets peak about 30–35), brutal beyond.
+  - Long weightless coasts are drawn as short breaks.
+- **The climb** (`climb` on a landing; `climbRide`): a lighter from the pad to the ship's orbit:
+  straight up to 60 m/s, pitching over as it climbs (to level by a quarter of the orbit's height,
+  at least 30 km), throttled to hold `max_g` (default 3), from `thrust_g` at liftoff (1.5), with
+  `exhaust_kms` (4.4) and `beta_kg_m2` fuelled (50,000, a rocket's). Engines off when the path's
+  high point reaches the orbit, a coast up to it, a burn to match the ship. The planet's turning is
+  left out. On Earth to 400 km: about 9.3 km/s, 35 kPa at max-Q at a minute, through the sound
+  barrier at 52 s, 3 g for over 4 minutes, engines off at 6 min, a 45-minute coast, 88% of the
+  liftoff mass burnt (warned over 90%). Its time to orbit and how far round the planet it gets
+  there are what the launch slots use, unless `ascent_min` is set.
+
 ### Whereabouts
 
 - **Where people and things are, and whether they could have got there** (the **Whereabouts** tool,
